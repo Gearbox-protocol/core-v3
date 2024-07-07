@@ -295,7 +295,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         creditFacade.setLossLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
+        creditFacade.setForbiddenTokensMask(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setEmergencyLiquidator(address(0), AllowanceAction.ALLOW);
@@ -308,6 +308,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
+        vm.roll(block.number + 1);
 
         address weth = tokenTestSuite.addressOf(Tokens.WETH);
 
@@ -1165,12 +1166,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
 
-        {
-            uint64 blockNow = 100;
-            creditFacade.setLastBlockBorrowed(blockNow);
-
-            vm.roll(blockNow);
-        }
+        creditFacade.setLastBlockBorrowed(uint64(block.number + 100));
+        creditFacade.setTotalBorrowedInBlock(0);
+        vm.roll(block.number + 100);
 
         uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
 
@@ -1208,6 +1206,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, maxDebt, 1);
+        vm.roll(block.number + 1);
 
         creditManagerMock.setManageDebt(50);
 
@@ -1570,7 +1569,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         creditManagerMock.addToken(link, linkMask);
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
+        creditFacade.setForbiddenTokensMask(linkMask);
 
         AdapterMock adapter = new AdapterMock(address(creditManagerMock), address(tokenTestSuite));
         vm.prank(CONFIGURATOR);
@@ -1670,12 +1669,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
     }
 
     /// @dev U:[FA-48]: rsetExpirationDate works properly
-    function test_U_FA_48_setExpirationDate_works_properly() public allExpirableCases {
+    function test_U_FA_48_setExpirationDate_works_properly() public expirableCase {
         assertEq(creditFacade.expirationDate(), 0, "SETUP: incorrect expiration date");
-
-        if (!expirable) {
-            vm.expectRevert(NotAllowedWhenNotExpirableException.selector);
-        }
 
         vm.prank(CONFIGURATOR);
         creditFacade.setExpirationDate(100);
@@ -1685,76 +1680,54 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
     /// @dev U:[FA-49]: setDebtLimits works properly
     function test_U_FA_49_setDebtLimits_works_properly() public notExpirableCase {
-        uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-
         assertEq(
-            maxDebtPerBlockMultiplier, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "SETUP: incorrect maxDebtPerBlockMultiplier"
+            creditFacade.maxDebtPerBlockMultiplier(),
+            DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+            "SETUP: incorrect maxDebtPerBlockMultiplier"
         );
         assertEq(minDebt, 0, "SETUP: incorrect minDebt");
         assertEq(maxDebt, 0, "SETUP: incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), 0, "SETUP: incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), 0, "SETUP: incorrect totalBorrowedInBlock");
 
-        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt >= type(uint128).max
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, type(uint128).max, 2);
-
-        // Case: it sets parameters properly
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits({newMinDebt: 1, newMaxDebt: 2, newMaxDebtPerBlockMultiplier: 3});
 
-        maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
         (minDebt, maxDebt) = creditFacade.debtLimits();
-
-        assertEq(maxDebtPerBlockMultiplier, 3, " incorrect maxDebtPerBlockMultiplier");
+        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 3, " incorrect maxDebtPerBlockMultiplier");
         assertEq(minDebt, 1, " incorrect minDebt");
         assertEq(maxDebt, 2, " incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), block.number, "incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
     }
 
-    /// @dev U:[FA-51]: `setLossLiquidator` works properly
-    function test_U_FA_51_setLossLiquidator_works_properly() public notExpirableCase {
+    /// @dev U:[FA-51]: setForbiddenTokensMask works properly
+    function test_U_FA_51_setForbiddenTokensMask_works_properly() public notExpirableCase {
+        assertEq(creditFacade.forbiddenTokenMask(), 0, "SETUP: incorrect forbiddenTokenMask");
+
+        uint256 newForbiddenTokensMask = 123;
+        vm.prank(CONFIGURATOR);
+        creditFacade.setForbiddenTokensMask(newForbiddenTokensMask);
+
+        assertEq(creditFacade.forbiddenTokenMask(), newForbiddenTokensMask, "incorrect forbiddenTokenMask");
+    }
+
+    /// @dev U:[FA-52]: `setLossLiquidator` works properly
+    function test_U_FA_52_setLossLiquidator_works_properly() public notExpirableCase {
         assertEq(creditFacade.lossLiquidator(), address(0), "SETUP: incorrect loss liquidator");
 
-        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(DUMB_ADDRESS);
+        creditFacade.setLossLiquidator(LIQUIDATOR);
 
-        address liquidator = address(new GeneralMock());
-        vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(liquidator);
-
-        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
-        assertTrue(creditFacade.canLiquidateWhilePaused(liquidator), "Loss liquidator can't liquidate on pause");
+        assertEq(creditFacade.lossLiquidator(), LIQUIDATOR, "Loss liquidator not set");
+        assertTrue(creditFacade.canLiquidateWhilePaused(LIQUIDATOR), "Loss liquidator can't liquidate on pause");
 
         vm.prank(CONFIGURATOR);
         creditFacade.setLossLiquidator(address(0));
+
         assertEq(creditFacade.lossLiquidator(), address(0), "Loss liquidator not unset");
-        assertFalse(creditFacade.canLiquidateWhilePaused(liquidator), "Loss liquidator still can liquidate on pause");
-    }
-
-    /// @dev U:[FA-52]: setTokenAllowance works properly
-    function test_U_FA_52_setTokenAllowance_works_properly() public notExpirableCase {
-        assertEq(creditFacade.forbiddenTokenMask(), 0, "SETUP: incorrect forbiddenTokenMask");
-
-        vm.expectRevert(TokenNotAllowedException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(DUMB_ADDRESS, AllowanceAction.ALLOW);
-
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 mask = 1 << 8;
-        creditManagerMock.addToken(link, mask);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
-
-        assertEq(creditFacade.forbiddenTokenMask(), mask, "incorrect forbiddenTokenMask");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(link, AllowanceAction.ALLOW);
-
-        assertEq(creditFacade.forbiddenTokenMask(), 0, "incorrect forbiddenTokenMask");
+        assertFalse(creditFacade.canLiquidateWhilePaused(LIQUIDATOR), "Loss liquidator still can liquidate on pause");
     }
 
     /// @dev U:[FA-53]: setEmergencyLiquidator works properly

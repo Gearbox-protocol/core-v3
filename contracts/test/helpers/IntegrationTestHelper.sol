@@ -416,8 +416,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             creditConfigurator.setCreditFacade(address(creditFacade));
 
             vm.startPrank(CONFIGURATOR);
-            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
-            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
+            creditConfigurator.setDebtLimits(cmParams.minDebt, cmParams.maxDebt);
             creditConfigurator.setFees(
                 cmParams.feeLiquidation,
                 cmParams.liquidationPremium,
@@ -425,6 +424,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.liquidationPremiumExpired
             );
             vm.stopPrank();
+            vm.roll(block.number + 1);
 
             _addCollateralTokens(cmParams.collateralTokens);
 

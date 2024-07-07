@@ -221,9 +221,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         uint256 tokenMask = _getTokenMaskOrRevert({token: token}); // I:[CC-9]
-        if (cf.forbiddenTokenMask() & tokenMask != 0) return; // I:[CC-9]
+        uint256 forbiddenTokensMask = cf.forbiddenTokenMask();
+        if (forbiddenTokensMask & tokenMask != 0) return; // I:[CC-9]
 
-        cf.setTokenAllowance({token: token, allowance: AllowanceAction.FORBID}); // I:[CC-9]
+        cf.setForbiddenTokensMask(forbiddenTokensMask | tokenMask);
         emit ForbidToken({token: token}); // I:[CC-9]
     }
 
@@ -241,9 +242,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         uint256 tokenMask = _getTokenMaskOrRevert({token: token}); // I:[CC-7]
-        if (cf.forbiddenTokenMask() & tokenMask == 0) return; // I:[CC-8]
+        uint256 forbiddenTokensMask = cf.forbiddenTokenMask();
+        if (forbiddenTokensMask & tokenMask == 0) return; // I:[CC-8]
 
-        cf.setTokenAllowance({token: token, allowance: AllowanceAction.ALLOW}); // I:[CC-8]
+        cf.setForbiddenTokensMask(forbiddenTokensMask & ~tokenMask); // I:[CC-8]
         emit AllowToken({token: token}); // I:[CC-8]
     }
 
@@ -424,6 +426,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
     /// @dev Reverts if `newPriceOracle` does not have price feeds for all collateral tokens
+    /// @dev Reverts if USD value of the current min debt is zero according to `newPriceOracle`
     function setPriceOracle(address newPriceOracle)
         external
         override
@@ -438,6 +441,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
                 revert PriceFeedDoesNotExistException(); // I:[CC-21]
             }
         }
+
+        (uint128 minDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
+        if (IPriceOracleV3(newPriceOracle).convertToUSD(minDebt, underlying) == 0) revert IncorrectPriceFeedException(); // I:[CC-21]
 
         CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
@@ -470,9 +476,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
-            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
+            _migrateEmergencyLiquidators(prevCreditFacade.emergencyLiquidators()); // I:[CC-22C]
 
-            _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
+            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
 
             _migrateForbiddenTokens(prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
@@ -489,8 +495,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     }
 
     /// @dev Migrate emergency liquidators to the new credit facade
-    function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
-        address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
+    function _migrateEmergencyLiquidators(address[] memory emergencyLiquidators) internal {
         uint256 len = emergencyLiquidators.length;
         for (uint256 i; i < len; ++i) {
             _addEmergencyLiquidator(emergencyLiquidators[i]);
@@ -499,10 +504,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
 
     /// @dev Migrates forbidden tokens to the new credit facade
     function _migrateForbiddenTokens(uint256 forbiddenTokensMask) internal {
+        CreditFacadeV3(creditFacade()).setForbiddenTokensMask(forbiddenTokensMask);
         while (forbiddenTokensMask != 0) {
             uint256 mask = forbiddenTokensMask.lsbMask();
-            address token = CreditManagerV3(creditManager).getTokenByMask(mask);
-            _forbidToken(token);
+            emit ForbidToken(CreditManagerV3(creditManager).getTokenByMask(mask));
             forbiddenTokensMask ^= mask;
         }
     }
@@ -535,33 +540,29 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     // CREDIT FACADE //
     // ------------- //
 
-    /// @notice Sets the new min debt limit in the credit facade
-    /// @param minDebt New minimum debt per credit account
-    /// @dev Reverts if `minDebt` is greater than the current max debt
-    function setMinDebtLimit(uint128 minDebt)
+    /// @notice Sets the new min and max debt limits in the credit facade
+    /// @param newMinDebt New minimum debt per credit account
+    /// @param newMaxDebt New maximum debt per credit account
+    /// @dev Reverts if `newMinDebt` is greater than `newMaxDebt`
+    /// @dev Reverts if `newMaxDebt / newMinDebt` is above the safety threhsold of `100 / maxEnabledTokens`
+    /// @dev Reverts if USD value of `minDebt` is zero according to the current price oracle
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt)
         external
         override
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2]
     {
-        (, uint128 currentMaxDebt) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(minDebt, currentMaxDebt);
+        _setLimits(newMinDebt, newMaxDebt);
     }
 
-    /// @notice Sets the new max debt limit in the credit facade
-    /// @param maxDebt New maximum debt per credit account
-    /// @dev Reverts if `maxDebt` is less than the current min debt
-    function setMaxDebtLimit(uint128 maxDebt)
-        external
-        override
-        controllerOrConfiguratorOnly // I:[CC-2B]
-    {
-        (uint128 currentMinDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(currentMinDebt, maxDebt);
-    }
-
-    /// @dev `set{Min|Max}DebtLimit` implementation
+    /// @dev `setDebtLimits` implementation
     function _setLimits(uint128 minDebt, uint128 maxDebt) internal {
         if (minDebt > maxDebt) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (maxDebt * CreditManagerV3(creditManager).maxEnabledTokens() > minDebt * 100) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).convertToUSD(minDebt, underlying) == 0) {
             revert IncorrectLimitsException(); // I:[CC-15]
         }
 
@@ -621,6 +622,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     function _setExpirationDate(uint40 newExpirationDate) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
+        if (!cf.expirable()) revert NotAllowedWhenNotExpirableException(); // I:[CC-25]
+
         if (block.timestamp > newExpirationDate || cf.expirationDate() >= newExpirationDate) {
             revert IncorrectExpirationDateException(); // I:[CC-25]
         }
@@ -630,7 +633,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     }
 
     /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
-    /// @param newLossLiquidator New loss liquidator, must be a contract or zero address
+    /// @param newLossLiquidator New loss liquidator, must be a contract, an emergency liquidator or a zero address
     function setLossLiquidator(address newLossLiquidator)
         external
         override
@@ -644,6 +647,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         if (cf.lossLiquidator() == newLossLiquidator) return;
+        if (
+            newLossLiquidator != address(0) && !cf.canLiquidateWhilePaused(newLossLiquidator)
+                && newLossLiquidator.code.length == 0
+        ) revert AddressIsNotContractException(newLossLiquidator); // I:[CC-26]
 
         cf.setLossLiquidator(newLossLiquidator); // I:[CC-26]
         emit SetLossLiquidator(newLossLiquidator); // I:[CC-26]
