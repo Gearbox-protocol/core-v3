@@ -13,8 +13,8 @@ import {IRateKeeper} from "../interfaces/base/IRateKeeper.sol";
 import {PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
-import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
 
 import "../interfaces/IExceptions.sol";
 
@@ -26,7 +26,7 @@ import "../interfaces/IExceptions.sol";
 ///         * increase fee that is charged when additional quota is purchased (more suited to leveraged trading).
 ///         Quota keeper stores information about quotas of accounts in all credit managers connected to the pool, and
 ///         performs calculations that help to keep pool's expected liquidity and credit managers' debt consistent.
-contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ControlledTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -79,7 +79,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
     /// @param pool_ Pool address
     /// @custom:tests U:[QK-1]
     constructor(address acl_, address contractsRegister_, address pool_)
-        ACLTrait(acl_)
+        ControlledTrait(acl_)
         ContractsRegisterTrait(contractsRegister_)
     {
         pool = pool_;

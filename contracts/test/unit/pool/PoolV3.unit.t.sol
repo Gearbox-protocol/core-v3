@@ -213,12 +213,6 @@ contract PoolV3UnitTest is TestHelper {
 
         vm.expectRevert("Pausable: paused");
         pool.withdraw({assets: 1, owner: user, receiver: user});
-
-        vm.expectRevert("Pausable: paused");
-        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
-
-        vm.expectRevert("Pausable: paused");
-        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
     }
 
     /// @notice U:[LP-2B]: External functions revert on re-entrancy

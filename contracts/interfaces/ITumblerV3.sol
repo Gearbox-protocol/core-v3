@@ -3,11 +3,11 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {IACLTrait} from "./base/IACLTrait.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 
 /// @title Tumbler V3 interface
-interface ITumblerV3 is IACLTrait, IRateKeeper {
+interface ITumblerV3 is IControlledTrait, IRateKeeper {
     // ------ //
     // EVENTS //
     // ------ //
