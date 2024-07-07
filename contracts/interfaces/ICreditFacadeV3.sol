@@ -148,7 +148,7 @@ interface ICreditFacadeV3 is IACLTrait, IVersion {
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    function setTokenAllowance(address token, AllowanceAction allowance) external;
+    function setForbiddenTokensMask(uint256 forbiddenTokensMask) external;
 
     function setLossLiquidator(address newLossLiquidator) external;
 

@@ -768,61 +768,47 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if (!expirable) {
-            revert NotAllowedWhenNotExpirableException(); // U:[FA-48]
-        }
         expirationDate = newExpirationDate; // U:[FA-48]
     }
 
-    /// @notice Sets debt limits per credit account
+    /// @notice Sets debt limits
     /// @param newMinDebt New minimum debt amount per credit account
     /// @param newMaxDebt New maximum debt amount per credit account
     /// @param newMaxDebtPerBlockMultiplier New max debt per block multiplier, `type(uint8).max` to disable the check
     /// @dev Reverts if caller is not credit configurator
-    /// @dev Reverts if `maxDebt * maxDebtPerBlockMultiplier` doesn't fit into `uint128`
+    /// @dev Prevents further borrowing in the current block unless this check is disabled
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if ((uint256(newMaxDebtPerBlockMultiplier) * newMaxDebt) > type(uint128).max) {
-            revert IncorrectParameterException(); // U:[FA-49]
-        }
-
         debtLimits.minDebt = newMinDebt; // U:[FA-49]
         debtLimits.maxDebt = newMaxDebt; // U:[FA-49]
         maxDebtPerBlockMultiplier = newMaxDebtPerBlockMultiplier; // U:[FA-49]
+        lastBlockBorrowed = uint64(block.number); // U:[FA-49]
+        totalBorrowedInBlock = type(uint128).max; // U:[FA-49]
     }
 
-    /// @notice Changes token's forbidden status
-    /// @param token Token to change the status for
-    /// @param allowance Status to set
+    /// @notice Sets forbidden tokens mask
+    /// @param newForbiddenTokensMask New forbidden tokens mask
     /// @dev Reverts if caller is not credit configurator
-    function setTokenAllowance(address token, AllowanceAction allowance)
+    function setForbiddenTokensMask(uint256 newForbiddenTokensMask)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        uint256 tokenMask = _getTokenMaskOrRevert(token); // U:[FA-52]
-
-        forbiddenTokenMask = (allowance == AllowanceAction.ALLOW)
-            ? forbiddenTokenMask.disable(tokenMask)
-            : forbiddenTokenMask.enable(tokenMask); // U:[FA-52]
+        forbiddenTokenMask = newForbiddenTokensMask; // U:[FA-51]
     }
 
     /// @notice Sets the new loss liquidator
     /// @param newLossLiquidator New loss liquidator
     /// @dev Reverts if caller is not credit configurator
-    /// @dev Reverts if `newLossLiquidator` is not a contract, unless it's zero address
     function setLossLiquidator(address newLossLiquidator)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if (newLossLiquidator != address(0) && newLossLiquidator.code.length == 0) {
-            revert AddressIsNotContractException(newLossLiquidator); // U:[FA-51]
-        }
-        lossLiquidator = newLossLiquidator; // U:[FA-51]
+        lossLiquidator = newLossLiquidator; // U:[FA-52]
     }
 
     /// @notice Changes account's status as emergency liquidator
@@ -873,11 +859,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             lastBlockBorrowed = uint64(block.number); // U:[FA-43]
         }
 
-        if (newDebtInCurrentBlock > uint256(_maxDebtPerBlockMultiplier) * debtLimits.maxDebt) {
-            revert BorrowedBlockLimitException(); // U:[FA-43]
-        }
+        uint128 maxDebt = debtLimits.maxDebt;
+        if (newDebtInCurrentBlock > _maxDebtPerBlockMultiplier * maxDebt) revert BorrowedBlockLimitException(); // U:[FA-43]
 
-        // the conversion is safe because of the check in `setDebtLimits`
+        // cast is safe since multiplication above didn't revert from overflow
         totalBorrowedInBlock = uint128(newDebtInCurrentBlock); // U:[FA-43]
     }
 
