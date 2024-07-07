@@ -15,13 +15,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Setup node.js
+        uses: actions/setup-node@v3
+        with:
+          cache: "yarn"
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Install dependencies
-        run: forge install
 
       - name: Compile contracts
         run: forge build
@@ -36,3 +43,7 @@ jobs:
 
       - name: Run gas tests
         run: forge test --mt test_G -vv
+
+      - name: Perform checks
+        run: |
+          yarn prettier:ci
