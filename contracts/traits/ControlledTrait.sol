@@ -16,15 +16,15 @@ abstract contract ControlledTrait is ACLTrait, IControlledTrait {
     /// @notice External controller address
     address public override controller;
 
-    /// @notice Constructor
-    /// @param  acl_ ACL contract address
-    constructor(address acl_) ACLTrait(acl_) {}
-
     /// @dev Ensures that function caller is external controller or configurator
     modifier controllerOrConfiguratorOnly() {
         _ensureCallerIsControllerOrConfigurator();
         _;
     }
+
+    /// @notice Constructor
+    /// @param  acl_ ACL contract address
+    constructor(address acl_) ACLTrait(acl_) {}
 
     /// @notice Sets new external controller, can only be called by configurator
     /// @dev    Reverts if `newController` is not a contract

@@ -1023,7 +1023,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
 
     /// @dev I:[CC-28]: removeEmergencyLiquidator works correctly and emits event
     function test_I_CC_28_removeEmergencyLiquidator_works_correctly() public creditTest {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
