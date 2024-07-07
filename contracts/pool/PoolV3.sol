@@ -453,7 +453,6 @@ contract PoolV3 is
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
         external
         override
-        whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
         creditManagerOnly // U:[LP-2C]
     {
@@ -495,7 +494,6 @@ contract PoolV3 is
     function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss)
         external
         override
-        whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
         creditManagerOnly // U:[LP-2C]
     {

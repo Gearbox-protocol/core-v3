@@ -674,7 +674,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     function removeEmergencyLiquidator(address liquidator)
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 

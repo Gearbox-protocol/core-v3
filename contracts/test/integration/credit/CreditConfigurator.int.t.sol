@@ -222,9 +222,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         creditConfigurator.addEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.removeEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setExpirationDate(0);
 
         vm.stopPrank();
@@ -261,6 +258,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
 
         vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
+
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
+        creditConfigurator.removeEmergencyLiquidator(address(0));
     }
 
     //
