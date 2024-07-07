@@ -1,19 +1,10 @@
 {
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity",
     "editor.tabSize": 4
   },
-
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true,
-  "editor.tabSize": 2,
-  "eslint.validate": ["javascript", "typescript"],
-  "files.eol": "\n",
   "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
-  "solidity.packageDefaultDependenciesDirectory": "node_modules",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.compileUsingRemoteVersion": "v0.8.23",
   "solidity.formatter": "forge"
 }

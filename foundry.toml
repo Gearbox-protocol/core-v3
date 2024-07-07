@@ -1,9 +1,9 @@
 [profile.default]
+src = 'contracts'
 libs = ['lib']
-out = 'forge-out'
+out = 'out'
 solc_version = '0.8.23'
 evm_version = 'shanghai'
-src = 'contracts'
 optimizer_runs = 12000
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
