@@ -140,9 +140,7 @@ interface ICreditConfiguratorV3 is IACLTrait, IVersion {
     // CREDIT FACADE //
     // ------------- //
 
-    function setMinDebtLimit(uint128 newMinDebt) external;
-
-    function setMaxDebtLimit(uint128 newMaxDebt) external;
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
 

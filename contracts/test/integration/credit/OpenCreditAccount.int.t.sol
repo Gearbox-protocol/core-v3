@@ -247,12 +247,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(type(uint8).max);
 
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(1);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(type(uint96).max);
-
         (address collateral,) = creditManager.collateralTokenByMask(1 << token1);
 
         tokenTestSuite.mint(collateral, USER, type(uint96).max);

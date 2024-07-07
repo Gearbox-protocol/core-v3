@@ -425,6 +425,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
     /// @dev Reverts if `newPriceOracle` does not have price feeds for all collateral tokens
+    /// @dev Reverts if USD value of the current min debt is zero according to `newPriceOracle`
     function setPriceOracle(address newPriceOracle)
         external
         override
@@ -439,6 +440,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
                 revert PriceFeedDoesNotExistException(); // I:[CC-21]
             }
         }
+
+        (uint128 minDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
+        if (IPriceOracleV3(newPriceOracle).convertToUSD(minDebt, underlying) == 0) revert IncorrectPriceFeedException(); // I:[CC-21]
 
         CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
@@ -535,33 +539,29 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     // CREDIT FACADE //
     // ------------- //
 
-    /// @notice Sets the new min debt limit in the credit facade
-    /// @param minDebt New minimum debt per credit account
-    /// @dev Reverts if `minDebt` is greater than the current max debt
-    function setMinDebtLimit(uint128 minDebt)
+    /// @notice Sets the new min and max debt limits in the credit facade
+    /// @param newMinDebt New minimum debt per credit account
+    /// @param newMaxDebt New maximum debt per credit account
+    /// @dev Reverts if `newMinDebt` is greater than `newMaxDebt`
+    /// @dev Reverts if `newMaxDebt / newMinDebt` is above the safety threhsold of `100 / maxEnabledTokens`
+    /// @dev Reverts if USD value of `minDebt` is zero according to the current price oracle
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt)
         external
         override
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2]
     {
-        (, uint128 currentMaxDebt) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(minDebt, currentMaxDebt);
+        _setLimits(newMinDebt, newMaxDebt);
     }
 
-    /// @notice Sets the new max debt limit in the credit facade
-    /// @param maxDebt New maximum debt per credit account
-    /// @dev Reverts if `maxDebt` is less than the current min debt
-    function setMaxDebtLimit(uint128 maxDebt)
-        external
-        override
-        controllerOrConfiguratorOnly // I:[CC-2B]
-    {
-        (uint128 currentMinDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(currentMinDebt, maxDebt);
-    }
-
-    /// @dev `set{Min|Max}DebtLimit` implementation
+    /// @dev `setDebtLimits` implementation
     function _setLimits(uint128 minDebt, uint128 maxDebt) internal {
         if (minDebt > maxDebt) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (maxDebt * CreditManagerV3(creditManager).maxEnabledTokens() > minDebt * 100) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).convertToUSD(minDebt, underlying) == 0) {
             revert IncorrectLimitsException(); // I:[CC-15]
         }
 
@@ -632,8 +632,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     }
 
     /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
-    /// @param newLossLiquidator New loss liquidator, must be a contract or zero address
-    /// @dev Reverts if `newLossLiquidator` is not a contract, unless it's zero address or an emergency liquidator
+    /// @param newLossLiquidator New loss liquidator, must be a contract, an emergency liquidator or a zero address
     function setLossLiquidator(address newLossLiquidator)
         external
         override
