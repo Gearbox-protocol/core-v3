@@ -959,9 +959,16 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
     /// @dev I:[CC-25]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
     function test_I_CC_25_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets()
         public
-        expirableCase
+        allExpirableCases
         creditTest
     {
+        if (!expirable) {
+            vm.expectRevert(NotAllowedWhenNotExpirableException.selector);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+            return;
+        }
+
         uint40 expirationDate = creditFacade.expirationDate();
 
         vm.prank(CONFIGURATOR);
@@ -990,16 +997,32 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
     /// @dev I:[CC-26]: setLossLiquidator works correctly
     function test_I_CC_26_setLossLiquidator_works_correctly() public creditTest {
         address liquidator = makeAddr("LOSS_LIQUIDATOR");
+        vm.startPrank(CONFIGURATOR);
+
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, liquidator));
+        creditConfigurator.setLossLiquidator(liquidator);
+
+        // can set contract as loss liquidator
         vm.etch(liquidator, "DUMMY_CODE");
 
         vm.expectEmit(true, true, true, true);
         emit ICreditConfiguratorV3.SetLossLiquidator(liquidator);
 
-        vm.prank(CONFIGURATOR);
         creditConfigurator.setLossLiquidator(liquidator);
-
         assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
-        assertTrue(creditFacade.canLiquidateWhilePaused(liquidator), "Loss liquidator can't liquidate on pause");
+
+        // can unset loss liquidator
+        creditConfigurator.setLossLiquidator(address(0));
+        assertEq(creditFacade.lossLiquidator(), address(0), "Loss liquidator not unset");
+
+        // can set emergency liquidator as loss liquidator even if it's not a contract
+        vm.etch(liquidator, "");
+        creditConfigurator.addEmergencyLiquidator(liquidator);
+
+        creditConfigurator.setLossLiquidator(liquidator);
+        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
+
+        vm.stopPrank();
     }
 
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event

@@ -425,6 +425,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.liquidationPremiumExpired
             );
             vm.stopPrank();
+            vm.roll(block.number + 1);
 
             _addCollateralTokens(cmParams.collateralTokens);
 

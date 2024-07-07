@@ -220,9 +220,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         uint256 tokenMask = _getTokenMaskOrRevert({token: token}); // I:[CC-9]
-        if (cf.forbiddenTokenMask() & tokenMask != 0) return; // I:[CC-9]
+        uint256 forbiddenTokensMask = cf.forbiddenTokenMask();
+        if (forbiddenTokensMask & tokenMask != 0) return; // I:[CC-9]
 
-        cf.setTokenAllowance({token: token, allowance: AllowanceAction.FORBID}); // I:[CC-9]
+        cf.setForbiddenTokensMask(forbiddenTokensMask | tokenMask);
         emit ForbidToken({token: token}); // I:[CC-9]
     }
 
@@ -240,9 +241,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         uint256 tokenMask = _getTokenMaskOrRevert({token: token}); // I:[CC-7]
-        if (cf.forbiddenTokenMask() & tokenMask == 0) return; // I:[CC-8]
+        uint256 forbiddenTokensMask = cf.forbiddenTokenMask();
+        if (forbiddenTokensMask & tokenMask == 0) return; // I:[CC-8]
 
-        cf.setTokenAllowance({token: token, allowance: AllowanceAction.ALLOW}); // I:[CC-8]
+        cf.setForbiddenTokensMask(forbiddenTokensMask & ~tokenMask); // I:[CC-8]
         emit AllowToken({token: token}); // I:[CC-8]
     }
 
@@ -469,9 +471,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
-            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
+            _migrateEmergencyLiquidators(prevCreditFacade.emergencyLiquidators()); // I:[CC-22C]
 
-            _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
+            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
 
             _migrateForbiddenTokens(prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
@@ -488,8 +490,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     }
 
     /// @dev Migrate emergency liquidators to the new credit facade
-    function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
-        address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
+    function _migrateEmergencyLiquidators(address[] memory emergencyLiquidators) internal {
         uint256 len = emergencyLiquidators.length;
         for (uint256 i; i < len; ++i) {
             _addEmergencyLiquidator(emergencyLiquidators[i]);
@@ -498,10 +499,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
 
     /// @dev Migrates forbidden tokens to the new credit facade
     function _migrateForbiddenTokens(uint256 forbiddenTokensMask) internal {
+        CreditFacadeV3(creditFacade()).setForbiddenTokensMask(forbiddenTokensMask);
         while (forbiddenTokensMask != 0) {
             uint256 mask = forbiddenTokensMask.lsbMask();
-            address token = CreditManagerV3(creditManager).getTokenByMask(mask);
-            _forbidToken(token);
+            emit ForbidToken(CreditManagerV3(creditManager).getTokenByMask(mask));
             forbiddenTokensMask ^= mask;
         }
     }
@@ -620,6 +621,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     function _setExpirationDate(uint40 newExpirationDate) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
+        if (!cf.expirable()) revert NotAllowedWhenNotExpirableException(); // I:[CC-25]
+
         if (block.timestamp > newExpirationDate || cf.expirationDate() >= newExpirationDate) {
             revert IncorrectExpirationDateException(); // I:[CC-25]
         }
@@ -630,6 +633,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
 
     /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
     /// @param newLossLiquidator New loss liquidator, must be a contract or zero address
+    /// @dev Reverts if `newLossLiquidator` is not a contract, unless it's zero address or an emergency liquidator
     function setLossLiquidator(address newLossLiquidator)
         external
         override
@@ -643,6 +647,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         if (cf.lossLiquidator() == newLossLiquidator) return;
+        if (
+            newLossLiquidator != address(0) && !cf.canLiquidateWhilePaused(newLossLiquidator)
+                && newLossLiquidator.code.length == 0
+        ) revert AddressIsNotContractException(newLossLiquidator); // I:[CC-26]
 
         cf.setLossLiquidator(newLossLiquidator); // I:[CC-26]
         emit SetLossLiquidator(newLossLiquidator); // I:[CC-26]
