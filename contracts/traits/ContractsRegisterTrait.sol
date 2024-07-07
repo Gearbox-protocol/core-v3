@@ -3,15 +3,17 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
+import {
+    AddressIsNotContractException,
+    RegisteredCreditManagerOnlyException,
+    RegisteredPoolOnlyException
+} from "../interfaces/IExceptions.sol";
 import {IContractsRegister} from "../interfaces/base/IContractsRegister.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 
-import {SanityCheckTrait} from "./SanityCheckTrait.sol";
-
-/// @title Contracts register trait
+/// @title  Contracts register trait
 /// @notice Trait that simplifies validation of pools and credit managers
-abstract contract ContractsRegisterTrait is IContractsRegisterTrait, SanityCheckTrait {
+abstract contract ContractsRegisterTrait is IContractsRegisterTrait {
     /// @notice Contracts register contract address
     address public immutable override contractsRegister;
 
@@ -28,9 +30,10 @@ abstract contract ContractsRegisterTrait is IContractsRegisterTrait, SanityCheck
     }
 
     /// @notice Constructor
-    /// @param _contractsRegister Contracts register address
-    constructor(address _contractsRegister) nonZeroAddress(_contractsRegister) {
-        contractsRegister = _contractsRegister;
+    /// @param  contractsRegister_ Contracts register contract address
+    constructor(address contractsRegister_) {
+        if (contractsRegister_.code.length == 0) revert AddressIsNotContractException(contractsRegister_);
+        contractsRegister = contractsRegister_;
     }
 
     /// @dev Ensures that given address is a registered pool
