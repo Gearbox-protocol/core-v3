@@ -4,10 +4,10 @@
 pragma solidity ^0.8.10;
 
 import {IPhantomToken} from "../../../interfaces/base/IPhantomToken.sol";
-import {PhantomTokenType} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 contract PhantomTokenMock is IPhantomToken {
-    PhantomTokenType public constant override _gearboxPhantomTokenType = PhantomTokenType.NO_TOKEN;
+    uint256 public constant override version = 3_10;
+    bytes32 public constant override contractType = "PT_MOCK";
     uint8 private immutable _decimals;
 
     address public underlying;

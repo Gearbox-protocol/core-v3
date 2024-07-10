@@ -1,13 +1,13 @@
-// (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+// SPDX-License-Identifier: BUSL-1.1
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Foundation, 2024.
+pragma solidity ^0.8.23;
 
-import {PhantomTokenType} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
-import {MultiCall} from "../ICreditFacadeV3.sol";
+import {IVersion} from "./IVersion.sol";
 
-interface IPhantomToken {
-    function _gearboxPhantomTokenType() external view returns (PhantomTokenType);
-
+interface IPhantomToken is IVersion {
     function getWithdrawalMultiCall(address creditAccount, uint256 amount)
         external
+        view
         returns (address tokenOut, uint256 amountOut, address targetContract, bytes memory callData);
 }

@@ -10,8 +10,8 @@ import {ERC20Mock} from "../token/ERC20Mock.sol";
 
 /// @title Adapter Mock
 contract PhantomTokenAdapterMock is IAdapter {
-    AdapterType public constant override _gearboxAdapterType = AdapterType.ABSTRACT;
-    uint16 public constant override _gearboxAdapterVersion = 1;
+    uint256 public constant override version = 3_10;
+    bytes32 public constant override contractType = "AD_MOCK_PHANTOM";
 
     address public immutable override creditManager;
     address public immutable override targetContract;

@@ -1448,7 +1448,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         );
 
         vm.expectEmit(true, true, false, true);
-        emit WithdrawCollateral(creditAccount, ptUnderlying, amount, USER);
+        emit ICreditFacadeV3.WithdrawCollateral(creditAccount, ptUnderlying, amount, USER);
 
         creditFacade.multicallInt({
             creditAccount: creditAccount,

@@ -552,11 +552,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 // withdrawCollateral
                 else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
                     _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
-                    // pulls credit account on top of the stack
+                    // pulls credit account and flags on top of the stack
                     address creditAccount_ = creditAccount;
+                    uint256 flags_ = flags;
                     (address token, uint256 amount, address to) =
                         abi.decode(mcall.callData[4:], (address, uint256, address)); // U:[FA-36]
-                    _withdrawCollateral(creditAccount_, token, amount, to); // U:[FA-36]
+                    flags = _withdrawCollateral(creditAccount_, token, amount, to, flags_); // U:[FA-36]
                     flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
                 }
                 // increaseDebt
