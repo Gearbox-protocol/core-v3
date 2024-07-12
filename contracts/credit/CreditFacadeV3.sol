@@ -23,11 +23,11 @@ import {
     ICreditManagerV3,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
-import {IPhantomToken} from "../interfaces/base/IPhantomToken.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
 import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
+import {IPhantomToken, IPhantomTokenWithdrawer} from "../interfaces/base/IPhantomToken.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
 // LIBRARIES
@@ -373,6 +373,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if `token` is underlying
+    /// @dev If `token` is a phantom token, it's withdrawn first, and its `depositedToken` is then sent to the liquidator.
+    ///      Both `seizedAmount` and `minSeizedAmount` refer to `depositedToken` in this case.
     /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough
     ///      here they are actually used to repay debt; unclaimed rewards are also safe in this case
     function partiallyLiquidateCreditAccount(
@@ -402,13 +404,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         uint256 feeAmount;
         (repaidAmount, feeAmount, seizedAmount) =
             _calcPartialLiquidationPayments(repaidAmount, token, priceOracle, !isUnhealthy);
+
+        uint256 flags;
+        (token, seizedAmount, flags) = _tryWithdrawPhantomToken(creditAccount, token, seizedAmount, 0);
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
         if (seizedAmount < minSeizedAmount) revert SeizedLessThanRequiredException(seizedAmount);
 
         _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
-        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury, 0);
-        uint256 flags = _withdrawCollateral(creditAccount, token, seizedAmount, to, 0);
-
-        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
+        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury);
+        _withdrawCollateral(creditAccount, token, seizedAmount, to);
 
         _fullCollateralCheck({
             creditAccount: creditAccount,
@@ -535,8 +539,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 // addCollateral
                 else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                     _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
-                    (address token, uint256 amount) = abi.decode(mcall.callData[4:], (address, uint256)); // U:[FA-26A]
-                    _addCollateral(creditAccount, token, amount); // U:[FA-26A]
+                    _addCollateral(creditAccount, mcall.callData[4:]); // U:[FA-26A]
                 }
                 // addCollateralWithPermit
                 else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
@@ -552,13 +555,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 // withdrawCollateral
                 else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
                     _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
-                    // pulls credit account and flags on top of the stack
-                    address creditAccount_ = creditAccount;
-                    uint256 flags_ = flags;
-                    (address token, uint256 amount, address to) =
-                        abi.decode(mcall.callData[4:], (address, uint256, address)); // U:[FA-36]
-                    flags = _withdrawCollateral(creditAccount_, token, amount, to, flags_); // U:[FA-36]
-                    flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
+                    flags = _withdrawCollateral(creditAccount, mcall.callData[4:], flags); // U:[FA-36]
                 }
                 // increaseDebt
                 else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
@@ -591,17 +588,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             // adapter calls
             else {
                 _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION); // U:[FA-21]
-                address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
-                if (targetContract == address(0)) {
-                    revert TargetContractNotAllowedException();
-                }
-                if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
-                    flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
-                    _setActiveCreditAccount(creditAccount); // U:[FA-38]
-                }
-                bool useSafePrices = abi.decode(mcall.target.functionCall(mcall.callData), (bool)); // U:[FA-38]
-                if (useSafePrices) flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-38,45]
-                emit Execute({creditAccount: creditAccount, targetContract: targetContract});
+                flags = _externalCall({
+                    creditAccount: creditAccount,
+                    target: ICreditManagerV3(creditManager).adapterToContract(mcall.target),
+                    adapter: mcall.target,
+                    callData: mcall.callData,
+                    flags: flags
+                }); // U:[FA-38]
             }
         }
 
@@ -663,16 +656,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
-    function _addCollateral(address creditAccount, address token, uint256 amount) internal {
+    function _addCollateral(address creditAccount, bytes calldata callData) internal {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26A]
         if (amount == 0) return;
-        ICreditManagerV3(creditManager).addCollateral({
-            payer: msg.sender,
-            creditAccount: creditAccount,
-            token: token,
-            amount: amount
-        }); // U:[FA-26A]
 
-        emit AddCollateral(creditAccount, token, amount); // U:[FA-26A]
+        _addCollateral(creditAccount, token, amount); // U:[FA-26A]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateralWithPermit` implementation
@@ -736,45 +724,25 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
-    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to, uint256 flags)
+    function _withdrawCollateral(address creditAccount, bytes calldata callData, uint256 flags)
         internal
         returns (uint256)
     {
-        if (amount == 0) return flags;
+        (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-36]
+
         if (amount == type(uint256).max) {
             amount = IERC20(token).safeBalanceOf(creditAccount);
-            if (amount <= 1) return flags;
-            unchecked {
-                --amount;
+            if (amount != 0) {
+                unchecked {
+                    --amount;
+                }
             }
         }
+        if (amount == 0) return flags;
 
-        /// Phantom tokens often represent non-transferable positions, and hence require
-        /// a position to be closed before the actual withdrawal is performed on the underlying. Closing
-        /// a position is usually a pre-determined simple action, so it is safe to prepend before withdrawal
-
-        try IPhantomToken(token).getWithdrawalMultiCall(creditAccount, amount) returns (
-            address tokenOut, uint256 amountOut, address targetContract, bytes memory callData
-        ) {
-            address adapter = ICreditManagerV3(creditManager).contractToAdapter(targetContract);
-
-            if (adapter == address(0)) {
-                revert TargetContractNotAllowedException();
-            }
-
-            uint256 balanceBefore = IERC20(tokenOut).balanceOf(creditAccount);
-
-            flags = _externalCall(creditAccount, targetContract, adapter, callData, flags);
-
-            amount = IERC20(tokenOut).balanceOf(creditAccount) - balanceBefore;
-            token = tokenOut;
-        } catch {}
-
-        ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
-
-        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
-
-        return flags;
+        (token, amount, flags) = _tryWithdrawPhantomToken(creditAccount, token, amount, flags); // U:[FA-36A]
+        _withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
+        return flags | REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
     }
 
     /// @dev `ICreditFacadeV3Multicall.setBotPermissions` implementation
@@ -785,6 +753,48 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         if (unexpectedPermissions != 0) revert UnexpectedPermissionsException(unexpectedPermissions); // U:[FA-37]
 
         IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-37]
+    }
+
+    /// @dev Phantom token withdrawal implementation
+    function _tryWithdrawPhantomToken(address creditAccount, address token, uint256 amount, uint256 flags)
+        internal
+        returns (address, uint256, uint256)
+    {
+        try IPhantomToken(token).getPhantomTokenInfo() returns (address target, address depositedToken) {
+            // ensure that `token` is recognized by the credit manager
+            _getTokenMaskOrRevert(token);
+
+            uint256 balanceBefore = IERC20(depositedToken).safeBalanceOf(creditAccount);
+            flags = _externalCall({
+                creditAccount: creditAccount,
+                target: target,
+                adapter: ICreditManagerV3(creditManager).contractToAdapter(target),
+                callData: abi.encodeCall(IPhantomTokenWithdrawer.withdrawPhantomToken, (token, amount)),
+                flags: flags
+            });
+
+            emit WithdrawPhantomToken(creditAccount, token, amount);
+            return (depositedToken, IERC20(depositedToken).safeBalanceOf(creditAccount) - balanceBefore, flags);
+        } catch {
+            return (token, amount, flags);
+        }
+    }
+
+    /// @dev Adapter call implementation
+    function _externalCall(address creditAccount, address target, address adapter, bytes memory callData, uint256 flags)
+        internal
+        returns (uint256)
+    {
+        if (adapter == address(0) || target == address(0)) revert TargetContractNotAllowedException(); // U:[FA-38]
+
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) _setActiveCreditAccount(creditAccount); // U:[FA-38]
+        flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
+
+        bool useSafePrices = abi.decode(adapter.functionCall(callData), (bool)); // U:[FA-38]
+        if (useSafePrices) flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-38,45]
+
+        emit Execute({creditAccount: creditAccount, targetContract: target}); // U:[FA-38]
+        return flags;
     }
 
     // ------------- //
@@ -994,6 +1004,28 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         IPriceOracleV3(priceOracle).updatePrices(updates);
     }
 
+    /// @dev Internal wrapper for `creditManager.addCollateral` call to reduce contract size
+    function _addCollateral(address creditAccount, address token, uint256 amount) internal {
+        ICreditManagerV3(creditManager).addCollateral({
+            payer: msg.sender,
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount
+        });
+        emit AddCollateral(creditAccount, token, amount);
+    }
+
+    /// @dev Internal wrapper for `creditManager.withdrawCollateral` call to reduce contract size
+    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
+        ICreditManagerV3(creditManager).withdrawCollateral({
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount,
+            to: to
+        });
+        emit WithdrawCollateral(creditAccount, token, amount, to);
+    }
+
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck` call to reduce contract size
     function _fullCollateralCheck(
         address creditAccount,
@@ -1035,20 +1067,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @dev Same as above but unsets active credit account
     function _unsetActiveCreditAccount() internal {
         _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS);
-    }
-
-    function _externalCall(address creditAccount, address target, address adapter, bytes memory callData, uint256 flags)
-        internal
-        returns (uint256)
-    {
-        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
-            flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
-            _setActiveCreditAccount(creditAccount); // U:[FA-38]
-        }
-        adapter.functionCall(callData); // U:[FA-38]
-        emit Execute({creditAccount: creditAccount, targetContract: target});
-
-        return flags;
     }
 
     /// @dev Internal wrapper for `creditManager.enabledTokensMaskOf` call to reduce contract size
