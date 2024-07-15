@@ -3,7 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.23;
 
-import "../../interfaces/IAddressProviderV3.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {
     ICreditManagerV3,
@@ -15,9 +16,12 @@ import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import "../../../interfaces/IExceptions.sol";
 
+import "../../../libraries/Constants.sol";
 import "../../lib/constants.sol";
 
 contract CreditManagerMock {
+    using SafeERC20 for IERC20;
+
     /// @dev Factory contract for Credit Accounts
     address public addressProvider;
 
@@ -40,7 +44,6 @@ contract CreditManagerMock {
     CollateralDebtData return_collateralDebtData;
 
     CollateralDebtData _liquidateCollateralDebtData;
-    bool _liquidateIsExpired;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
@@ -68,6 +71,8 @@ contract CreditManagerMock {
     uint256 qu_tokensToDisable;
 
     uint256 sw_tokensToDisable;
+
+    bool _transfersActivated;
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
@@ -147,12 +152,11 @@ contract CreditManagerMock {
 
     function closeCreditAccount(address) external {}
 
-    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, bool isExpired)
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, bool)
         external
         returns (uint256 remainingFunds, uint256 loss)
     {
         _liquidateCollateralDebtData = collateralDebtData;
-        _liquidateIsExpired = isExpired;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
@@ -173,6 +177,11 @@ contract CreditManagerMock {
         activeCreditAccount = creditAccount;
     }
 
+    function getActiveCreditAccountOrRevert() external view returns (address) {
+        if (revertOnSetActiveAccount) revert ActiveCreditAccountNotSetException();
+        return activeCreditAccount;
+    }
+
     function setQuotedTokensMask(uint256 _quotedTokensMask) external {
         quotedTokensMask = _quotedTokensMask;
     }
@@ -187,10 +196,6 @@ contract CreditManagerMock {
 
     function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
         return _liquidateCollateralDebtData;
-    }
-
-    function liquidateIsExpired() external view returns (bool) {
-        return _liquidateIsExpired;
     }
 
     function enabledTokensMaskOf(address) external view returns (uint256) {
@@ -239,10 +244,6 @@ contract CreditManagerMock {
         flags &= ~flag;
     }
 
-    function addCollateral(address, address, address, uint256) external pure returns (uint256) {
-        return 0;
-    }
-
     function setManageDebt(uint256 newDebt) external {
         return_newDebt = newDebt;
     }
@@ -255,7 +256,37 @@ contract CreditManagerMock {
         return (return_newDebt, 0, 0);
     }
 
-    function withdrawCollateral(address, address, uint256, address) external pure returns (uint256) {
+    function activateTransfers() external {
+        _transfersActivated = true;
+    }
+
+    function deactivateTransfers() external {
+        _transfersActivated = false;
+    }
+
+    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256)
+    {
+        if (_transfersActivated) IERC20(token).safeTransferFrom(payer, creditAccount, amount);
         return 0;
+    }
+
+    function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
+        external
+        returns (uint256)
+    {
+        if (_transfersActivated) IERC20(token).safeTransferFrom(creditAccount, to, amount);
+        return 0;
+    }
+
+    function fees() external pure returns (uint16, uint16, uint16, uint16, uint16) {
+        return (
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+        );
     }
 }
