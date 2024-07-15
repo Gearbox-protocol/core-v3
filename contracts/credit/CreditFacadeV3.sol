@@ -369,12 +369,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param to Account to withdraw seized `token` to
     /// @param priceUpdates On-demand price feed updates to apply before calculations, see `PriceUpdate` for details
     /// @return seizedAmount Amount of `token` seized
-    /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
+    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator or the loss liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if `token` is underlying
     /// @dev If `token` is a phantom token, it's withdrawn first, and its `depositedToken` is then sent to the liquidator.
     ///      Both `seizedAmount` and `minSeizedAmount` refer to `depositedToken` in this case.
+    ///      `depositedToken` must not be underlying.
     /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough
     ///      here they are actually used to repay debt; unclaimed rewards are also safe in this case
     function partiallyLiquidateCreditAccount(
@@ -394,7 +395,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         address priceOracle = _priceOracle();
         if (priceUpdates.length != 0) _updatePrices(priceOracle, priceUpdates);
 
-        if (token == underlying) revert UnderlyingIsNotLiquidatableException();
         (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount);
 
         uint256 balanceBefore = IERC20(underlying).safeBalanceOf(creditAccount);
@@ -407,13 +407,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         uint256 flags;
         (token, seizedAmount, flags) = _tryWithdrawPhantomToken(creditAccount, token, seizedAmount, 0);
-        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
+        if (token == underlying) revert UnderlyingIsNotLiquidatableException();
         if (seizedAmount < minSeizedAmount) revert SeizedLessThanRequiredException(seizedAmount);
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
 
         _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
         _withdrawCollateral(creditAccount, underlying, feeAmount, treasury);
         _withdrawCollateral(creditAccount, token, seizedAmount, to);
-
         _fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: cdd.enabledTokensMask,
@@ -762,7 +762,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     {
         try IPhantomToken(token).getPhantomTokenInfo() returns (address target, address depositedToken) {
             // ensure that `token` is recognized by the credit manager
-            _getTokenMaskOrRevert(token);
+            _getTokenMaskOrRevert(token); // U:[FA-36A]
 
             uint256 balanceBefore = IERC20(depositedToken).safeBalanceOf(creditAccount);
             flags = _externalCall({
@@ -771,9 +771,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 adapter: ICreditManagerV3(creditManager).contractToAdapter(target),
                 callData: abi.encodeCall(IPhantomTokenWithdrawer.withdrawPhantomToken, (token, amount)),
                 flags: flags
-            });
+            }); // U:[FA-36A]
 
-            emit WithdrawPhantomToken(creditAccount, token, amount);
+            emit WithdrawPhantomToken(creditAccount, token, amount); // U:[FA-36A]
             return (depositedToken, IERC20(depositedToken).safeBalanceOf(creditAccount) - balanceBefore, flags);
         } catch {
             return (token, amount, flags);

@@ -173,6 +173,11 @@ contract CreditManagerMock {
         activeCreditAccount = creditAccount;
     }
 
+    function getActiveCreditAccountOrRevert() external view returns (address) {
+        if (revertOnSetActiveAccount) revert ActiveCreditAccountNotSetException();
+        return activeCreditAccount;
+    }
+
     function setQuotedTokensMask(uint256 _quotedTokensMask) external {
         quotedTokensMask = _quotedTokensMask;
     }

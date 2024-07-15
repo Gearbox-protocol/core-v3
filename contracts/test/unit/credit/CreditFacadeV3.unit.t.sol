@@ -8,7 +8,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
-import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
+import {PhantomTokenMock, PhantomTokenWithdrawerMock} from "../../mocks/token/PhantomTokenMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -21,7 +21,6 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
-import {PhantomTokenAdapterMock} from "../../mocks/core/PhantomTokenAdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
@@ -1425,39 +1424,77 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
     /// @dev U:[FA-36A]: multicall `withdrawCollateral` with phantom tokens works properly
     function test_U_FA_36A_multicall_withdrawCollateral_with_phantom_token_works_correctly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
-
-        address ptUnderlying = address(new ERC20Mock("PT Underlying", "PTU", 18));
-
-        PhantomTokenMock ptMock = new PhantomTokenMock(ptUnderlying);
-
-        address adapter =
-            address(new PhantomTokenAdapterMock(address(creditManagerMock), address(ptMock), ptUnderlying));
-
-        ERC20Mock(ptUnderlying).set_minter(adapter);
-        ptMock.mint(creditAccount, 100);
-
-        creditManagerMock.setContractAllowance(address(adapter), address(ptMock));
-
         uint256 amount = 100;
 
-        vm.expectCall(address(adapter), abi.encodeCall(PhantomTokenMock.withdrawalCall, (DUMB_ADDRESS, 100)));
+        GeneralMock targetContract = new GeneralMock();
+        ERC20Mock depositedToken = new ERC20Mock("Test Token", "TEST", 18);
+
+        PhantomTokenMock phantomToken =
+            new PhantomTokenMock(address(targetContract), address(depositedToken), "Phantom Token", "PHANTOM");
+        PhantomTokenWithdrawerMock adapter =
+            new PhantomTokenWithdrawerMock(address(creditManagerMock), address(phantomToken));
+
+        depositedToken.set_minter(address(adapter));
+        phantomToken.mint(creditAccount, amount);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (address(phantomToken), amount, USER))
+            })
+        );
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+
+        creditManagerMock.addToken(address(depositedToken), 1 << 1);
+        creditManagerMock.addToken(address(phantomToken), 1 << 2);
+
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: address(targetContract)});
+
+        vm.expectCall(
+            address(adapter),
+            abi.encodeCall(PhantomTokenWithdrawerMock.withdrawPhantomToken, (address(phantomToken), amount))
+        );
 
         vm.expectCall(
             address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, ptUnderlying, amount, USER))
+            abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, address(depositedToken), amount, USER))
         );
 
-        vm.expectEmit(true, true, false, true);
-        emit ICreditFacadeV3.WithdrawCollateral(creditAccount, ptUnderlying, amount, USER);
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
+            )
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit ICreditFacadeV3.Execute(creditAccount, address(targetContract));
+
+        vm.expectEmit(true, true, true, true);
+        emit ICreditFacadeV3.WithdrawPhantomToken(creditAccount, address(phantomToken), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit ICreditFacadeV3.WithdrawCollateral(creditAccount, address(depositedToken), amount, USER);
 
         creditFacade.multicallInt({
             creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (address(ptMock), amount, USER))
-                })
-            ),
+            calls: calls,
             enabledTokensMask: 0,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
@@ -1636,7 +1673,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall(
-                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 0, USER))
+                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1, USER))
                 )
             ),
             enabledTokensMask: linkMask,
