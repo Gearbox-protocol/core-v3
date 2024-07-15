@@ -315,7 +315,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             flags |= SKIP_PRICE_UPDATES_CALL_FLAG;
         }
 
-        (CollateralDebtData memory collateralDebtData, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,16]
+        (CollateralDebtData memory collateralDebtData, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,14]
 
         BalanceWithMask[] memory initialBalances = BalancesLogic.storeBalances({
             creditAccount: creditAccount,
@@ -323,7 +323,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             getTokenByMaskFn: _getTokenByMask
         });
 
-        _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, flags); // U:[FA-16]
+        _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, flags); // U:[FA-14]
 
         address failedToken = BalancesLogic.compareBalances({
             creditAccount: creditAccount,
@@ -331,9 +331,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             balances: initialBalances,
             comparison: Comparison.LESS_OR_EQUAL
         });
-        if (failedToken != address(0)) revert RemainingTokenBalanceIncreasedException(failedToken); // U:[FA-14]
+        if (failedToken != address(0)) revert RemainingTokenBalanceIncreasedException(failedToken); // U:[FA-14A]
 
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-16]
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-14]
 
         uint256 remainingFunds;
         (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
@@ -341,9 +341,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             collateralDebtData: collateralDebtData,
             to: to,
             isExpired: !isUnhealthy
-        }); // U:[FA-15,16]
+        }); // U:[FA-14]
 
-        emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-16]
+        emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-14]
 
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
@@ -372,12 +372,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator or the loss liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
-    /// @dev Reverts if `token` is underlying
+    /// @dev Reverts if `token` is underlying or if `token` is a phantom token and its `depositedToken` is underlying
     /// @dev If `token` is a phantom token, it's withdrawn first, and its `depositedToken` is then sent to the liquidator.
     ///      Both `seizedAmount` and `minSeizedAmount` refer to `depositedToken` in this case.
-    ///      `depositedToken` must not be underlying.
-    /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough
-    ///      here they are actually used to repay debt; unclaimed rewards are also safe in this case
+    /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough here
+    ///      they are actually used to repay debt. Unclaimed rewards are safe since adapter calls are not allowed.
     function partiallyLiquidateCreditAccount(
         address creditAccount,
         address token,
@@ -388,41 +387,41 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     )
         external
         override
-        whenNotPausedOrEmergency // U:[FA-2]
+        whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
         returns (uint256 seizedAmount)
     {
         address priceOracle = _priceOracle();
         if (priceUpdates.length != 0) _updatePrices(priceOracle, priceUpdates);
 
-        (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount);
+        (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,16]
 
         uint256 balanceBefore = IERC20(underlying).safeBalanceOf(creditAccount);
-        _addCollateral(creditAccount, underlying, repaidAmount);
+        _addCollateral(creditAccount, underlying, repaidAmount); // U:[FA-16]
         repaidAmount = IERC20(underlying).safeBalanceOf(creditAccount) - balanceBefore;
 
         uint256 feeAmount;
         (repaidAmount, feeAmount, seizedAmount) =
-            _calcPartialLiquidationPayments(repaidAmount, token, priceOracle, !isUnhealthy);
+            _calcPartialLiquidationPayments(repaidAmount, token, priceOracle, !isUnhealthy); // U:[FA-15]
 
         uint256 flags;
-        (token, seizedAmount, flags) = _tryWithdrawPhantomToken(creditAccount, token, seizedAmount, 0);
-        if (token == underlying) revert UnderlyingIsNotLiquidatableException();
-        if (seizedAmount < minSeizedAmount) revert SeizedLessThanRequiredException(seizedAmount);
-        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
+        (token, seizedAmount, flags) = _tryWithdrawPhantomToken(creditAccount, token, seizedAmount, 0); // U:[FA-16A]
+        if (token == underlying) revert UnderlyingIsNotLiquidatableException(); // U:[FA-16,16A]
+        if (seizedAmount < minSeizedAmount) revert SeizedLessThanRequiredException(seizedAmount); // U:[FA-16,16A]
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount(); // U:[FA-16A]
 
-        _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
-        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury);
-        _withdrawCollateral(creditAccount, token, seizedAmount, to);
+        _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // U:[FA-16]
+        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury); // U:[FA-16]
+        _withdrawCollateral(creditAccount, token, seizedAmount, to); // U:[FA-16]
         _fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: cdd.enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
             useSafePrices: false
-        });
+        }); // U:[FA-16]
 
-        emit PartiallyLiquidateCreditAccount(creditAccount, token, msg.sender, repaidAmount, seizedAmount, feeAmount);
+        emit PartiallyLiquidateCreditAccount(creditAccount, token, msg.sender, repaidAmount, seizedAmount, feeAmount); // U:[FA-16]
     }
 
     /// @notice Executes a batch of calls allowing user to manage their credit account
@@ -943,18 +942,18 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         returns (CollateralDebtData memory cdd, bool isUnhealthy)
     {
         cdd = ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-        isUnhealthy = cdd.twvUSD < cdd.totalDebtUSD;
-        if (cdd.debt == 0 || !isUnhealthy && !_isExpired()) revert CreditAccountNotLiquidatableException();
+        isUnhealthy = cdd.twvUSD < cdd.totalDebtUSD; // U:[FA-13]
+        if (cdd.debt == 0 || !isUnhealthy && !_isExpired()) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
     }
 
     /// @dev Calculates and returns partial liquidation payment amounts:
     ///      - amount of underlying that should go towards repaying debt
     ///      - amount of underlying that should go towards liquidation fees
     ///      - amount of collateral that should be sent to the liquidator
-    function _calcPartialLiquidationPayments(uint256 repaidAmount, address token, address priceOracle, bool isExpired)
+    function _calcPartialLiquidationPayments(uint256 amount, address token, address priceOracle, bool isExpired)
         internal
         view
-        returns (uint256 repaidAmount_, uint256 feeAmount, uint256 seizedAmount)
+        returns (uint256 repaidAmount, uint256 feeAmount, uint256 seizedAmount)
     {
         (
             ,
@@ -963,11 +962,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             uint16 feeLiquidationExpired,
             uint16 liquidationDiscountExpired
         ) = ICreditManagerV3(creditManager).fees();
-        seizedAmount = IPriceOracleV3(priceOracle).convert(repaidAmount, underlying, token) * PERCENTAGE_FACTOR
-            / (isExpired ? liquidationDiscountExpired : liquidationDiscount);
-        feeAmount = repaidAmount * (isExpired ? feeLiquidationExpired : feeLiquidation) / PERCENTAGE_FACTOR;
+        seizedAmount = IPriceOracleV3(priceOracle).convert(amount, underlying, token) * PERCENTAGE_FACTOR
+            / (isExpired ? liquidationDiscountExpired : liquidationDiscount); // U:[FA-15]
+        feeAmount = amount * (isExpired ? feeLiquidationExpired : feeLiquidation) / PERCENTAGE_FACTOR; // U:[FA-15]
         unchecked {
-            repaidAmount_ = repaidAmount - feeAmount;
+            // unchecked subtraction is safe because credit configurator ensures that liquidation fee is below 100%
+            repaidAmount = amount - feeAmount; // U:[FA-15]
         }
     }
 

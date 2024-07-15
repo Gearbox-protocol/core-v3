@@ -17,6 +17,8 @@ contract PhantomTokenMock is IPhantomToken, ERC20 {
     address public immutable target;
     address public immutable depositedToken;
 
+    uint256 public exchangeRate = 1e18;
+
     constructor(address target_, address depositedToken_, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
     {
@@ -32,12 +34,20 @@ contract PhantomTokenMock is IPhantomToken, ERC20 {
         _burn(account, amount);
     }
 
-    function _transfer(address, address, uint256) internal pure override {
+    function transfer(address, uint256) public pure override returns (bool) {
         revert NotImplementedException();
     }
 
-    function getPhantomTokenInfo() external view returns (address, address) {
+    function transferFrom(address, address, uint256) public pure override returns (bool) {
+        revert NotImplementedException();
+    }
+
+    function getPhantomTokenInfo() external view override returns (address, address) {
         return (target, depositedToken);
+    }
+
+    function setExchangeRate(uint256 value) external {
+        exchangeRate = value;
     }
 }
 
@@ -60,7 +70,7 @@ contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {
     function withdrawPhantomToken(address, uint256 amount) external override returns (bool) {
         address creditAccount = ICreditManagerV3(creditManager).getActiveCreditAccountOrRevert();
         PhantomTokenMock(phantomToken).burn(creditAccount, amount);
-        ERC20Mock(depositedToken).mint(creditAccount, amount);
+        ERC20Mock(depositedToken).mint(creditAccount, amount * PhantomTokenMock(phantomToken).exchangeRate() / 1e18);
         return false;
     }
 }
