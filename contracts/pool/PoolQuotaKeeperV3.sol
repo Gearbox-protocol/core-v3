@@ -74,13 +74,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ControlledTrait, ContractsRegi
     }
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
-    /// @param contractsRegister_ Contracts register address
     /// @param pool_ Pool address
     /// @custom:tests U:[QK-1]
-    constructor(address acl_, address contractsRegister_, address pool_)
-        ControlledTrait(acl_)
-        ContractsRegisterTrait(contractsRegister_)
+    constructor(address pool_)
+        ControlledTrait(IPoolV3(pool_).acl())
+        ContractsRegisterTrait(IPoolV3(pool_).contractsRegister())
     {
         pool = pool_;
         underlying = IPoolV3(pool_).asset();

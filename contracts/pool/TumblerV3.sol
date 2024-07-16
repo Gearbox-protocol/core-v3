@@ -32,14 +32,10 @@ contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param  acl_ ACL contract address
     /// @param  quotaKeeper_ Address of the quota keeper to provide rates for
     /// @param  epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address acl_, address quotaKeeper_, uint256 epochLength_)
-        ControlledTrait(acl_)
-        nonZeroAddress(quotaKeeper_)
-    {
+    constructor(address quotaKeeper_, uint256 epochLength_) ControlledTrait(IPoolQuotaKeeperV3(quotaKeeper_).acl()) {
         quotaKeeper = quotaKeeper_;
         epochLength = epochLength_;
     }

@@ -3,16 +3,16 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.23;
 
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 contract PoolQuotaKeeperMock {
     uint256 public constant version = 3_10;
 
-    /// @dev Address provider
     address public immutable underlying;
-
-    /// @dev Address of the protocol treasury
     address public immutable pool;
+    address public immutable acl;
+    address public immutable contractsRegister;
 
     /// @dev Address of the gauge that determines quota rates
     address public gauge;
@@ -40,6 +40,8 @@ contract PoolQuotaKeeperMock {
     mapping(address => uint128) internal _outstandingInterest;
 
     constructor(address _pool, address _underlying) {
+        acl = IPoolV3(_pool).acl();
+        contractsRegister = IPoolV3(_pool).contractsRegister();
         pool = _pool;
         underlying = _underlying;
     }

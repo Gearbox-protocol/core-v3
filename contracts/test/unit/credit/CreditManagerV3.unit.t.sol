@@ -126,7 +126,7 @@ contract CreditManagerV3UnitTest is TestHelper, BalanceHelper, CreditAccountMock
     ///
 
     function _deployCreditManager() internal {
-        poolMock = new PoolMock(address(addressProvider), underlying);
+        poolMock = new PoolMock(address(addressProvider), address(addressProvider), underlying);
 
         poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));

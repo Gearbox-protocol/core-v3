@@ -50,22 +50,23 @@ contract GauageV3UnitTest is TestHelper {
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
 
-        poolMock = new PoolMock(address(addressProvider), underlying);
+        poolMock = new PoolMock(address(addressProvider), address(addressProvider), underlying);
 
         poolQuotaKeeperMock = makeAddr("POOL_QUOTA_KEEPER");
+        vm.mockCall(poolQuotaKeeperMock, abi.encodeWithSignature("acl()"), abi.encode(address(addressProvider)));
         poolMock.setPoolQuotaKeeper(poolQuotaKeeperMock);
 
         gearStakingMock = new GearStakingMock();
         gearStakingMock.setCurrentEpoch(900);
 
-        gauge = new GaugeV3Harness(address(addressProvider), address(poolQuotaKeeperMock), address(gearStakingMock));
+        gauge = new GaugeV3Harness(address(poolQuotaKeeperMock), address(gearStakingMock));
     }
 
     /// @dev U:[GA-1]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
         vm.expectEmit(false, false, false, true);
         emit IGaugeV3.SetFrozenEpoch(true);
-        gauge = new GaugeV3Harness(address(addressProvider), address(poolQuotaKeeperMock), address(gearStakingMock));
+        gauge = new GaugeV3Harness(address(poolQuotaKeeperMock), address(gearStakingMock));
 
         assertEq(gauge.quotaKeeper(), address(poolQuotaKeeperMock), "Incorrect quotaKeeper");
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
@@ -73,10 +74,7 @@ contract GauageV3UnitTest is TestHelper {
         assertTrue(gauge.epochFrozen(), "Epoch not frozen");
 
         vm.expectRevert(ZeroAddressException.selector);
-        new GaugeV3Harness(address(addressProvider), address(poolQuotaKeeperMock), address(0));
-
-        vm.expectRevert(ZeroAddressException.selector);
-        new GaugeV3Harness(address(addressProvider), address(0), address(gearStakingMock));
+        new GaugeV3Harness(address(poolQuotaKeeperMock), address(0));
     }
 
     /// @dev U:[GA-2]: voterOnly functions reverts if called by non-voter

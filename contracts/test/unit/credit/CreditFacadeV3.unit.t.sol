@@ -139,7 +139,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
-        PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        PoolMock poolMock =
+            new PoolMock(address(addressProvider), address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
         treasury = makeAddr("TREASURY");
         poolMock.setTreasury(treasury);
 
@@ -168,7 +169,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
-            address(addressProvider),
             address(creditManagerMock),
             address(botListMock),
             tokenTestSuite.addressOf(Tokens.WETH),

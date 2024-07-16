@@ -19,8 +19,8 @@ import "../../../interfaces/IExceptions.sol";
 contract PoolMock {
     using SafeERC20 for IERC20;
 
-    // Address repository
-    address public addressProvider;
+    address public acl;
+    address public contractsRegister;
 
     // Total borrowed amount: https://dev.gearbox.fi/developers/pool/economy/total-borrowed
     uint256 public totalBorrowed;
@@ -78,8 +78,9 @@ contract PoolMock {
         _;
     }
 
-    constructor(address _addressProvider, address _underlyingToken) {
-        addressProvider = _addressProvider;
+    constructor(address _acl, address _contractsRegister, address _underlyingToken) {
+        acl = _acl;
+        contractsRegister = _contractsRegister;
         underlyingToken = _underlyingToken;
         asset = _underlyingToken;
         borrowAPY_RAY = RAY / 10;

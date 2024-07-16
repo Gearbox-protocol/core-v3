@@ -151,7 +151,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _botList Bot list address
     /// @param _weth WETH token address
@@ -159,14 +158,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, unless the date is set via `setExpirationDate` in the configurator.
     /// @dev Reverts if `_creditManager` is not added to the `_botList`
-    constructor(
-        address _acl,
-        address _creditManager,
-        address _botList,
-        address _weth,
-        address _degenNFT,
-        bool _expirable
-    ) ACLTrait(_acl) {
+    constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
+        ACLTrait(IPoolV3(ICreditManagerV3(_creditManager).pool()).acl())
+    {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]

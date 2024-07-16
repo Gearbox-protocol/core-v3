@@ -35,21 +35,18 @@ contract TumblerV3UnitTest is Test {
 
     function setUp() public {
         addressProvider = new AddressProviderV3ACLMock();
-        pool = new PoolMock(address(addressProvider), underlying);
+        pool = new PoolMock(address(addressProvider), address(addressProvider), underlying);
         poolQuotaKeeper = new PoolQuotaKeeperMock(address(pool), underlying);
         poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        tumbler = new TumblerV3(address(addressProvider), address(poolQuotaKeeper), 1 days);
+        tumbler = new TumblerV3(address(poolQuotaKeeper), 1 days);
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
-    function test_U_TU_01_constructor_works_as_expected() public {
+    function test_U_TU_01_constructor_works_as_expected() public view {
         assertEq(tumbler.quotaKeeper(), address(poolQuotaKeeper), "Incorrect quotaKeeper");
         assertEq(tumbler.epochLength(), 1 days, "Incorrect epochLength");
-
-        vm.expectRevert(ZeroAddressException.selector);
-        new TumblerV3(address(addressProvider), address(0), 1 days);
     }
 
     /// @notice U:[TU-2]: `addToken` works as expected

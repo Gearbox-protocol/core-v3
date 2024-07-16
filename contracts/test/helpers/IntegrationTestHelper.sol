@@ -393,7 +393,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.name
             );
 
-            creditConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager));
+            creditConfigurator = new CreditConfiguratorV3(address(creditManager));
             creditManager.setCreditConfigurator(address(creditConfigurator));
 
             vm.startPrank(CONFIGURATOR);
@@ -405,7 +405,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             vm.stopPrank();
 
             creditFacade = new CreditFacadeV3(
-                address(acl),
                 address(creditManager),
                 address(botList),
                 weth,

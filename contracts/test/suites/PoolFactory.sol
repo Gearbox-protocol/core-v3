@@ -56,7 +56,7 @@ contract PoolFactory is Test {
             symbol_: config.symbol()
         });
 
-        poolQuotaKeeper = new PoolQuotaKeeperV3(acl, contractsRegister, payable(address(pool)));
+        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
 
         vm.prank(CONFIGURATOR);
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
@@ -64,7 +64,7 @@ contract PoolFactory is Test {
         vm.label(address(poolQuotaKeeper), string.concat("PoolQuotaKeeperV3-", config.symbol()));
 
         address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
-        gauge = new GaugeV3(acl, address(poolQuotaKeeper), gearStaking);
+        gauge = new GaugeV3(address(poolQuotaKeeper), gearStaking);
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
 
