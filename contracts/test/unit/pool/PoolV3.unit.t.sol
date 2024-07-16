@@ -6,13 +6,14 @@ pragma solidity ^0.8.23;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
 import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
 import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
-import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -41,7 +42,6 @@ contract PoolV3UnitTest is TestHelper {
     // contracts
     address interestRateModel;
     address creditManager;
-    address quotaKeeper;
 
     // mocks
     ERC20FeeMock underlying;
@@ -63,7 +63,6 @@ contract PoolV3UnitTest is TestHelper {
         creditManager = makeAddr("CREDIT_MANAGER");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
         interestRateModel = makeAddr("INTEREST_RATE_MODEL");
-        quotaKeeper = makeAddr("QUOTA_KEEPER");
 
         vm.startPrank(configurator);
         addressProvider = new AddressProviderV3ACLMock();
@@ -79,24 +78,22 @@ contract PoolV3UnitTest is TestHelper {
         pool = new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
-            underlyingToken_: address(underlying),
+            underlying_: address(underlying),
             treasury_: address(treasury),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
-            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
+            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol())),
+            salt_: bytes32(0)
         });
 
         // setup mocks
         vm.mockCall(interestRateModel, abi.encode(calcBorrowRateSelector), abi.encode(RAY / 20)); // 5%
         vm.mockCall(creditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(pool));
-        vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(pool));
 
         // connect contracts
-        vm.startPrank(configurator);
+        vm.prank(configurator);
         pool.setCreditManagerDebtLimit(creditManager, 1000);
-        pool.setPoolQuotaKeeper(quotaKeeper);
-        vm.stopPrank();
 
         // setup liquidity and borrowing
         pool.hackExpectedLiquidityLU(2000);
@@ -119,36 +116,39 @@ contract PoolV3UnitTest is TestHelper {
         new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
-            underlyingToken_: address(0),
+            underlying_: address(0),
             treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
             name_: "",
-            symbol_: ""
+            symbol_: "",
+            salt_: bytes32(0)
         });
 
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
-            underlyingToken_: address(underlying),
+            underlying_: address(underlying),
             treasury_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
             name_: "",
-            symbol_: ""
+            symbol_: "",
+            salt_: bytes32(0)
         });
 
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
-            underlyingToken_: address(underlying),
+            underlying_: address(underlying),
             treasury_: treasury,
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
             name_: "",
-            symbol_: ""
+            symbol_: "",
+            salt_: bytes32(0)
         });
     }
 
@@ -163,12 +163,13 @@ contract PoolV3UnitTest is TestHelper {
         pool = new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
-            underlyingToken_: address(underlying),
+            underlying_: address(underlying),
             treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
-            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
+            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol())),
+            salt_: bytes32(0)
         });
 
         assertEq(pool.asset(), address(underlying), "Incorrect asset");
@@ -180,6 +181,23 @@ contract PoolV3UnitTest is TestHelper {
         assertEq(pool.baseInterestIndex(), RAY, "Incorrect baseInterestIndex");
         assertEq(pool.interestRateModel(), address(interestRateModel), "Incorrect interestRateModel");
         assertEq(pool.totalDebtLimit(), 2000, "Incorrect totalDebtLimit");
+
+        address quotaKeeper = pool.poolQuotaKeeper();
+        assertEq(
+            quotaKeeper,
+            Create2.computeAddress({
+                salt: bytes32(0),
+                bytecodeHash: keccak256(
+                    abi.encodePacked(
+                        type(PoolQuotaKeeperV3).creationCode,
+                        abi.encode(address(addressProvider), address(addressProvider), address(underlying), address(pool))
+                    )
+                ),
+                deployer: address(pool)
+            }),
+            "Incorrect poolQuotaKeeper"
+        );
+        assertEq(PoolQuotaKeeperV3(quotaKeeper).pool(), address(pool), "Incorrect pool address in quota keeper");
 
         (, string memory eip712Name,,,,,) = pool.eip712Domain();
         assertEq(eip712Name, "diesel Test Token", "Incorrect EIP-712 name");
@@ -243,12 +261,12 @@ contract PoolV3UnitTest is TestHelper {
         vm.expectRevert("ReentrancyGuard: reentrant call");
         pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
 
+        vm.prank(pool.poolQuotaKeeper());
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        vm.prank(quotaKeeper);
         pool.updateQuotaRevenue({quotaRevenueDelta: 0});
 
+        vm.prank(pool.poolQuotaKeeper());
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        vm.prank(quotaKeeper);
         pool.setQuotaRevenue({newQuotaRevenue: 0});
     }
 
@@ -268,9 +286,6 @@ contract PoolV3UnitTest is TestHelper {
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setInterestRateModel({newInterestRateModel: address(0)});
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.setPoolQuotaKeeper({quotaKeeper: address(0)});
 
         vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
@@ -992,7 +1007,7 @@ contract PoolV3UnitTest is TestHelper {
     function test_U_LP_19_updateQuotaRevenue_works_as_expected() public {
         pool.hackQuotaRevenue(100);
 
-        vm.prank(quotaKeeper);
+        vm.prank(pool.poolQuotaKeeper());
         pool.updateQuotaRevenue(10);
 
         // implicitly test that `_setQuotaRevenue` is called with correct parameters
@@ -1004,7 +1019,7 @@ contract PoolV3UnitTest is TestHelper {
         pool.hackQuotaRevenue(100);
         vm.warp(block.timestamp + 365 days);
 
-        vm.prank(quotaKeeper);
+        vm.prank(pool.poolQuotaKeeper());
         pool.setQuotaRevenue(200);
         assertEq(pool.expectedLiquidityLU(), 2100, "Incorrect expectedLiquidityLU");
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenueUpdate");
@@ -1048,61 +1063,6 @@ contract PoolV3UnitTest is TestHelper {
         pool.setInterestRateModel(newInterestRateModel);
 
         assertEq(pool.interestRateModel(), newInterestRateModel, "Incorrect interestRateModel");
-    }
-
-    /// @notice U:[LP-23A]: `setPoolQuotaKeeper` reverts on zero address
-    function test_U_LP_23A_setPoolQuotaKeeper_reverts_on_zero_address() public {
-        vm.expectRevert(ZeroAddressException.selector);
-        vm.prank(configurator);
-        pool.setPoolQuotaKeeper(address(0));
-    }
-
-    /// @notice U:[LP-23B]: quota keeper initialization works as expected
-    function test_U_LP_23B_quotaKeeper_initialization_works_as_expected() public {
-        pool.hackQuotaKeeper(address(0));
-
-        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
-        pool.poolQuotaKeeper();
-
-        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
-        pool.updateQuotaRevenue(0);
-
-        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
-        pool.setQuotaRevenue(0);
-
-        pool.hackQuotaKeeper(quotaKeeper);
-
-        vm.expectRevert(QuotaKeeperAlreadyInitializedException.selector);
-        vm.prank(configurator);
-        pool.setPoolQuotaKeeper(quotaKeeper);
-    }
-
-    /// @notice U:[LP-23C]: `setPoolQuotaKeeper` reverts on incompatible quota keeper
-    function test_U_LP_23C_setPoolQuotaKeeper_reverts_on_incompatible_quota_keeper() public {
-        pool.hackQuotaKeeper(address(0));
-
-        address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
-        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(makeAddr("WRONG_POOL")));
-
-        vm.expectRevert(IncompatibleQuotaKeeperException.selector);
-        vm.prank(configurator);
-        pool.setPoolQuotaKeeper(newQuotaKeeper);
-    }
-
-    /// @notice U:[LP-23D]: `setPoolQuotaKeeper` works as expected
-    function test_U_LP_23D_setPoolQuotaKeeper_works_as_expected() public {
-        pool.hackQuotaKeeper(address(0));
-
-        address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
-        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(address(pool)));
-
-        vm.expectEmit(true, true, true, true);
-        emit IPoolV3.SetPoolQuotaKeeper(newQuotaKeeper);
-
-        vm.prank(configurator);
-        pool.setPoolQuotaKeeper(newQuotaKeeper);
-
-        assertEq(pool.poolQuotaKeeper(), newQuotaKeeper, "Incorrect poolQuotaKeeper");
     }
 
     /// @notice U:[LP-24]: `setTotalDebtLimit` works as expected

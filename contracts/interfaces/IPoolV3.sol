@@ -30,9 +30,6 @@ interface IPoolV3 is IControlledTrait, IContractsRegisterTrait, IVersion, IERC46
     /// @notice Emitted when new interest rate model contract is set
     event SetInterestRateModel(address indexed newInterestRateModel);
 
-    /// @notice Emitted when the quota keeper contract is initialized
-    event SetPoolQuotaKeeper(address indexed quotaKeeper);
-
     /// @notice Emitted when new total debt limit is set
     event SetTotalDebtLimit(uint256 limit);
 
@@ -128,8 +125,6 @@ interface IPoolV3 is IControlledTrait, IContractsRegisterTrait, IVersion, IERC46
     // ------------- //
 
     function setInterestRateModel(address newInterestRateModel) external;
-
-    function setPoolQuotaKeeper(address quotaKeeper) external;
 
     function setTotalDebtLimit(uint256 newLimit) external;
 

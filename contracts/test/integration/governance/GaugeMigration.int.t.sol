@@ -52,7 +52,9 @@ contract GaugeMigrationIntegrationTest is Test {
         pool = new PoolMock(address(addressProvider), address(addressProvider), address(underlying));
 
         // deploy quota keeper and connect it to the pool
-        quotaKeeper = new PoolQuotaKeeperV3(address(pool));
+        quotaKeeper = new PoolQuotaKeeperV3(
+            address(addressProvider), address(addressProvider), address(underlying), address(pool)
+        );
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
         // deploy gauge and connect it to the quota keeper and staking

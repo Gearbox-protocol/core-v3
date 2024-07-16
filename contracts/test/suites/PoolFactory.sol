@@ -48,19 +48,16 @@ contract PoolFactory is Test {
         pool = new PoolV3({
             acl_: acl,
             contractsRegister_: contractsRegister,
-            underlyingToken_: underlying,
+            underlying_: underlying,
             treasury_: IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL),
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
             name_: config.name(),
-            symbol_: config.symbol()
+            symbol_: config.symbol(),
+            salt_: bytes32(0)
         });
 
-        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
-
-        vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
-
+        poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
         vm.label(address(poolQuotaKeeper), string.concat("PoolQuotaKeeperV3-", config.symbol()));
 
         address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);

@@ -14,13 +14,16 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+// CONTRACTS
+import {PoolQuotaKeeperV3} from "./PoolQuotaKeeperV3.sol";
+
 // INTERFACES
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
@@ -84,8 +87,8 @@ contract PoolV3 is
     /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
 
-    /// @dev Quota keeper contract address
-    address internal _quotaKeeper;
+    /// @notice Quota keeper contract address
+    address public immutable override poolQuotaKeeper;
     /// @dev Current quota revenue
     uint96 internal _quotaRevenue;
 
@@ -121,28 +124,30 @@ contract PoolV3 is
     /// @notice Constructor
     /// @param acl_ ACL contract address
     /// @param contractsRegister_ Contracts register address
-    /// @param underlyingToken_ Pool underlying token address
+    /// @param underlying_ Pool underlying token address
     /// @param treasury_ Treasury address
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
+    /// @param salt_ Salt for quota keeper deployment via `CREATE2`
     constructor(
         address acl_,
         address contractsRegister_,
-        address underlyingToken_,
+        address underlying_,
         address treasury_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
-        string memory symbol_
+        string memory symbol_,
+        bytes32 salt_
     )
         ControlledTrait(acl_) // U:[LP-1A]
         ContractsRegisterTrait(contractsRegister_)
-        ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
+        ERC4626(IERC20(underlying_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]
-        nonZeroAddress(underlyingToken_) // U:[LP-1A]
+        nonZeroAddress(underlying_) // U:[LP-1A]
         nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
@@ -155,6 +160,14 @@ contract PoolV3 is
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
+
+        poolQuotaKeeper = Create2.deploy({
+            amount: 0,
+            salt: salt_,
+            bytecode: abi.encodePacked(
+                type(PoolQuotaKeeperV3).creationCode, abi.encode(acl_, contractsRegister_, underlying_, address(this))
+            )
+        }); // U:[LP-1B]
     }
 
     /// @notice Contract type
@@ -625,12 +638,6 @@ contract PoolV3 is
     // QUOTAS //
     // ------ //
 
-    /// @notice Returns the quota keeper address or reverts if it is not initialized
-    function poolQuotaKeeper() public view override returns (address quotaKeeper) {
-        quotaKeeper = _quotaKeeper;
-        if (quotaKeeper == address(0)) revert QuotaKeeperNotInitializedException(); // U:[LP-23B]
-    }
-
     /// @notice Current annual quota revenue in underlying tokens
     function quotaRevenue() public view override returns (uint256) {
         return _quotaRevenue;
@@ -697,20 +704,6 @@ contract PoolV3 is
         interestRateModel = newInterestRateModel; // U:[LP-22B]
         _updateBaseInterest(0, 0, false); // U:[LP-22B]
         emit SetInterestRateModel(newInterestRateModel); // U:[LP-22B]
-    }
-
-    /// @notice Initializes the quota keeper, can only be called by configurator
-    /// @param quotaKeeper Address of the quota keeper contract
-    function setPoolQuotaKeeper(address quotaKeeper)
-        external
-        override
-        configuratorOnly // U:[LP-2C]
-        nonZeroAddress(quotaKeeper) // U:[LP-23A]
-    {
-        if (_quotaKeeper != address(0)) revert QuotaKeeperAlreadyInitializedException(); // U:[LP-23B]
-        if (IPoolQuotaKeeperV3(quotaKeeper).pool() != address(this)) revert IncompatibleQuotaKeeperException(); // U:[LP-23C]
-        _quotaKeeper = quotaKeeper; // U:[LP-23D]
-        emit SetPoolQuotaKeeper(quotaKeeper); // U:[LP-23D]
     }
 
     /// @notice Sets new total debt limit, can only be called by controller or configurator
@@ -793,9 +786,9 @@ contract PoolV3 is
         if (!_creditManagerSet.contains(msg.sender)) revert CallerNotCreditManagerException(); // U:[LP-2C]
     }
 
-    /// @dev Ensures that function caller is quota keeper, which must be initialized
+    /// @dev Ensures that function caller is the quota keeper
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-        if (msg.sender != poolQuotaKeeper()) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 
     /// @dev Same as `ERC20._transfer` but reverts if contract is paused

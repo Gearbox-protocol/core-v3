@@ -31,7 +31,9 @@ contract QuotaRatesIntegrationTest is Test {
         token2 = new ERC20Mock("Test Token 2", "TEST2", 18);
         pool = new PoolMock(address(addressProvider), address(addressProvider), address(underlying));
 
-        quotaKeeper = new PoolQuotaKeeperV3(address(pool));
+        quotaKeeper = new PoolQuotaKeeperV3(
+            address(addressProvider), address(addressProvider), address(underlying), address(pool)
+        );
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
         tumbler = new TumblerV3(address(quotaKeeper), 1 days);
