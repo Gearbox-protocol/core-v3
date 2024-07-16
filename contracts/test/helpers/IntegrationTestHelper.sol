@@ -576,7 +576,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.roll(block.number + 1);
     }
 
-    function expectSafeAllowance(address creditAccount, address target) internal {
+    function expectSafeAllowance(address creditAccount, address target) internal view {
         uint256 len = creditManager.collateralTokensCount();
         for (uint256 i = 0; i < len; i++) {
             (address token,) = creditManager.collateralTokenByMask(1 << i);
