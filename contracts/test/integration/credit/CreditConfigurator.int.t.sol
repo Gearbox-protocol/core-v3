@@ -119,6 +119,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
 
     /// @dev I:[CC-1]: constructor sets correct values
     function test_I_CC_01_constructor_sets_correct_values() public creditTest {
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditConfiguratorV3(address(0));
+
         assertEq(address(creditConfigurator.creditManager()), address(creditManager), "Incorrect creditManager");
 
         assertEq(address(creditConfigurator.creditFacade()), address(creditFacade), "Incorrect creditFacade");

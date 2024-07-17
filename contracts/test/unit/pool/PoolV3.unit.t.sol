@@ -114,6 +114,32 @@ contract PoolV3UnitTest is TestHelper {
     function test_U_LP_01A_constructor_reverts_on_zero_addresses() public {
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
+            acl: address(0),
+            contractsRegister: address(addressProvider),
+            underlying_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: type(uint256).max,
+            name_: "",
+            symbol_: "",
+            salt_: bytes32(0)
+        });
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(0),
+            underlying_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: type(uint256).max,
+            name_: "",
+            symbol_: "",
+            salt_: bytes32(0)
+        });
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new PoolV3Harness({
             acl: address(addressProvider),
             contractsRegister: address(addressProvider),
             underlying_: address(0),

@@ -7,7 +7,8 @@ import {
     AddressIsNotContractException,
     CallerNotConfiguratorException,
     CallerNotPausableAdminException,
-    CallerNotUnpausableAdminException
+    CallerNotUnpausableAdminException,
+    ZeroAddressException
 } from "../interfaces/IExceptions.sol";
 import {IACL} from "../interfaces/base/IACL.sol";
 import {IACLTrait} from "../interfaces/base/IACLTrait.sol";
@@ -38,7 +39,9 @@ abstract contract ACLTrait is IACLTrait {
 
     /// @notice Constructor
     /// @param  acl_ ACL contract address
+    /// @dev    Reverts if `acl_` is zero address or is not a contract
     constructor(address acl_) {
+        if (acl_ == address(0)) revert ZeroAddressException();
         if (acl_.code.length == 0) revert AddressIsNotContractException(acl_);
         acl = acl_;
     }

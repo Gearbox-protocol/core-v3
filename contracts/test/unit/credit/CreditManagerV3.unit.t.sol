@@ -8,6 +8,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
 import "../../../libraries/Constants.sol";
 
@@ -278,37 +279,49 @@ contract CreditManagerV3UnitTest is TestHelper, BalanceHelper, CreditAccountMock
     /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
     function test_U_CM_01_constructor_sets_correct_values() public creditManagerTest {
         vm.expectRevert(ZeroAddressException.selector);
-        new CreditManagerV3Harness(
+        new CreditManagerV3(
+            address(0),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            name
+        );
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditManagerV3(
             address(poolMock),
             address(0),
             address(priceOracleMock),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
-            name,
-            isFeeToken
+            name
+        );
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditManagerV3(
+            address(poolMock),
+            address(accountFactory),
+            address(0),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            name
         );
 
         vm.expectRevert(IncorrectParameterException.selector);
-        new CreditManagerV3Harness(
-            address(poolMock),
-            address(accountFactory),
-            address(priceOracleMock),
-            0,
-            DEFAULT_FEE_INTEREST,
-            name,
-            isFeeToken
+        new CreditManagerV3(
+            address(poolMock), address(accountFactory), address(priceOracleMock), 0, DEFAULT_FEE_INTEREST, name
         );
 
         PriceOracleMock priceOracleMock2 = new PriceOracleMock();
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        new CreditManagerV3Harness(
+        new CreditManagerV3(
             address(poolMock),
             address(accountFactory),
             address(priceOracleMock2),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
-            name,
-            isFeeToken
+            name
         );
 
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));

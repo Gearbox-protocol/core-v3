@@ -65,7 +65,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     /// @notice Constructor
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _creditManager) ControlledTrait(IPoolV3(CreditManagerV3(_creditManager).pool()).acl()) {
+    /// @dev Reverts if `_creditManager` is zero address
+    constructor(address _creditManager)
+        ControlledTrait(_creditManager == address(0) ? address(0) : IPoolV3(CreditManagerV3(_creditManager).pool()).acl()) // I:[CC-1]
+    {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 

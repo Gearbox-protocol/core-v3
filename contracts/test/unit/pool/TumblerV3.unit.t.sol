@@ -44,9 +44,12 @@ contract TumblerV3UnitTest is Test {
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
-    function test_U_TU_01_constructor_works_as_expected() public view {
+    function test_U_TU_01_constructor_works_as_expected() public {
         assertEq(tumbler.quotaKeeper(), address(poolQuotaKeeper), "Incorrect quotaKeeper");
         assertEq(tumbler.epochLength(), 1 days, "Incorrect epochLength");
+
+        vm.expectRevert(ZeroAddressException.selector);
+        tumbler = new TumblerV3(address(0), 1 days);
     }
 
     /// @notice U:[TU-2]: `addToken` works as expected

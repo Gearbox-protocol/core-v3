@@ -43,6 +43,7 @@ import {
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -60,7 +61,7 @@ import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 ///         - policies on how liquidations with loss are performed
 ///         - forbidden tokens (they count towards account value, but having them enabled as collateral restricts allowed
 ///         actions and triggers a safer version of collateral check, incentivizing users to decrease exposure to them).
-contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardTrait, SanityCheckTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
@@ -157,9 +158,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, unless the date is set via `setExpirationDate` in the configurator.
+    /// @dev Reverts if any of `_creditManager` or `_botList` is zero address
     /// @dev Reverts if `_creditManager` is not added to the `_botList`
     constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
-        ACLTrait(IPoolV3(ICreditManagerV3(_creditManager).pool()).acl())
+        ACLTrait(_creditManager == address(0) ? address(0) : IPoolV3(ICreditManagerV3(_creditManager).pool()).acl()) // U:[FA-1]
+        nonZeroAddress(_botList) // U:[FA-1]
     {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]

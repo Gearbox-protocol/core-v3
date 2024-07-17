@@ -6,7 +6,8 @@ pragma solidity ^0.8.23;
 import {
     AddressIsNotContractException,
     RegisteredCreditManagerOnlyException,
-    RegisteredPoolOnlyException
+    RegisteredPoolOnlyException,
+    ZeroAddressException
 } from "../interfaces/IExceptions.sol";
 import {IContractsRegister} from "../interfaces/base/IContractsRegister.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
@@ -31,7 +32,9 @@ abstract contract ContractsRegisterTrait is IContractsRegisterTrait {
 
     /// @notice Constructor
     /// @param  contractsRegister_ Contracts register contract address
+    /// @dev    Reverts if `contractsRegister_` is zero address or is not a contract
     constructor(address contractsRegister_) {
+        if (contractsRegister_ == address(0)) revert ZeroAddressException();
         if (contractsRegister_.code.length == 0) revert AddressIsNotContractException(contractsRegister_);
         contractsRegister = contractsRegister_;
     }

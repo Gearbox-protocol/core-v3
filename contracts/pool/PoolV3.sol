@@ -143,7 +143,7 @@ contract PoolV3 is
         bytes32 salt_
     )
         ControlledTrait(acl_) // U:[LP-1A]
-        ContractsRegisterTrait(contractsRegister_)
+        ContractsRegisterTrait(contractsRegister_) // U:[LP-1A]
         ERC4626(IERC20(underlying_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]

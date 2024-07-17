@@ -190,6 +190,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
 
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(address(0), address(botListMock), weth, address(degenNFTMock), expirable);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(address(creditManagerMock), address(0), weth, address(degenNFTMock), expirable);
+
         botListMock.setCreditManagerAddedReturns(false);
         vm.expectRevert(CreditManagerNotAddedException.selector);
         new CreditFacadeV3Harness(
