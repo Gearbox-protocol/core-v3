@@ -7,7 +7,7 @@ pragma solidity ^0.8.23;
 import {GaugeV3, QuotaRateParams, UserTokenVotes} from "../../../pool/GaugeV3.sol";
 
 contract GaugeV3Harness is GaugeV3 {
-    constructor(address acl, address _pool, address _gearStaking) GaugeV3(acl, _pool, _gearStaking) {}
+    constructor(address _pool, address _gearStaking) GaugeV3(_pool, _gearStaking) {}
 
     function setQuotaRateParams(
         address token,

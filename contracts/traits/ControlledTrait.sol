@@ -24,6 +24,7 @@ abstract contract ControlledTrait is ACLTrait, IControlledTrait {
 
     /// @notice Constructor
     /// @param  acl_ ACL contract address
+    /// @dev    Reverts if `acl_` is zero address or is not a contract
     constructor(address acl_) ACLTrait(acl_) {}
 
     /// @notice Sets new external controller, can only be called by configurator

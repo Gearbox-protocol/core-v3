@@ -54,6 +54,7 @@ contract PriceOracleV3 is ControlledTrait, PriceFeedValidationTrait, SanityCheck
 
     /// @notice Constructor
     /// @param  acl_ ACL contract address
+    /// @dev    Reverts if `acl_` is zero address or is not a contract
     constructor(address acl_) ControlledTrait(acl_) {}
 
     /// @notice Returns all tokens that have price feeds

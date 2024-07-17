@@ -21,6 +21,7 @@ import {CreditManagerV3} from "./CreditManagerV3.sol";
 import {ICreditConfiguratorV3, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IAdapter} from "../interfaces/base/IAdapter.sol";
 import {IPhantomToken} from "../interfaces/base/IPhantomToken.sol";
 
@@ -62,10 +63,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, Reentra
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager) ControlledTrait(_acl) {
+    /// @dev Reverts if `_creditManager` is zero address
+    constructor(address _creditManager)
+        ControlledTrait(_creditManager == address(0) ? address(0) : IPoolV3(CreditManagerV3(_creditManager).pool()).acl()) // I:[CC-1]
+    {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 

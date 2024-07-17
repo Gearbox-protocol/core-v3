@@ -139,7 +139,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
-        PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        PoolMock poolMock =
+            new PoolMock(address(addressProvider), address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
         treasury = makeAddr("TREASURY");
         poolMock.setTreasury(treasury);
 
@@ -168,7 +169,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
-            address(addressProvider),
             address(creditManagerMock),
             address(botListMock),
             tokenTestSuite.addressOf(Tokens.WETH),
@@ -185,9 +185,22 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
         assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
-        assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        assertEq(creditFacade.weth(), weth, "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(address(0), address(botListMock), weth, address(degenNFTMock), expirable);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(address(creditManagerMock), address(0), weth, address(degenNFTMock), expirable);
+
+        botListMock.setCreditManagerAddedReturns(false);
+        vm.expectRevert(CreditManagerNotAddedException.selector);
+        new CreditFacadeV3Harness(
+            address(creditManagerMock), address(botListMock), weth, address(degenNFTMock), expirable
+        );
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause

@@ -10,8 +10,7 @@ import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
     CreditManagerNotAddedException,
-    MasterCreditAccountAlreadyDeployedException,
-    RegisteredCreditManagerOnlyException
+    MasterCreditAccountAlreadyDeployedException
 } from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";

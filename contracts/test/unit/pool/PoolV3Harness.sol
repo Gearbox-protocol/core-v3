@@ -13,14 +13,15 @@ contract PoolV3Harness is PoolV3 {
     constructor(
         address acl,
         address contractsRegister,
-        address underlyingToken_,
+        address underlying_,
         address treasury_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
-        string memory symbol_
+        string memory symbol_,
+        bytes32 salt_
     )
-        PoolV3(acl, contractsRegister, underlyingToken_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_)
+        PoolV3(acl, contractsRegister, underlying_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_, salt_)
     {}
 
     // ------- //
@@ -75,10 +76,6 @@ contract PoolV3Harness is PoolV3 {
     // ------ //
     // QUOTAS //
     // ------ //
-
-    function hackQuotaKeeper(address quotaKeeper) external {
-        _quotaKeeper = quotaKeeper;
-    }
 
     function hackQuotaRevenue(uint256 value) external {
         _quotaRevenue = uint96(value);

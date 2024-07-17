@@ -15,15 +15,16 @@ contract PoolV3_USDT is PoolV3, USDT_Transfer {
     constructor(
         address acl_,
         address contractsRegister_,
-        address underlyingToken_,
+        address underlying_,
         address treasury_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
-        string memory symbol_
+        string memory symbol_,
+        bytes32 salt_
     )
-        PoolV3(acl_, contractsRegister_, underlyingToken_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_)
-        USDT_Transfer(underlyingToken_)
+        PoolV3(acl_, contractsRegister_, underlying_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_, salt_)
+        USDT_Transfer(underlying_)
     {}
 
     function _amountWithFee(uint256 amount) internal view override returns (uint256) {

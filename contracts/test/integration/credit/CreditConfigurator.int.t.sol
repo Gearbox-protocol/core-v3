@@ -29,7 +29,6 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
-import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
@@ -64,7 +63,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
-    ) internal {
+    ) internal view {
         (
             ,
             uint16 feeLiquidation2,
@@ -120,6 +119,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
 
     /// @dev I:[CC-1]: constructor sets correct values
     function test_I_CC_01_constructor_sets_correct_values() public creditTest {
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditConfiguratorV3(address(0));
+
         assertEq(address(creditConfigurator.creditManager()), address(creditManager), "Incorrect creditManager");
 
         assertEq(address(creditConfigurator.creditFacade()), address(creditFacade), "Incorrect creditFacade");
@@ -802,7 +804,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
     {
         if (expirable) {
             CreditFacadeV3 initialCf =
-                new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), true);
+                new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), true);
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(initialCf));
@@ -821,9 +823,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
-        CreditFacadeV3 cf = new CreditFacadeV3(
-            address(acl), address(creditManager), address(botList), address(0), address(0), expirable
-        );
+        CreditFacadeV3 cf =
+            new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), expirable);
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -860,8 +861,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
     function test_I_CC_22B_setCreditFacade_reverts_if_new_facade_is_adapter() public creditTest {
         vm.startPrank(CONFIGURATOR);
 
-        CreditFacadeV3 cf =
-            new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), false);
+        CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), false);
         AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
         TargetContractMock target = new TargetContractMock();
 
@@ -897,8 +897,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
 
         vm.stopPrank();
 
-        CreditFacadeV3 cf =
-            new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), false);
+        CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), false);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setCreditFacade(address(cf));
@@ -915,9 +914,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         BotListV3 otherBotList = new BotListV3(address(this));
         otherBotList.addCreditManager(address(creditManager));
 
-        CreditFacadeV3 newCreditFacade = new CreditFacadeV3(
-            address(acl), address(creditManager), address(otherBotList), address(0), address(0), false
-        );
+        CreditFacadeV3 newCreditFacade =
+            new CreditFacadeV3(address(creditManager), address(otherBotList), address(0), address(0), false);
 
         vm.expectRevert(IncorrectBotListException.selector);
         vm.prank(CONFIGURATOR);
@@ -934,12 +932,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter1));
 
-        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(acl), address(creditManager));
+        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(creditManager));
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter2));
 
-        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(acl), address(creditManager));
+        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(creditManager));
 
         vm.expectRevert(IncorrectAdaptersSetException.selector);
         vm.prank(CONFIGURATOR);
@@ -1089,7 +1087,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
 
-        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager));
+        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(creditManager));
 
         address[] memory newAllowedAdapters = newConfigurator.allowedAdapters();
 

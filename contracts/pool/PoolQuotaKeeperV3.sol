@@ -74,16 +74,18 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ControlledTrait, ContractsRegi
     }
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
-    /// @param contractsRegister_ Contracts register address
-    /// @param pool_ Pool address
+    /// @param  acl_ ACL contract address
+    /// @param  contractsRegister_ Contracts register address
+    /// @param  underlying_ Underlying token address
+    /// @param  pool_ Pool address
+    /// @dev    Quota keeper is deployed via `CREATE2` inside pool's constructor so inputs validity is ensured there
     /// @custom:tests U:[QK-1]
-    constructor(address acl_, address contractsRegister_, address pool_)
+    constructor(address acl_, address contractsRegister_, address underlying_, address pool_)
         ControlledTrait(acl_)
         ContractsRegisterTrait(contractsRegister_)
     {
         pool = pool_;
-        underlying = IPoolV3(pool_).asset();
+        underlying = underlying_;
     }
 
     /// @notice Whether `creditManager` is added

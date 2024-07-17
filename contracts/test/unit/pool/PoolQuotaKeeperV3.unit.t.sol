@@ -62,9 +62,9 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper {
         addressProvider = new AddressProviderV3ACLMock();
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        poolMock = new PoolMock(address(addressProvider), underlying);
+        poolMock = new PoolMock(address(addressProvider), address(addressProvider), underlying);
 
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), underlying, address(poolMock));
 
         poolMock.setPoolQuotaKeeper(address(pqk));
 
@@ -89,7 +89,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper {
     //
 
     /// @notice U:[QK-1]: constructor sets parameters correctly
-    function test_U_QK_01_constructor_sets_parameters_correctly() public {
+    function test_U_QK_01_constructor_sets_parameters_correctly() public view {
         assertEq(address(poolMock), pqk.pool(), "Incorrect poolMock address");
         assertEq(underlying, pqk.underlying(), "Incorrect poolMock address");
     }
@@ -276,7 +276,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper {
 
     /// @notice U:[QK-7]: setGauge works as expected
     function test_U_QK_07_setGauge_works_as_expected() public {
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), underlying, address(poolMock));
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
@@ -301,7 +301,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper {
 
     /// @notice U:[QK-8]: addCreditManager works as expected
     function test_U_QK_08_addCreditManager_works_as_expected() public {
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), underlying, address(poolMock));
 
         address[] memory managers = pqk.creditManagers();
         assertEq(managers.length, 0, "SETUP: at least one creditmanager is unexpectedly connected");

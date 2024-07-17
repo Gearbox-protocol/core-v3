@@ -4,14 +4,16 @@
 pragma solidity ^0.8.23;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
-import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
+import {USDTFees} from "../../../libraries/USDTFees.sol";
+import {IUSDT} from "../../../interfaces/external/IUSDT.sol";
 
 import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
-contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
+contract CreditManagerV3Harness is CreditManagerV3 {
+    using USDTFees for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     bool _enableTransferFee;
@@ -24,10 +26,7 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         uint16 _feeInterest,
         string memory _name,
         bool enableTransferFee
-    )
-        CreditManagerV3(_pool, _accountFactory, _priceOracle, _maxEnabledTokens, _feeInterest, _name)
-        USDT_Transfer(IPoolV3(_pool).underlyingToken())
-    {
+    ) CreditManagerV3(_pool, _accountFactory, _priceOracle, _maxEnabledTokens, _feeInterest, _name) {
         _enableTransferFee = enableTransferFee;
     }
 
@@ -129,10 +128,16 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
     }
 
     function _amountWithFee(uint256 amount) internal view override returns (uint256) {
-        return _enableTransferFee ? _amountUSDTWithFee(amount) : amount;
+        if (!_enableTransferFee) return amount;
+        uint256 basisPointsRate = IUSDT(underlying).basisPointsRate();
+        if (basisPointsRate == 0) return amount;
+        return amount.amountUSDTWithFee({basisPointsRate: basisPointsRate, maximumFee: IUSDT(underlying).maximumFee()});
     }
 
     function _amountMinusFee(uint256 amount) internal view override returns (uint256) {
-        return _enableTransferFee ? _amountUSDTMinusFee(amount) : amount;
+        if (!_enableTransferFee) return amount;
+        uint256 basisPointsRate = IUSDT(underlying).basisPointsRate();
+        if (basisPointsRate == 0) return amount;
+        return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: IUSDT(underlying).maximumFee()});
     }
 }

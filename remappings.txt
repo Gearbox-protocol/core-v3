@@ -1,4 +1,3 @@
-ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 @1inch=lib/@1inch/
 @openzeppelin/=lib/@openzeppelin/

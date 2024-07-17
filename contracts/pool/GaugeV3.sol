@@ -54,14 +54,12 @@ contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param  acl_ ACL contract address
     /// @param  quotaKeeper_ Address of the quota keeper to provide rates for
     /// @param  gearStaking_ Address of the GEAR staking contract
     /// @dev    Reverts if any of `quotaKeeper_` or `gearStaking_` is zero address
     /// @custom:tests U:[GA-1]
-    constructor(address acl_, address quotaKeeper_, address gearStaking_)
-        ControlledTrait(acl_)
-        nonZeroAddress(quotaKeeper_)
+    constructor(address quotaKeeper_, address gearStaking_)
+        ControlledTrait(quotaKeeper_ == address(0) ? address(0) : IPoolQuotaKeeperV3(quotaKeeper_).acl())
         nonZeroAddress(gearStaking_)
     {
         quotaKeeper = quotaKeeper_;
