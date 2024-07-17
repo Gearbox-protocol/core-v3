@@ -277,6 +277,17 @@ contract CreditManagerV3UnitTest is TestHelper, BalanceHelper, CreditAccountMock
 
     /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
     function test_U_CM_01_constructor_sets_correct_values() public creditManagerTest {
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(0),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            name,
+            isFeeToken
+        );
+
         vm.expectRevert(IncorrectParameterException.selector);
         new CreditManagerV3Harness(
             address(poolMock),

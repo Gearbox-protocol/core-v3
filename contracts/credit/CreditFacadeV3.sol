@@ -153,7 +153,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @notice Constructor
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _botList Bot list address
-    /// @param _weth WETH token address
+    /// @param _weth WETH token address or `address(0)`
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, unless the date is set via `setExpirationDate` in the configurator.

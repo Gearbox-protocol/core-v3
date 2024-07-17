@@ -57,6 +57,9 @@ contract GearStakingV3UnitTest is Test {
 
     /// @dev U:[GS-1]: constructor sets correct values
     function test_U_GS_01_constructor_sets_correct_values() public {
+        vm.expectRevert(ZeroAddressException.selector);
+        new GearStakingV3(CONFIGURATOR, address(0), block.timestamp);
+
         assertEq(address(gearStaking.gear()), gearToken, "Gear token incorrect");
         assertEq(gearStaking.getCurrentEpoch(), 0, "First epoch timestamp incorrect");
 

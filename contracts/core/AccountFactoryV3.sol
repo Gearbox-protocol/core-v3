@@ -70,6 +70,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
 
     /// @notice Constructor
     /// @param  owner_ Contract owner
+    /// @dev    Reverts if `owner_` is zero address
     constructor(address owner_) {
         transferOwnership(owner_);
     }

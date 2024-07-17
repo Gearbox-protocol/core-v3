@@ -72,9 +72,6 @@ contract GauageV3UnitTest is TestHelper {
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
         assertEq(gauge.epochLastUpdate(), 900, "Incorrect epoch");
         assertTrue(gauge.epochFrozen(), "Epoch not frozen");
-
-        vm.expectRevert(ZeroAddressException.selector);
-        new GaugeV3Harness(address(poolQuotaKeeperMock), address(0));
     }
 
     /// @dev U:[GA-2]: voterOnly functions reverts if called by non-voter

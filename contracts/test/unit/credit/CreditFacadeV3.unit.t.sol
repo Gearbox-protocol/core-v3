@@ -185,9 +185,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
         assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
         assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
-        assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        assertEq(creditFacade.weth(), weth, "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
+
+        botListMock.setCreditManagerAddedReturns(false);
+        vm.expectRevert(CreditManagerNotAddedException.selector);
+        new CreditFacadeV3Harness(
+            address(creditManagerMock), address(botListMock), weth, address(degenNFTMock), expirable
+        );
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause

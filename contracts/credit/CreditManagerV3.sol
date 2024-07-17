@@ -157,6 +157,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Sets `msg.sender` as credit configurator, which MUST then pass the role to `CreditConfiguratorV3` contract
     ///      once it's deployed via `setCreditConfigurator`. The latter performs crucial sanity checks, and configuring
     ///      the credit manager without them might have dramatic consequences.
+    /// @dev Reverts if `_accountFactory` is zero address
     /// @dev Reverts if `_maxEnabledTokens` is zero
     constructor(
         address _pool,
@@ -165,7 +166,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint8 _maxEnabledTokens,
         uint16 _feeInterest,
         string memory _name
-    ) {
+    )
+        nonZeroAddress(_accountFactory) // U:[CM-1]
+    {
         if (_maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
 
         pool = _pool; // U:[CM-1]
