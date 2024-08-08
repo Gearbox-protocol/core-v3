@@ -339,7 +339,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             if (remainingBorrowable < 10 * minDebt) {
                 uint256 depositAmount = 10 * minDebt;
                 {
-                    if (pool.expectedLiquidity() != 0) {
+                    if (pool.expectedLiquidity() != 0 && pool.expectedLiquidity() > pool.availableLiquidity()) {
                         uint256 utilization =
                             WAD * (pool.expectedLiquidity() - pool.availableLiquidity()) / pool.expectedLiquidity();
                         if (utilization > 85 * WAD / 100) {
