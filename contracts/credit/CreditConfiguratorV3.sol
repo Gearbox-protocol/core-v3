@@ -90,6 +90,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @dev Reverts if `token` is underlying
     /// @dev Reverts if `token` is not quoted in the quota keeper
     /// @dev Reverts if `liquidationThreshold` is greater than underlying's LT
+    /// @dev `liquidationThreshold` can be zero to allow users to deposit connector tokens to credit accounts and swap
+    ///      them into actual collateral and to withdraw reward tokens sent to credit accounts by integrated protocols
     function addCollateralToken(address token, uint16 liquidationThreshold)
         external
         override
