@@ -332,24 +332,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // CREDIT MANAGER //
     // -------------- //
 
-    /// @notice Sets the maximum number of tokens enabled as collateral on a credit account
-    /// @param newMaxEnabledTokens New maximum number of enabled tokens
-    /// @dev Reverts if `newMaxEnabledTokens` is zero
-    function setMaxEnabledTokens(uint8 newMaxEnabledTokens)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        CreditManagerV3 cm = CreditManagerV3(creditManager);
-
-        if (newMaxEnabledTokens == 0) revert IncorrectParameterException(); // I:[CC-26]
-
-        if (newMaxEnabledTokens == cm.maxEnabledTokens()) return;
-
-        cm.setMaxEnabledTokens(newMaxEnabledTokens); // I:[CC-26]
-        emit SetMaxEnabledTokens(newMaxEnabledTokens); // I:[CC-26]
-    }
-
     /// @notice Sets new fees params in the credit manager (all fields in bps)
     /// @notice Sets underlying token's liquidation threshold to 1 - liquidation fee - liquidation premium and
     ///         upper-bounds all other tokens' LTs with this number, which interrupts ongoing LT rampings

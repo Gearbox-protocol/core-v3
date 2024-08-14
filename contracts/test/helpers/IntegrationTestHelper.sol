@@ -383,6 +383,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
+                maxEnabledTokens: cmParams.maxEnabledTokens,
                 feeInterest: cmParams.feeInterest,
                 name: cmParams.name
             });
