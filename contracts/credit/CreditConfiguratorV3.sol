@@ -10,6 +10,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBRARIES & CONSTANTS
 import {BitMask} from "../libraries/BitMask.sol";
+import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
@@ -333,14 +334,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // -------------- //
 
     /// @notice Sets new fees params in the credit manager (all fields in bps)
-    /// @notice Sets underlying token's liquidation threshold to 1 - liquidation fee - liquidation premium and
-    ///         upper-bounds all other tokens' LTs with this number, which interrupts ongoing LT rampings
+    /// @notice Sets underlying token's liquidation threshold to 1 - liquidation fee - liquidation premium
     /// @param feeLiquidation Percentage of liquidated account value taken by the protocol as profit
     /// @param liquidationPremium Percentage of liquidated account value that can be taken by liquidator
     /// @param feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
     /// @param liquidationPremiumExpired Percentage of liquidated expired account value that can be taken by liquidator
     /// @dev Reverts if `liquidationPremium + feeLiquidation` is above 100%
     /// @dev Reverts if `liquidationPremiumExpired + feeLiquidationExpired` is above 100%
+    /// @dev Reverts if new underlying's LT is below some collateral token's LT, accounting for ramps
     function setFees(
         uint16 feeLiquidation,
         uint16 liquidationPremium,
@@ -414,15 +415,21 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             ltFinal: ltUnderlying,
             timestampRampStart: type(uint40).max,
             rampDuration: 0
-        }); // I:[CC-25]
+        }); // I:[CC-18]
 
         uint256 len = CreditManagerV3(creditManager).collateralTokensCount();
         unchecked {
             for (uint256 i = 1; i < len; ++i) {
-                (address token, uint16 lt) = CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: 1 << i});
-                if (lt > ltUnderlying) {
-                    _setLiquidationThreshold({token: token, liquidationThreshold: ltUnderlying}); // I:[CC-25]
-                }
+                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+                (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
+                    CreditManagerV3(creditManager).ltParams(token);
+                uint16 lt = CreditLogic.getLiquidationThreshold({
+                    ltInitial: ltInitial,
+                    ltFinal: ltFinal,
+                    timestampRampStart: timestampRampStart,
+                    rampDuration: rampDuration
+                });
+                if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
             }
         }
     }
@@ -485,7 +492,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
-            _setMaxCumulativeLoss(maxCumulativeLoss); // [CC-22]
+            _setMaxCumulativeLoss(maxCumulativeLoss); // I:[CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
