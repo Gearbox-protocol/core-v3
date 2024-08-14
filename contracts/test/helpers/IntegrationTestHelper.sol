@@ -548,8 +548,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _makeAccountsLiquitable() internal {
-        vm.prank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
+        uint256 idx = creditManager.collateralTokensCount() - 1;
+        while (idx != 0) {
+            address token = creditManager.getTokenByMask(1 << (idx--));
+            creditConfigurator.setLiquidationThreshold(token, 0);
+        }
         creditConfigurator.setFees(200, 9000, 100, 9500);
+        vm.stopPrank();
 
         // switch to new block to be able to close account
         vm.roll(block.number + 1);
