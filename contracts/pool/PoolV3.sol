@@ -41,8 +41,14 @@ struct DebtParams {
 }
 
 /// @title Pool V3
-/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
-/// @notice Pool shares implement EIP-2612 permits
+/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard and
+///         supporting EIP-2612 permits. Pool's underlying is expected to be your normal ERC-20 token:
+///         - no rebasing or any calculations that can affect transfers accuracy (fee-on-transfer tokens can
+///         be supported though by overriding `_amountWithFee` and `_amountMinusFee` functions)
+///         - such scale that amounts fit into `uint96` and are not sensitive to ~4 digits precision loss
+///         (nearly all tokens with decimals between 6 and 18 work)
+/// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
+///      dead address before allowing borrowing
 contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
@@ -172,7 +178,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // ---------------- //
 
     /// @notice Total amount of underlying tokens managed by the pool, same as `expectedLiquidity`
-    /// @dev Since `totalAssets` doesn't depend on underlying balance, pool is not vulnerable to the inflation attack
     function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
@@ -363,14 +368,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Internal conversion function (from assets to shares) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
         uint256 supply = totalSupply();
         return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
     }
 
     /// @dev Internal conversion function (from shares to assets) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         uint256 supply = totalSupply();
         return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
