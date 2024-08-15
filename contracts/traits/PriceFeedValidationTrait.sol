@@ -27,9 +27,6 @@ abstract contract PriceFeedValidationTrait {
     }
 
     /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
-    /// @dev Some price feeds return stale prices unless updated right before querying their answer, which causes
-    ///      issues during deployment and configuration, so for such price feeds staleness check is skipped, and
-    ///      special care must be taken to ensure all parameters are in tune.
     /// @custom:tests U:[PO-8]
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
         if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed);
@@ -50,7 +47,7 @@ abstract contract PriceFeedValidationTrait {
                 if (stalenessPeriod != 0) revert IncorrectParameterException();
             } else {
                 if (stalenessPeriod == 0) revert IncorrectParameterException();
-                if (!_isUpdatable(priceFeed)) _checkAnswer(answer, updatedAt, stalenessPeriod);
+                _checkAnswer(answer, updatedAt, stalenessPeriod);
             }
         } catch {
             revert IncorrectPriceFeedException();
