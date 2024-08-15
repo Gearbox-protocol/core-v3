@@ -750,6 +750,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // INTERNALS //
     // --------- //
 
+    /// @dev Same as `ERC20._transfer` but reverts if contract is paused
+    function _transfer(address from, address to, uint256 amount)
+        internal
+        override
+        whenNotPaused // U:[LP-2A]
+    {
+        super._transfer(from, to, amount);
+    }
+
     /// @dev Returns amount of token that should be transferred to receive `amount`
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
