@@ -694,7 +694,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (uint256 newDebt,,) =
             ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
 
-        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28,32,33]
+        _revertIfOutOfDebtLimits(newDebt, action); // U:[FA-28,32,33]
     }
 
     /// @dev `ICreditFacadeV3Multicall.updateQuota` implementation
@@ -881,9 +881,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         totalBorrowedInBlock = uint128(newDebtInCurrentBlock); // U:[FA-43]
     }
 
-    /// @dev Ensures that account's debt principal is within allowed range or is zero
-    function _revertIfOutOfDebtLimits(uint256 debt) internal view {
-        if (debt == 0) return;
+    /// @dev Ensures that account's debt principal takes allowed values:
+    ///      - for borrowing, new debt must be within allowed limits
+    ///      - for repayment, new debt must be above allowed minimum or zero
+    function _revertIfOutOfDebtLimits(uint256 debt, ManageDebtAction action) internal view {
+        if (debt == 0 && action == ManageDebtAction.DECREASE_DEBT) return;
         uint256 minDebt;
         uint256 maxDebt;
 
@@ -895,7 +897,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             minDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
         }
 
-        if (debt < minDebt || debt > maxDebt) {
+        if (debt < minDebt || debt > maxDebt && action == ManageDebtAction.INCREASE_DEBT) {
             revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
         }
     }
