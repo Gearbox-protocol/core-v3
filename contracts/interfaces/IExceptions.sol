@@ -293,7 +293,7 @@ error ParameterChangedAfterQueuedTxException();
 error InvalidBotException();
 
 /// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
-error InsufficientBotPermissionsException();
+error IncorrectBotPermissionsException();
 
 // --------------- //
 // ACCOUNT FACTORY //

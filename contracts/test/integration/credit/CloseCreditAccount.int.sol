@@ -146,6 +146,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         );
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ADD_COLLATERAL_PERMISSION);
 
         vm.prank(USER);
         creditFacade.multicall(

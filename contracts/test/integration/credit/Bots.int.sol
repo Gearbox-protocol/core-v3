@@ -46,6 +46,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
@@ -107,6 +108,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         vm.expectCall(
             address(creditManager),
