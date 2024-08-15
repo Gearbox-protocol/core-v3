@@ -27,11 +27,11 @@ interface IBotListV3Events {
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Emitted when `bot`'s forbidden status is set
-    event SetBotForbiddenStatus(address indexed bot, bool forbidden);
+    /// @notice Emitted when `bot` is forbidden
+    event ForbidBot(address indexed bot);
 
-    /// @notice Emitted when `creditManager`'s approved status is set
-    event SetCreditManagerApprovedStatus(address indexed creditManager, bool approved);
+    /// @notice Emitted when `creditManager` is approved
+    event ApproveCreditManager(address indexed creditManager);
 }
 
 /// @title Bot list V3 interface
@@ -63,7 +63,7 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function approvedCreditManager(address creditManager) external view returns (bool);
 
-    function setBotForbiddenStatus(address bot, bool forbidden) external;
+    function forbidBot(address bot) external;
 
-    function setCreditManagerApprovedStatus(address creditManager, bool approved) external;
+    function approveCreditManager(address creditManager) external;
 }

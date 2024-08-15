@@ -96,7 +96,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.botMulticall(creditAccount, calls);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(bot);
 
         vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (bot)));
         vm.prank(bot);

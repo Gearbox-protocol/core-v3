@@ -131,20 +131,20 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         return _botInfo[bot].forbidden;
     }
 
-    /// @notice Sets `bot`'s status to `forbidden`
-    function setBotForbiddenStatus(address bot, bool forbidden) external override onlyOwner {
+    /// @notice Forbid's `bot`
+    function forbidBot(address bot) external override onlyOwner {
         BotInfo storage info = _botInfo[bot];
-        if (info.forbidden != forbidden) {
-            info.forbidden = forbidden;
-            emit SetBotForbiddenStatus(bot, forbidden);
+        if (!info.forbidden) {
+            info.forbidden = true;
+            emit ForbidBot(bot);
         }
     }
 
-    /// @notice Sets `creditManager`'s status to `approved`
-    function setCreditManagerApprovedStatus(address creditManager, bool approved) external override onlyOwner {
-        if (approvedCreditManager[creditManager] != approved) {
-            approvedCreditManager[creditManager] = approved;
-            emit SetCreditManagerApprovedStatus(creditManager, approved);
+    /// @notice Approves `creditManager`
+    function approveCreditManager(address creditManager) external override onlyOwner {
+        if (!approvedCreditManager[creditManager]) {
+            approvedCreditManager[creditManager] = true;
+            emit ApproveCreditManager(creditManager);
         }
     }
 
