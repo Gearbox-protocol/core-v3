@@ -152,6 +152,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
+    /// @dev Checks that `_priceOracle` has a price for underlying
     /// @dev Sets `msg.sender` as credit configurator
     constructor(
         address _pool,
@@ -171,6 +172,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
+        try IPriceOracleV3(_priceOracle).getPrice(underlying) returns (uint256) {}
+        catch {
+            revert IncorrectPriceException(); // U:[CM-1]
+        }
         _addToken(underlying); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]

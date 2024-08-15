@@ -442,12 +442,24 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
+    /// @dev Checks that `newPriceOracle` has prices for all collateral tokens
     function setPriceOracle(address newPriceOracle)
         external
         override
         configuratorOnly // I:[CC-2]
     {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
+
+        uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
+        unchecked {
+            for (uint256 i; i < num; ++i) {
+                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+                try IPriceOracleV3(newPriceOracle).getPrice(token) returns (uint256) {}
+                catch {
+                    revert IncorrectPriceException(); // I:[CC-21]
+                }
+            }
+        }
 
         CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
