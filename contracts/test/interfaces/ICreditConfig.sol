@@ -56,6 +56,27 @@ struct VelodromeV2Pool {
     address factory;
 }
 
+struct PendlePair {
+    address market;
+    Tokens inputToken;
+    Tokens pendleToken;
+    uint8 status;
+}
+
+struct MellowUnderlyingConfig {
+    Contracts vault;
+    Tokens underlying;
+}
+
+struct AdapterConfig {
+    BalancerPool[] balancerPools;
+    UniswapV3Pair[] uniswapV3Pairs;
+    GenericSwapPair[] genericSwapPairs;
+    VelodromeV2Pool[] velodromeV2Pools;
+    PendlePair[] pendlePairs;
+    MellowUnderlyingConfig[] mellowUnderlyings;
+}
+
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
     /// @dev The Credit Manager's name
@@ -88,10 +109,7 @@ struct CreditManagerV3DeployParams {
     uint256 poolLimit;
     //
     // ADAPTER CIONFIGURATION
-    BalancerPool[] balancerPools;
-    UniswapV3Pair[] uniswapV3Pairs;
-    GenericSwapPair[] genericSwapPairs;
-    VelodromeV2Pool[] velodromeV2Pools;
+    AdapterConfig adapterConfig;
 }
 
 struct GaugeRate {
