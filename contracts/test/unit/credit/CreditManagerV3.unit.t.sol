@@ -529,11 +529,20 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditAccount, expectedAccount, _testCaseErr("Incorrect credit account returned"));
 
-        (,, uint128 cumulativeQuotaInterest, uint128 quotaFees,, uint16 flags, uint64 lastDebtUpdate, address borrower)
-        = creditManager.creditAccountInfo(creditAccount);
+        (
+            ,
+            ,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
         assertEq(quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
+        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokensMask"));
         assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
@@ -570,9 +579,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: 0,
-            cumulativeIndexLastUpdate: 0,
-            cumulativeQuotaInterest: 0,
-            quotaFees: 0,
+            cumulativeIndexLastUpdate: 123,
+            cumulativeQuotaInterest: 123,
+            quotaFees: 123,
             enabledTokensMask: 0,
             flags: 123,
             borrower: address(0)
@@ -581,11 +590,22 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
         creditManager.closeCreditAccount(creditAccount);
 
-        (,,,, uint256 enabledTokensMask, uint16 flags, uint64 lastDebtUpdate, address borrower) =
-            creditManager.creditAccountInfo(creditAccount);
-        assertEq(enabledTokensMask, 0, "enabledTokensMask not cleared");
+        (
+            ,
+            uint256 cumulativeIndexLastUpdate,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(cumulativeIndexLastUpdate, 0, "cumulativeIndexLastUpdate not cleaned");
+        assertEq(cumulativeQuotaInterest, 1, "cumulativeQuotaInterest not cleaned");
+        assertEq(quotaFees, 0, "quotaFees not cleaned");
+        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, "enabledTokensMask not cleared");
         assertEq(borrower, address(0), "borrower not cleared");
-        assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
+        assertEq(lastDebtUpdate, 0, "lastDebtUpdate not cleared");
         assertEq(flags, 0, "flags not cleared");
 
         assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
