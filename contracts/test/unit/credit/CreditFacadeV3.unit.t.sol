@@ -310,6 +310,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
+        vm.roll(block.number + 1);
 
         address weth = tokenTestSuite.addressOf(Tokens.WETH);
 
@@ -1195,12 +1196,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
 
-        {
-            uint64 blockNow = 100;
-            creditFacade.setLastBlockBorrowed(blockNow);
-
-            vm.roll(blockNow);
-        }
+        creditFacade.setLastBlockBorrowed(uint64(block.number + 100));
+        creditFacade.setTotalBorrowedInBlock(40);
+        vm.roll(block.number + 100);
 
         uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
 
@@ -1238,6 +1236,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, maxDebt, 1);
+        vm.roll(block.number + 1);
 
         creditManagerMock.setManageDebt(50);
 
@@ -1717,12 +1716,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
         assertEq(minDebt, 0, "SETUP: incorrect minDebt");
         assertEq(maxDebt, 0, "SETUP: incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), 0, "SETUP: incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), 0, "SETUP: incorrect totalBorrowedInBlock");
 
-        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt >= type(uint128).max
+        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt > type(uint128).max
         vm.expectRevert(IncorrectParameterException.selector);
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, type(uint128).max, 2);
+        creditFacade.setDebtLimits(1, type(uint128).max / 2 + 1, 2);
 
         // Case: it sets parameters properly
         vm.prank(CONFIGURATOR);
@@ -1734,6 +1735,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(maxDebtPerBlockMultiplier, 3, " incorrect maxDebtPerBlockMultiplier");
         assertEq(minDebt, 1, " incorrect minDebt");
         assertEq(maxDebt, 2, " incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), block.number, "incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
     }
 
     /// @dev U:[FA-50]: setBotList works properly
