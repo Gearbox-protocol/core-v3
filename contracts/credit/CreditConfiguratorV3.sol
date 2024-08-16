@@ -277,10 +277,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert AddressIsNotContractException(targetContract); // I:[CC-10A]
         }
 
-        if (
-            targetContract == creditManager || targetContract == creditFacade() || adapter == creditManager
-                || adapter == creditFacade()
-        ) revert TargetContractNotAllowedException(); // I:[CC-10C]
+        address cf = creditFacade();
+        if (targetContract == creditFacade() || adapter == creditFacade()) {
+            revert TargetContractNotAllowedException(); // I:[CC-10C]
+        }
 
         address currentAdapter = CreditManagerV3(creditManager).contractToAdapter(targetContract);
         if (currentAdapter != address(0)) {
@@ -487,6 +487,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param newCreditFacade New credit facade
     /// @param migrateParams Whether to migrate old credit facade params
     /// @dev Reverts if `newCreditFacade` is incompatible with credit manager
+    /// @dev Reverts if `newCreditFacade` is one of allowed adapters or their target contracts
     function setCreditFacade(address newCreditFacade, bool migrateParams)
         external
         override
@@ -496,6 +497,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (newCreditFacade == address(prevCreditFacade)) return;
 
         _revertIfContractIncompatible(newCreditFacade); // I:[CC-20]
+        if (
+            CreditManagerV3(creditManager).adapterToContract(newCreditFacade) != address(0)
+                || CreditManagerV3(creditManager).contractToAdapter(newCreditFacade) != address(0)
+        ) revert TargetContractNotAllowedException(); // I:[CC-22B]
 
         CreditManagerV3(creditManager).setCreditFacade(newCreditFacade); // I:[CC-22]
 
@@ -557,6 +562,16 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (newCreditConfigurator == address(this)) return;
 
         _revertIfContractIncompatible(newCreditConfigurator); // I:[CC-20]
+
+        address[] memory newAllowedAdapters = CreditConfiguratorV3(newCreditConfigurator).allowedAdapters();
+        uint256 num = newAllowedAdapters.length;
+        if (num != allowedAdaptersSet.length()) revert IncorrectAdaptersSetException(); // I:[CC-23]
+        unchecked {
+            for (uint256 i; i < num; ++i) {
+                if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
+            }
+        }
+
         CreditManagerV3(creditManager).setCreditConfigurator(newCreditConfigurator); // I:[CC-23]
         emit CreditConfiguratorUpgraded(newCreditConfigurator); // I:[CC-23]
     }
