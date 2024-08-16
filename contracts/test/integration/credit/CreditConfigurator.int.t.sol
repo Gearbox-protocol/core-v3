@@ -30,6 +30,7 @@ import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
+import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -253,10 +254,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMinDebtLimit(0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMaxDebtLimit(0);
+        creditConfigurator.setDebtLimits(0, 0);
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
@@ -597,40 +595,44 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // CREDIT MANAGER MGMT
     //
 
-    /// @dev I:[CC-15]: setMinDebtLimit and setMaxDebtLimit revert if minAmount > maxAmount
-    function test_I_CC_15_setMinDebtLimit_setMaxDebtLimit_revert_if_minAmount_gt_maxAmount() public creditTest {
+    /// @dev I:[CC-15]: setDebtLimits reverts if limits are incorrect
+    function test_I_CC_15_setDebtLimits_reverts_if_limits_are_incorrect() public creditTest {
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
+        // min debt greater than max debt
         vm.expectRevert(IncorrectLimitsException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(maxDebt + 1);
+        creditConfigurator.setDebtLimits(maxDebt, minDebt);
 
+        // ratio max / min greater than safety threshold
         vm.expectRevert(IncorrectLimitsException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(minDebt - 1);
+        creditConfigurator.setDebtLimits(minDebt, minDebt * 50);
+
+        // min debt evaluated at 0 USD
+        uint8 decimals = ERC20(underlying).decimals();
+        if (decimals > 8) {
+            vm.expectRevert(IncorrectLimitsException.selector);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setDebtLimits(uint128(10 ** (decimals - 8) - 1), uint128(10 ** (decimals - 8) + 1));
+        }
     }
 
-    /// @dev I:[CC-16]: setMinDebtLimit and setMaxDebtLimit set limits
-    function test_I_CC_16_setLimits_sets_limits() public creditTest {
+    /// @dev I:[CC-16]: setDebtLimits works as expected
+    function test_I_CC_16_setDebtLimits_works_as_expected() public creditTest {
         (uint128 minDebtOld, uint128 maxDebtOld) = creditFacade.debtLimits();
-        uint128 newminDebt = minDebtOld + 1000;
-        uint128 newmaxDebt = maxDebtOld + 1000;
+        uint128 newMinDebt = minDebtOld + 1000;
+        uint128 newMaxDebt = maxDebtOld + 1000;
 
         vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, maxDebtOld);
+        emit SetBorrowingLimits(newMinDebt, newMaxDebt);
+
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(newminDebt);
+        creditConfigurator.setDebtLimits(newMinDebt, newMaxDebt);
+
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-        assertEq(minDebt, newminDebt, "Incorrect minDebt");
-        assertEq(maxDebt, maxDebtOld, "Incorrect maxDebt");
-
-        vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, newmaxDebt);
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(newmaxDebt);
-        (minDebt, maxDebt) = creditFacade.debtLimits();
-        assertEq(minDebt, newminDebt, "Incorrect minDebt");
-        assertEq(maxDebt, newmaxDebt, "Incorrect maxDebt");
+        assertEq(minDebt, newMinDebt, "Incorrect minDebt");
+        assertEq(maxDebt, newMaxDebt, "Incorrect maxDebt");
     }
 
     /// @dev I:[CC-17]: setFees reverts for incorrect fees
@@ -765,11 +767,22 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         PriceOracleV3 newPriceOracle = new PriceOracleV3(address(acl));
         vm.startPrank(CONFIGURATOR);
 
+        // minDebt evaluates at 0
+        PriceFeedMock priceFeed = new PriceFeedMock(0, 8);
+        priceFeed.setSkipPriceCheck(FlagState.TRUE);
+        newPriceOracle.setPriceFeed(underlying, address(priceFeed), 0);
+
+        vm.expectRevert(IncorrectPriceException.selector);
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
+
+        // missing feeds for collateral tokens
+        newPriceOracle.setPriceFeed(underlying, priceOracle.priceFeeds(underlying), 1);
+
         vm.expectRevert(IncorrectPriceException.selector);
         creditConfigurator.setPriceOracle(address(newPriceOracle));
 
         uint256 num = creditManager.collateralTokensCount();
-        for (uint256 i; i < num; ++i) {
+        for (uint256 i = 1; i < num; ++i) {
             address token = creditManager.getTokenByMask(1 << i);
             newPriceOracle.setPriceFeed(token, priceOracle.priceFeeds(token), 1);
         }

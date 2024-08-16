@@ -393,8 +393,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             creditConfigurator = cmf.creditConfigurator();
 
             vm.startPrank(CONFIGURATOR);
-            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
-            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
+            creditConfigurator.setDebtLimits(cmParams.minDebt, cmParams.maxDebt);
             creditConfigurator.setFees(
                 cmParams.feeLiquidation,
                 cmParams.liquidationPremium,

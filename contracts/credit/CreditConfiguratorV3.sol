@@ -442,6 +442,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
+    /// @dev Reverts if USD value of the current min debt is zero according to `newPriceOracle`
     /// @dev Checks that `newPriceOracle` has prices for all collateral tokens
     function setPriceOracle(address newPriceOracle)
         external
@@ -450,9 +451,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
 
+        (uint128 minDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
+        if (IPriceOracleV3(newPriceOracle).convertToUSD(minDebt, underlying) == 0) revert IncorrectPriceException(); // I:[CC-21]
+
         uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
         unchecked {
-            for (uint256 i; i < num; ++i) {
+            for (uint256 i = 1; i < num; ++i) {
                 address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
                 try IPriceOracleV3(newPriceOracle).getPrice(token) returns (uint256) {}
                 catch {
@@ -580,33 +584,29 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // CREDIT FACADE //
     // ------------- //
 
-    /// @notice Sets the new min debt limit in the credit facade
-    /// @param minDebt New minimum debt per credit account
-    /// @dev Reverts if `minDebt` is greater than the current max debt
-    function setMinDebtLimit(uint128 minDebt)
+    /// @notice Sets the new min and max debt limits in the credit facade
+    /// @param newMinDebt New minimum debt per credit account
+    /// @param newMaxDebt New maximum debt per credit account
+    /// @dev Reverts if `newMinDebt` is greater than `newMaxDebt`
+    /// @dev Reverts if `newMaxDebt / newMinDebt` is above the safety threhsold of `100 / maxEnabledTokens`
+    /// @dev Reverts if USD value of `minDebt` is zero according to the current price oracle
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt)
         external
         override
         controllerOnly // I:[CC-2B]
     {
-        (, uint128 currentMaxDebt) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(minDebt, currentMaxDebt);
-    }
-
-    /// @notice Sets the new max debt limit in the credit facade
-    /// @param maxDebt New maximum debt per credit account
-    /// @dev Reverts if `maxDebt` is less than the current min debt
-    function setMaxDebtLimit(uint128 maxDebt)
-        external
-        override
-        controllerOnly // I:[CC-2B]
-    {
-        (uint128 currentMinDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
-        _setLimits(currentMinDebt, maxDebt);
+        _setLimits(newMinDebt, newMaxDebt);
     }
 
     /// @dev `set{Min|Max}DebtLimit` implementation
     function _setLimits(uint128 minDebt, uint128 maxDebt) internal {
         if (minDebt > maxDebt) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (maxDebt * CreditManagerV3(creditManager).maxEnabledTokens() > minDebt * 100) {
+            revert IncorrectLimitsException(); // I:[CC-15]
+        }
+        if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).convertToUSD(minDebt, underlying) == 0) {
             revert IncorrectLimitsException(); // I:[CC-15]
         }
 
