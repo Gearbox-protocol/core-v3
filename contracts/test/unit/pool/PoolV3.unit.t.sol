@@ -325,8 +325,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // ERC-4626 LENDING //
     // ---------------- //
 
-    /// @notice U:[LP-5]: `{deposit|mint|withdraw|redeem}` functions revert on zero address receiver
-    function test_U_LP_05_lending_functions_revert_on_zero_address_receiver() public {
+    /// @notice U:[LP-5A]: `{deposit|mint|withdraw|redeem}` functions revert on zero address receiver
+    function test_U_LP_05A_lending_functions_revert_on_zero_address_receiver() public {
         vm.startPrank(user);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -346,6 +346,40 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         vm.expectRevert(ZeroAddressException.selector);
         pool.redeem({shares: 1, receiver: address(0), owner: user});
+        vm.stopPrank();
+    }
+
+    /// @notice U:[LP-5B]: `{deposit|mint|withdraw|redeem}` functions revert on zero amounts
+    function test_U_LP_05B_lending_functions_revert_on_zero_amounts() public {
+        vm.startPrank(user);
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.deposit({assets: 0, receiver: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.depositWithReferral({assets: 0, receiver: user, referralCode: 0});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.mint({shares: 0, receiver: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.mintWithReferral({shares: 0, receiver: user, referralCode: 0});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.withdraw({assets: 0, receiver: user, owner: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.redeem({shares: 0, receiver: user, owner: user});
+
+        pool.hackTransferFee(5000);
+
+        // user receives 0 shares
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.deposit({assets: 2, receiver: user});
+
+        // user receives 0 assets
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.redeem({shares: 1, receiver: user, owner: user});
         vm.stopPrank();
     }
 
