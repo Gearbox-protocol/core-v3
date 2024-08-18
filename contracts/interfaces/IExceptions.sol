@@ -85,6 +85,9 @@ error CreditManagerCantBorrowException();
 /// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 
+/// @notice Thrown when attempting to connect a gauge to an incompatible pool quota keeper
+error IncompatibleGaugeException();
+
 /// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();
 

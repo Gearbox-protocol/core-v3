@@ -81,6 +81,8 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         tumbler.addToken(token1, 4200);
 
+        assertTrue(tumbler.isTokenAdded(token1), "token1 is not added");
+
         address[] memory quotedTokens = tumbler.getTokens();
         assertEq(quotedTokens.length, 1, "Incorrect getTokens.length");
         assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
@@ -98,6 +100,8 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         emit AddToken(token2);
 
         tumbler.addToken(token2, 0);
+
+        assertTrue(tumbler.isTokenAdded(token2), "token2 is not added");
 
         quotedTokens = tumbler.getTokens();
         assertEq(quotedTokens.length, 2, "Incorrect getTokens.length");

@@ -285,11 +285,26 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
+        vm.expectRevert(ZeroAddressException.selector);
+        pqk.setGauge(address(0));
+
+        GaugeMock gaugeMock2 = new GaugeMock(address(addressProvider), makeAddr("POOL"));
+        vm.expectRevert(IncompatibleGaugeException.selector);
+        pqk.setGauge(address(gaugeMock2));
+
         vm.expectEmit(true, true, false, false);
         emit SetGauge(address(gaugeMock));
 
         pqk.setGauge(address(gaugeMock));
         assertEq(pqk.gauge(), address(gaugeMock), "gauge address wasnt updated");
+
+        vm.prank(address(gaugeMock));
+        pqk.addQuotaToken(makeAddr("TOKEN"));
+
+        GaugeMock gaugeMock3 = new GaugeMock(address(addressProvider), address(poolMock));
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        pqk.setGauge(address(gaugeMock3));
     }
 
     /// @notice U:[PQK-9]: addCreditManager works as expected
