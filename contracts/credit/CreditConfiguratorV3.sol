@@ -162,7 +162,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Schedules token's liquidation threshold ramping
     /// @param token Token to ramp the LT for
     /// @param liquidationThresholdFinal Final LT after ramping in bps
-    /// @param rampStart Timestamp to start the ramping at
+    /// @param rampStart If in future, specifies the timestamp to start ramping at, otherwise starts immediately
     /// @param rampDuration Ramping duration
     /// @dev Reverts if `token` is underlying
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
@@ -185,8 +185,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert IncorrectLiquidationThresholdException(); // I:[CC-30]
         }
 
-        // if function is executed later than `rampStart`, start from `block.timestamp` to avoid LT jumps
         rampStart = block.timestamp > rampStart ? uint40(block.timestamp) : rampStart; // I:[CC-30]
+        if (uint256(rampStart) + rampDuration > type(uint40).max) {
+            revert IncorrectParameterException(); // I:[CC-30]
+        }
 
         uint16 currentLT = CreditManagerV3(creditManager).liquidationThresholds({token: token}); // I:[CC-30]
         CreditManagerV3(creditManager).setCollateralTokenData({
