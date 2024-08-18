@@ -444,9 +444,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.closeCreditAccount, (creditAccount)));
 
         if (hasCalls) {
-            calls = MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
-            );
+            calls =
+                MultiCallBuilder.build(MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, ())}));
         }
 
         if (hasBotPermissions) {
@@ -1443,7 +1442,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     /// @dev U:[FA-37]: multicall `setBotPermissions` works properly
-    function test_U_FA_37_setBotPermissions_warks_properly() public notExpirableCase {
+    function test_U_FA_37_setBotPermissions_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
         address bot = makeAddr("BOT");
 
@@ -1501,17 +1500,18 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
     }
 
-    /// @dev U:[FA-38]: multicall external calls works properly
-    function test_U_FA_38_multicall_external_calls_properly() public notExpirableCase {
+    /// @dev U:[FA-38]: multicall external call works properly
+    function test_U_FA_38_multicall_externalCall_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         creditManagerMock.setBorrower(USER);
 
-        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+        AdapterMock adapter = new AdapterMock(address(creditManagerMock), DUMB_ADDRESS);
+        adapter.setReturn_useSafePrices(true);
 
-        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: DUMB_ADDRESS});
 
-        vm.expectCall(adapter, abi.encodeCall(AdapterMock.dumbCall, (0, 0)));
+        vm.expectCall(address(adapter), abi.encodeCall(adapter.dumbCall, ()));
 
         vm.expectCall(
             address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
@@ -1519,18 +1519,26 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
+            )
+        );
+
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+                MultiCall({target: address(adapter), callData: abi.encodeCall(adapter.dumbCall, ())})
             ),
             enabledTokensMask: 0,
             flags: EXTERNAL_CALLS_PERMISSION
         });
     }
 
-    /// @dev U:[FA-39]: revertIfNoPermission calls works properly
-    function test_U_FA_39_revertIfNoPermission_calls_properly(uint256 mask) public notExpirableCase {
+    /// @dev U:[FA-39]: revertIfNoPermission works properly
+    function test_U_FA_39_revertIfNoPermission_works_properly(uint256 mask) public notExpirableCase {
         uint8 index = uint8(getHash(mask, 1));
         uint256 permission = 1 << index;
 
@@ -1614,6 +1622,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
 
+        AdapterMock adapter = new AdapterMock(address(creditManagerMock), address(tokenTestSuite));
+        vm.prank(CONFIGURATOR);
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: address(tokenTestSuite)});
+
         // reverts if trying to increase debt if there are enabled foribdden tokens
         vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
         creditFacade.multicallInt({
@@ -1638,6 +1650,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
 
+        // reverts if trying to perform unsafe adapter call if there are enabled foribdden tokens
+        adapter.setReturn_useSafePrices(true);
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(MultiCall(address(adapter), abi.encodeCall(adapter.dumbCall, ()))),
+            enabledTokensMask: linkMask,
+            flags: EXTERNAL_CALLS_PERMISSION
+        });
+
         // reverts on trying to increase quota of forbidden token
         vm.expectRevert(abi.encodeWithSelector(ForbiddenTokenQuotaIncreasedException.selector, (link)));
         creditFacade.multicallInt({
@@ -1649,16 +1671,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             flags: UPDATE_QUOTA_PERMISSION
         });
 
-        // reverts on trying to increasing balance of enabled forbidden token
-        creditManagerMock.setContractAllowance(address(tokenTestSuite), address(tokenTestSuite));
-
+        // reverts on trying to increase balance of enabled forbidden token
+        adapter.setReturn_useSafePrices(false);
         vm.expectRevert(abi.encodeWithSelector(ForbiddenTokenBalanceIncreasedException.selector, (link)));
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall(
-                    address(tokenTestSuite),
-                    abi.encodeWithSignature("mint(uint8,address,uint256)", Tokens.LINK, creditAccount, 10)
+                    address(adapter), abi.encodeWithSignature("mint(uint8,address,uint256)", Tokens.LINK, creditAccount, 10)
                 )
             ),
             enabledTokensMask: linkMask,
