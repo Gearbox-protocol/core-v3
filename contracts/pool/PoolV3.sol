@@ -60,9 +60,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
-    /// @notice Underlying token address
-    address public immutable override underlyingToken;
-
     /// @notice Protocol treasury address
     address public immutable override treasury;
 
@@ -135,7 +132,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
-        underlyingToken = underlyingToken_; // U:[LP-1B]
         treasury = treasury_; // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
@@ -157,9 +153,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         return _creditManagerSet.values();
     }
 
+    /// @notice Pool's underlying token, same as `asset()`
+    /// @dev Exists for backward compatibility
+    function underlyingToken() external view override returns (address) {
+        return asset(); // U:[LP-1B]
+    }
+
     /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
-        return IERC20(underlyingToken).safeBalanceOf(address(this)); // U:[LP-3]
+        return IERC20(asset()).safeBalanceOf(address(this)); // U:[LP-3]
     }
 
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
@@ -326,7 +328,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         if (assetsReceived == 0 || shares == 0) revert AmountCantBeZeroException(); // U:[LP-5B]
-        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
+        IERC20(asset()).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
 
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
@@ -360,10 +362,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
-        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
+        IERC20(asset()).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
-                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
+                IERC20(asset()).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
             }
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
@@ -448,7 +450,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
         _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
 
-        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
+        IERC20(asset()).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
         emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
     }
 

@@ -58,7 +58,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using Math for uint256;
     using CreditLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
-    using CreditAccountHelper for ICreditAccountV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -312,7 +311,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         if (amountToPool != 0) {
-            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+            _safeTransfer({creditAccount: creditAccount, token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
         }
         _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
@@ -328,7 +327,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 amountToLiquidator = Math.min(remainingFunds - minRemainingFunds, underlyingBalance);
 
             if (amountToLiquidator != 0) {
-                ICreditAccountV3(creditAccount).transfer({token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
+                _safeTransfer({creditAccount: creditAccount, token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
 
                 remainingFunds -= amountToLiquidator; // U:[CM-8]
             }
@@ -401,7 +400,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amount = maxRepayment; // U:[CM-11]
             }
 
-            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            _safeTransfer({creditAccount: creditAccount, token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
             uint256 profit;
@@ -483,7 +482,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256)
     {
         getTokenMaskOrRevert({token: token}); // U:[CM-26]
-        ICreditAccountV3(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
+        _safeTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount}); // U:[CM-27]
         return 0;
     }
 
@@ -1289,7 +1288,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         getTokenMaskOrRevert({token: token}); // U:[CM-15]
-        ICreditAccountV3(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
+        CreditAccountHelper.safeApprove({creditAccount: creditAccount, token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
@@ -1302,6 +1301,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
+    }
+
+    /// @dev Internal wrapper for `creditAccount.safeTransfer` call to redice contract size
+    function _safeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
+        ICreditAccountV3(creditAccount).safeTransfer(token, to, amount);
     }
 
     /// @dev Internal wrapper for `creditAccount.execute` call to reduce contract size
