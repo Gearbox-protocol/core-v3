@@ -185,6 +185,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(0),
+            address(0),
+            address(degenNFTMock),
+            expirable
+        );
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause
@@ -289,9 +299,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setDebtLimits(0, 0, 0);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setBotList(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setCumulativeLossParams(0, false);
@@ -1737,16 +1744,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(maxDebt, 2, " incorrect maxDebt");
         assertEq(creditFacade.lastBlockBorrowedInt(), block.number, "incorrect lastBlockBorrowed");
         assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
-    }
-
-    /// @dev U:[FA-50]: setBotList works properly
-    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
-        assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setBotList(DUMB_ADDRESS);
-
-        assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
     }
 
     /// @dev U:[FA-51]: setCumulativeLossParams works properly
