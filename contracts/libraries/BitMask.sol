@@ -70,4 +70,12 @@ library BitMask {
     {
         return (enabledTokensMask | bitsToEnable) & (~bitsToDisable); // U:[BM-5]
     }
+
+    /// @notice Returns a mask with only the least significant bit of `mask` enabled
+    /// @dev This function can be used to efficiently iterate over enabled bits in a mask
+    function lsbMask(uint256 mask) internal pure returns (uint256) {
+        unchecked {
+            return mask & uint256(-int256(mask)); // U:[BM-6]
+        }
+    }
 }
