@@ -153,7 +153,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Checks that `_priceOracle` has a price for underlying
-    /// @dev Sets `msg.sender` as credit configurator
+    /// @dev Sets `msg.sender` as credit configurator, which MUST then pass the role to `CreditConfiguratorV3` contract
+    ///      once it's deployed via `setCreditConfigurator`. The latter performs crucial sanity checks, and configuring
+    ///      the credit manager without them might have dramatic consequences.
     constructor(
         address _pool,
         address _accountFactory,
