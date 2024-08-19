@@ -669,10 +669,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (linkToken, type(uint256).max, USER))
-            }),
-            MultiCall({
-                target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER))
             })
         );

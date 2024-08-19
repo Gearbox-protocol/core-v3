@@ -325,20 +325,6 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
                     )
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(
-                        ICreditFacadeV3Multicall.withdrawCollateral,
-                        (tokenTestSuite.addressOf(Tokens.LINK), type(uint256).max, USER)
-                    )
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(
-                        ICreditFacadeV3Multicall.withdrawCollateral,
-                        (tokenTestSuite.addressOf(Tokens.USDT), type(uint256).max, USER)
-                    )
                 })
             )
         );
@@ -369,8 +355,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(100_000 * WAD));
         _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(100_000 * WAD));
 
-        quotaLink = uint96(bound(quotaLink, 0, uint96(type(int96).max)));
-        quotaUsdt = uint96(bound(quotaUsdt, 0, uint96(type(int96).max)));
+        quotaLink = uint96(bound(quotaLink, 1, uint96(type(int96).max)));
+        quotaUsdt = uint96(bound(quotaUsdt, 1, uint96(type(int96).max)));
 
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -460,7 +446,9 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     function test_I_CMQ_09_updateQuotas_with_positive_value_reverts_on_zero_debt() public creditTest {
         _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
 
-        address creditAccount = _openCreditAccount(0, USER, 0, 0);
+        tokenTestSuite.mint(Tokens.DAI, address(this), 1e18);
+        tokenTestSuite.approve(Tokens.DAI, address(this), address(creditManager), 1e18);
+        address creditAccount = _openCreditAccount(1e18, USER, 0, 0);
 
         // (, uint256 maxDebt) = creditFacade.debtLimits();
         // uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);

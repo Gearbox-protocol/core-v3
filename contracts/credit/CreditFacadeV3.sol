@@ -387,7 +387,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         returns (uint256 seizedAmount)
     {
         address priceOracle = _priceOracle();
-        IPriceOracleV3(priceOracle).updatePrices(priceUpdates);
+        if (priceUpdates.length != 0) _updatePrices(priceOracle, priceUpdates);
 
         if (token == underlying) revert UnderlyingIsNotLiquidatableException();
         (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount);
@@ -528,8 +528,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     // addCollateral
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
-                        (address token, uint256 amount) = abi.decode(mcall.callData[4:], (address, uint256)); // U:[FA-26A]
-                        _addCollateral(creditAccount, token, amount); // U:[FA-26A]
+                        _addCollateral(creditAccount, mcall.callData[4:]); // U:[FA-26A]
                     }
                     // addCollateralWithPermit
                     else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
@@ -545,11 +544,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     // withdrawCollateral
                     else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
-                        // pulls credit account on top of the stack
-                        address creditAccount_ = creditAccount;
-                        (address token, uint256 amount, address to) =
-                            abi.decode(mcall.callData[4:], (address, uint256, address)); // U:[FA-36]
-                        _withdrawCollateral(creditAccount_, token, amount, to); // U:[FA-36]
+                        _withdrawCollateral(creditAccount, mcall.callData[4:]); // U:[FA-36]
                         flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
                     }
                     // increaseDebt
@@ -658,25 +653,22 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _onDemandPriceUpdates(bytes calldata callData) internal {
         PriceUpdate[] memory updates = abi.decode(callData, (PriceUpdate[])); // U:[FA-25]
 
-        IPriceOracleV3(_priceOracle()).updatePrices(updates); // U:[FA-25]
+        _updatePrices(_priceOracle(), updates); // U:[FA-25]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
-    function _addCollateral(address creditAccount, address token, uint256 amount) internal {
-        ICreditManagerV3(creditManager).addCollateral({
-            payer: msg.sender,
-            creditAccount: creditAccount,
-            token: token,
-            amount: amount
-        }); // U:[FA-26A]
+    function _addCollateral(address creditAccount, bytes calldata callData) internal {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26A]
+        if (amount == 0) revert AmountCantBeZeroException(); // U:[FA-26A]
 
-        emit AddCollateral(creditAccount, token, amount); // U:[FA-26A]
+        _addCollateral(creditAccount, token, amount); // U:[FA-26A]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateralWithPermit` implementation
     function _addCollateralWithPermit(address creditAccount, bytes calldata callData) internal {
         (address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
             abi.decode(callData, (address, uint256, uint256, uint8, bytes32, bytes32)); // U:[FA-26B]
+        if (amount == 0) revert AmountCantBeZeroException(); // U:[FA-26B]
 
         // `token` is only validated later in `addCollateral`, but to benefit off of it the attacker would have to make
         // it recognizable as collateral in the credit manager, which requires gaining configurator access rights
@@ -689,6 +681,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         internal
     {
+        if (amount == 0) revert AmountCantBeZeroException(); // U:[FA-27,31]
         if (action == ManageDebtAction.INCREASE_DEBT) {
             _revertIfOutOfDebtPerBlockLimit(amount); // U:[FA-28]
         }
@@ -707,6 +700,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint256 forbiddenTokensMask
     ) internal returns (uint256, uint256) {
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
+        if (quotaChange == 0) revert AmountCantBeZeroException(); // U:[FA-34]
 
         if (quotaChange > 0) {
             forbiddenTokensMask = _forbiddenTokensMaskRoE(forbiddenTokensMask);
@@ -729,17 +723,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
-    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
+    function _withdrawCollateral(address creditAccount, bytes calldata callData) internal {
+        (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-36]
+
         if (amount == type(uint256).max) {
             amount = IERC20(token).safeBalanceOf(creditAccount);
-            if (amount <= 1) return;
-            unchecked {
-                --amount;
+            if (amount >= 1) {
+                unchecked {
+                    --amount;
+                }
             }
         }
-        ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
+        if (amount == 0) revert AmountCantBeZeroException(); // U:[FA-36]
 
-        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
+        _withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
     }
 
     /// @dev `ICreditFacadeV3Multicall.setBotPermissions` implementation
@@ -964,6 +961,33 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Internal wrapper for `creditManager.priceOracle` call to reduce contract size
     function _priceOracle() internal view returns (address) {
         return ICreditManagerV3(creditManager).priceOracle();
+    }
+
+    /// @dev Internal wrapper for `priceOracle.updatePrices` call to reduce contract size
+    function _updatePrices(address priceOracle, PriceUpdate[] memory updates) internal {
+        IPriceOracleV3(priceOracle).updatePrices(updates);
+    }
+
+    /// @dev Internal wrapper for `creditManager.addCollateral` call to reduce contract size
+    function _addCollateral(address creditAccount, address token, uint256 amount) internal {
+        ICreditManagerV3(creditManager).addCollateral({
+            payer: msg.sender,
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount
+        });
+        emit AddCollateral(creditAccount, token, amount);
+    }
+
+    /// @dev Internal wrapper for `creditManager.withdrawCollateral` call to reduce contract size
+    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
+        ICreditManagerV3(creditManager).withdrawCollateral({
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount,
+            to: to
+        });
+        emit WithdrawCollateral(creditAccount, token, amount, to);
     }
 
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck` call to reduce contract size
