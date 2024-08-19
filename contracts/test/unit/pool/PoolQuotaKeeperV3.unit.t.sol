@@ -279,6 +279,17 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         }
     }
 
+    /// @notice U:[PQK-7B]: updateRates reverts on zero rate
+    function test_U_PQK_07B_updateRates_reverts_on_zero_rate() public {
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+
+        gaugeMock.addQuotaToken(dai, 0);
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(address(gaugeMock));
+        pqk.updateRates();
+    }
+
     /// @notice U:[PQK-8]: setGauge works as expected
     function test_U_PQK_08_setGauge_works_as_expected() public {
         pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
@@ -399,8 +410,20 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         pqk.addCreditManager(address(creditManagerMock));
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-        vm.expectRevert(TokenIsNotQuotedException.selector);
 
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        vm.prank(address(creditManagerMock));
+        pqk.updateQuota({
+            creditAccount: DUMB_ADDRESS,
+            token: link,
+            requestedChange: -int96(uint96(100 * WAD)),
+            minQuota: 0,
+            maxQuota: 1
+        });
+
+        gaugeMock.addQuotaToken({token: link, rate: 10_00});
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         vm.prank(address(creditManagerMock));
         pqk.updateQuota({
             creditAccount: DUMB_ADDRESS,
@@ -778,6 +801,11 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         gaugeMock.addQuotaToken({token: token1, rate: 10_00});
         gaugeMock.addQuotaToken({token: token2, rate: 20_00});
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+
+        vm.prank(address(creditManagerMock));
+        pqk.accrueQuotaInterest(creditAccount, tokens);
 
         vm.prank(address(gaugeMock));
         pqk.updateRates();

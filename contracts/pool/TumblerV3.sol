@@ -32,6 +32,8 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     address public immutable override underlying;
 
     /// @notice Pool's quota keeper
+    /// @dev Unlike in `GaugeV3`, quota keeper is stored as immutable because even in an unlikely scenario
+    ///      of its migration replacing the tumbler is very simple as there are no user votes to move
     address public immutable override poolQuotaKeeper;
 
     /// @notice Epoch length in seconds
@@ -82,7 +84,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
 
     /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
     ///         sets its rate to `rate`
-    /// @dev Reverts if `token` is zero address, pool's underlying or is already added
+    /// @dev Reverts if `token` is zero address, pool's underlying or is already added, or if `rate` is zero
     /// @custom:tests U:[TU-2]
     function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
         if (token == underlying || !_tokensSet.add(token)) revert TokenNotAllowedException();
@@ -99,7 +101,6 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     /// @custom:tests U:[TU-3]
     function setRate(address token, uint16 rate) external override controllerOrConfiguratorOnly {
         if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
-        if (rate == 0) revert IncorrectParameterException();
         _setRate(token, rate);
     }
 
@@ -112,6 +113,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
 
     /// @dev `setRate` implementation
     function _setRate(address token, uint16 rate) internal {
+        if (rate == 0) revert IncorrectParameterException();
         if (_rates[token] == rate) return;
         _rates[token] = rate;
         emit SetRate(token, rate);
