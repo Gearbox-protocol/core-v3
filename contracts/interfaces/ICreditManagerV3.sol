@@ -8,7 +8,7 @@ import {IVersion} from "./base/IVersion.sol";
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
 ///         - `DECREASE_DEBT` repays debt components (quota interest and fees -> base interest and fees -> debt principal)
-///           and updates all corresponding state varibles (base interest index, quota interest and fees, debt).
+///           and updates all corresponding state variables (base interest index, quota interest and fees, debt).
 ///           When repaying all the debt, ensures that account has no enabled quotas.
 enum ManageDebtAction {
     INCREASE_DEBT,

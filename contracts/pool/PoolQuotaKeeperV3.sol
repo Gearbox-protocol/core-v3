@@ -469,7 +469,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function setTokenLimit(address token, uint96 limit)
         external
         override
-        controllerOnly // U:[PQK-2]
+        controllerOrConfiguratorOnly // U:[PQK-2]
     {
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
         _setTokenLimit(tokenQuotaParams, token, limit);
@@ -497,7 +497,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function setTokenQuotaIncreaseFee(address token, uint16 fee)
         external
         override
-        controllerOnly // U:[PQK-2]
+        controllerOrConfiguratorOnly // U:[PQK-2]
     {
         if (fee > PERCENTAGE_FACTOR) {
             revert IncorrectParameterException();

@@ -238,7 +238,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
-    /// @notice Withdraws pool shares for given amount of underlying tokens
+    /// @notice Burns pool shares in exchange for given amount of underlying tokens
     /// @param assets Amount of underlying to withdraw
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -257,7 +257,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
-    /// @notice Redeems given number of pool shares for underlying tokens
+    /// @notice Redeems given number of pool shares in exchange for underlying tokens
     /// @param shares Number of pool shares to redeem
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -701,7 +701,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
     {
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
@@ -713,7 +713,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
         registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {

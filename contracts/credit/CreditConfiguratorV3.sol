@@ -134,7 +134,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
@@ -176,7 +176,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         (, uint16 ltUnderlying) =
             CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: UNDERLYING_TOKEN_MASK});
@@ -242,7 +242,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         nonZeroAddress(token)
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
@@ -305,7 +305,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(adapter)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         address targetContract = _getTargetContractOrRevert({adapter: adapter});
         if (CreditManagerV3(creditManager).adapterToContract(adapter) == address(0)) {
@@ -575,7 +575,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setLimits(newMinDebt, newMaxDebt);
     }
@@ -606,7 +606,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
@@ -636,7 +636,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setMaxCumulativeLoss(newMaxCumulativeLoss); // I:[CC-31]
     }
@@ -656,7 +656,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function resetCumulativeLoss()
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-32]

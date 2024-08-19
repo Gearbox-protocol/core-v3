@@ -28,6 +28,9 @@ interface IPriceFeed is IVersion {
 /// @title Updatable price feed interface
 /// @notice Extended version of `IPriceFeed` for pull oracles that allow on-demand updates
 interface IUpdatablePriceFeed is IPriceFeed {
+    /// @notice Emitted when price is updated
+    event UpdatePrice(uint256 price);
+
     /// @notice Whether price feed is updatable
     function updatable() external view returns (bool);
 

@@ -17,7 +17,7 @@ import {PriceOracleV3} from "../../core/PriceOracleV3.sol";
 
 contract GenesisFactory is Ownable {
     AddressProviderV3ACLMock public addressProvider;
-    PriceOracleV3 priceOracle;
+    PriceOracleV3 public priceOracle;
 
     constructor(address wethToken, address treasury) {
         addressProvider = new AddressProviderV3ACLMock();
@@ -44,12 +44,5 @@ contract GenesisFactory is Ownable {
         addressProvider.addPausableAdmin(msg.sender);
         addressProvider.addUnpausableAdmin(msg.sender);
         addressProvider.transferOwnership(msg.sender);
-    }
-
-    function addPriceFeeds(PriceFeedConfig[] memory priceFeeds) external onlyOwner {
-        uint256 len = priceFeeds.length;
-        for (uint256 i; i < len; ++i) {
-            priceOracle.setPriceFeed(priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod);
-        }
     }
 }

@@ -155,7 +155,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
-    /// @param _expirable Whether this facade should be expirable
+    /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
+    ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
     constructor(
         address _acl,
         address _creditManager,
@@ -192,7 +193,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
     ///         - If Degen NFT is enabled, burns one from the caller
     ///         - Opens an account in the credit manager
-    ///         - Performs a multicall (all calls allowed except debt decrease and withdrawals)
+    ///         - Performs a multicall (all calls allowed except debt decrease)
     ///         - Runs the collateral check
     /// @param onBehalfOf Address on whose behalf to open the account
     /// @param calls List of calls to perform after opening the account

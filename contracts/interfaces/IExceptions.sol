@@ -243,7 +243,7 @@ error CallerNotCreditManagerException();
 error CallerNotCreditFacadeException();
 
 /// @notice Thrown on attempting to call an access restricted function not as controller or configurator
-error CallerNotControllerException();
+error CallerNotControllerOrConfiguratorException();
 
 /// @notice Thrown on attempting to pause a contract without pausable admin rights
 error CallerNotPausableAdminException();

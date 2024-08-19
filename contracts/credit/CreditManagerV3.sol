@@ -276,6 +276,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Account to liquidate
     /// @param collateralDebtData A struct with account's debt and collateral data
     /// @param to Address to transfer underlying left after liquidation
+    /// @param isExpired Whether this is an expired account liquidation and lower premium should apply
     /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
@@ -351,7 +352,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Increases or decreases credit account's debt
-    /// @param creditAccount Account to increase/decrease debr for
+    /// @param creditAccount Account to increase/decrease debt for
     /// @param amount Amount of underlying to change the total debt by
     /// @param enabledTokensMask  Bitmask of account's enabled collateral tokens
     /// @param action Manage debt type, see `ManageDebtAction`

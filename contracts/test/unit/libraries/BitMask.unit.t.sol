@@ -13,20 +13,6 @@ import {TestHelper} from "../../lib/helper.sol";
 contract BitMaskUnitTest is TestHelper {
     using BitMask for uint256;
 
-    /// @notice U:[BM-1]: `calcIndex` reverts for zero value
-    function test_U_BM_01_calcIndex_reverts_for_zero_value() public {
-        vm.expectRevert(IncorrectParameterException.selector);
-        uint256(0).calcIndex();
-    }
-
-    /// @notice U:[BM-2]: `calcIndex` works correctly
-    function test_U_BM_02_calcIndex_works_correctly() public {
-        for (uint256 i = 0; i < 256; ++i) {
-            uint256 mask = 1 << i;
-            assertEq(mask.calcIndex(), i, "Incorrect index");
-        }
-    }
-
     /// @notice U:[BM-3]: `calcEnabledTokens` works correctly
     function test_U_BM_03_calcEnabledTokens_works_correctly(uint8 bitsToEnable, uint256 randomValue) public {
         uint256 bitMask;

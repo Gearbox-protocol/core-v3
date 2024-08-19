@@ -115,7 +115,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectRevert(ZeroAddressException.selector);
         priceOracle.setPriceFeed(token, address(0), 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         priceOracle.setPriceFeed(token, priceFeed, 0);
 
         // setting the price feed

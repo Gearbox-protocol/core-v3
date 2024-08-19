@@ -7,7 +7,8 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 import {IACL} from "../interfaces/IACL.sol";
 import {
-    CallerNotControllerException,
+    AddressIsNotContractException,
+    CallerNotControllerOrConfiguratorException,
     CallerNotPausableAdminException,
     CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
@@ -26,7 +27,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     address public controller;
 
     /// @dev Ensures that function caller is external controller or configurator
-    modifier controllerOnly() {
+    modifier controllerOrConfiguratorOnly() {
         _ensureCallerIsControllerOrConfigurator();
         _;
     }
@@ -35,7 +36,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsControllerOrConfigurator() internal view {
         if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
-            revert CallerNotControllerException();
+            revert CallerNotControllerOrConfiguratorException();
         }
     }
 
@@ -69,9 +70,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @notice Constructor
     /// @param acl ACL contract address
-    constructor(address acl) ACLTrait(acl) {
-        controller = IACL(acl).owner();
-    }
+    constructor(address acl) ACLTrait(acl) {}
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
     function pause() external virtual pausableAdminsOnly {
@@ -83,9 +82,10 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         _unpause();
     }
 
-    /// @notice Sets new external controller, can only be called by configurator
+    /// @notice Sets new external controller contract, can only be called by configurator
     function setController(address newController) external configuratorOnly {
         if (controller == newController) return;
+        if (newController.code.length == 0) revert AddressIsNotContractException(newController);
         controller = newController;
         emit NewController(newController);
     }

@@ -14,13 +14,13 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Contracts register contract address
     address public immutable contractsRegister;
 
-    /// @dev Ensures that given address is a registered credit manager
+    /// @dev Ensures that given address is a registered pool
     modifier registeredPoolOnly(address addr) {
         _ensureRegisteredPool(addr);
         _;
     }
 
-    /// @dev Ensures that given address is a registered pool
+    /// @dev Ensures that given address is a registered credit manager
     modifier registeredCreditManagerOnly(address addr) {
         _ensureRegisteredCreditManager(addr);
         _;
