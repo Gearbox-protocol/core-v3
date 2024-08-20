@@ -3,7 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
+import {IContractsRegister} from "../interfaces/base/IContractsRegister.sol";
+import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 import {
     AddressIsNotContractException,
     RegisteredCreditManagerOnlyException,
@@ -13,9 +14,9 @@ import {
 
 /// @title Contracts register trait
 /// @notice Trait that simplifies validation of pools and credit managers
-abstract contract ContractsRegisterTrait {
+abstract contract ContractsRegisterTrait is IContractsRegisterTrait {
     /// @notice Contracts register contract address
-    address public immutable contractsRegister;
+    address public immutable override contractsRegister;
 
     /// @dev Ensures that given address is a registered pool
     modifier registeredPoolOnly(address addr) {

@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IRateKeeper} from "./base/IRateKeeper.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 
 interface ITumblerV3Events {
     /// @notice Emitted when new token is added
@@ -14,7 +15,7 @@ interface ITumblerV3Events {
 }
 
 /// @title Tumbler V3 interface
-interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
+interface ITumblerV3 is IRateKeeper, IControlledTrait, ITumblerV3Events {
     function underlying() external view returns (address);
 
     function poolQuotaKeeper() external view returns (address);

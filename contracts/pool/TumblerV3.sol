@@ -26,6 +26,9 @@ contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "RK_TUMBLER";
+
     /// @notice Pool whose quota rates are set by this contract
     address public immutable override pool;
 

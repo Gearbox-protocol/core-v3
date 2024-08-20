@@ -6,9 +6,10 @@ pragma solidity ^0.8.17;
 import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
-import {IACL} from "../../interfaces/IACL.sol";
-import {IContractsRegister} from "../../interfaces/IContractsRegister.sol";
+import {IACL} from "../../interfaces//base/IACL.sol";
+import {IContractsRegister} from "../../interfaces/base/IContractsRegister.sol";
 
 import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -312,7 +313,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 vm.prank(INITIAL_LP);
                 pool.deposit(depositAmount, INITIAL_LP);
 
-                address configurator = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
+                address configurator = Ownable(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
                 uint256 currentLimit = pool.creditManagerDebtLimit(address(creditManager));
                 vm.prank(configurator);
                 pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + depositAmount);

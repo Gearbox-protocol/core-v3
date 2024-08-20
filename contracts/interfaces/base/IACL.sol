@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 interface IACL {
-    function owner() external view returns (address);
     function isConfigurator(address account) external view returns (bool);
     function isPausableAdmin(address addr) external view returns (bool);
     function isUnpausableAdmin(address addr) external view returns (bool);

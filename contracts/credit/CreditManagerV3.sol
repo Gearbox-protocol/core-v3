@@ -182,6 +182,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditConfigurator = msg.sender; // U:[CM-1]
     }
 
+    /// @notice Contract type
+    function contractType() external view virtual override returns (bytes32) {
+        return "CM";
+    }
+
     // ------------------ //
     // ACCOUNT MANAGEMENT //
     // ------------------ //
