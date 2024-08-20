@@ -6,9 +6,10 @@ pragma abicoder v1;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-/// LIBS & TRAITS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+// LIBS & TRAITS
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
@@ -29,7 +30,7 @@ import "../interfaces/IExceptions.sol";
 ///         * increase fee that is charged when additional quota is purchased (more suited to leveraged trading).
 ///         Quota keeper stores information about quotas of accounts in all credit managers connected to the pool, and
 ///         performs calculations that help to keep pool's expected liquidity and credit managers' debt consistent.
-contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ControlledTrait, ContractsRegisterTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
 
@@ -77,7 +78,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Constructor
     /// @param _pool Pool address
     constructor(address _pool)
-        ACLNonReentrantTrait(ACLNonReentrantTrait(_pool).acl())
+        ControlledTrait(ControlledTrait(_pool).acl())
         ContractsRegisterTrait(ContractsRegisterTrait(_pool).contractsRegister())
     {
         pool = _pool; // U:[PQK-1]

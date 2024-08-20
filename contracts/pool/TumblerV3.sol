@@ -14,12 +14,13 @@ import {
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
 ///         instead of voting, allows controller to set rates directly with custom epoch length
-contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
+contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -49,7 +50,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     /// @param pool_ Pool whose quota rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address pool_, uint256 epochLength_) ACLNonReentrantTrait(ACLNonReentrantTrait(pool_).acl()) {
+    constructor(address pool_, uint256 epochLength_) ControlledTrait(ControlledTrait(pool_).acl()) {
         pool = pool_;
         underlying = IPoolV3(pool_).underlyingToken();
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();

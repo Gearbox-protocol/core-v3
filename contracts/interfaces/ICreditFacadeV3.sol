@@ -152,4 +152,8 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function setTokenAllowance(address token, AllowanceAction allowance) external;
 
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
+
+    function pause() external;
+
+    function unpause() external;
 }
