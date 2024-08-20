@@ -153,6 +153,11 @@ contract PoolV3 is
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
     }
 
+    /// @notice Contract type
+    function contractType() external view virtual override returns (bytes32) {
+        return "LP";
+    }
+
     /// @notice Pool shares decimals, matches underlying token decimals
     function decimals() public view override(ERC20, ERC4626, IERC20Metadata) returns (uint8) {
         return ERC4626.decimals();

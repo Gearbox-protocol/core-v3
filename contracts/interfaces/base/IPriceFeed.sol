@@ -3,15 +3,11 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {PriceFeedType} from "@gearbox-protocol/sdk-gov/contracts/PriceFeedType.sol";
 import {IVersion} from "./IVersion.sol";
 
 /// @title Price feed interface
 /// @notice Interface for Chainlink-like price feeds that can be plugged into Gearbox's price oracle
 interface IPriceFeed is IVersion {
-    /// @notice Price feed type
-    function priceFeedType() external view returns (PriceFeedType);
-
     /// @notice Whether price feed implements its own staleness and sanity checks
     function skipPriceCheck() external view returns (bool);
 

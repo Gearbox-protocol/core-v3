@@ -41,6 +41,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "CC";
+
     /// @notice Credit manager address
     address public immutable override creditManager;
 

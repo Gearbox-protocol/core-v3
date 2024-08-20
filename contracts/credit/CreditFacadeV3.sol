@@ -29,7 +29,7 @@ import {
     ICreditManagerV3,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
-import {IDegenNFT} from "../interfaces/IDegenNFT.sol";
+import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
@@ -73,6 +73,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "CF";
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
