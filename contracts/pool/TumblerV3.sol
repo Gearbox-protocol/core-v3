@@ -46,11 +46,10 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
     /// @param pool_ Pool whose quota rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address acl_, address pool_, uint256 epochLength_) ACLNonReentrantTrait(acl_) {
+    constructor(address pool_, uint256 epochLength_) ACLNonReentrantTrait(ACLNonReentrantTrait(pool_).acl()) {
         pool = pool_;
         underlying = IPoolV3(pool_).underlyingToken();
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();

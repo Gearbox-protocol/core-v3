@@ -122,8 +122,32 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // GENERAL //
     // ------- //
 
-    /// @notice U:[LP-1A]: Constructor reverts on zero addresses
-    function test_U_LP_01A_constructor_reverts_on_zero_addresses() public {
+    /// @notice U:[LP-1A]: Constructor reverts on empty parameters
+    function test_U_LP_01A_constructor_reverts_on_empty_parameters() public {
+        vm.expectRevert(IncorrectParameterException.selector);
+        new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
+            underlyingToken_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: address(interestRateModel),
+            totalDebtLimit_: type(uint256).max,
+            name_: "",
+            symbol_: "dUSDC"
+        });
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
+            underlyingToken_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: address(interestRateModel),
+            totalDebtLimit_: type(uint256).max,
+            name_: "diesel USD Coin",
+            symbol_: ""
+        });
+
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
             acl: address(addressProvider),
@@ -132,8 +156,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -144,8 +168,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -156,8 +180,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: treasury,
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
     }
 

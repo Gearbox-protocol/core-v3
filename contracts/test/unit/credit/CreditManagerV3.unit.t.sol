@@ -306,6 +306,17 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(poolMock),
             address(accountFactory),
             address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            "",
+            isFeeToken
+        );
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
             0,
             DEFAULT_FEE_INTEREST,
             name,
