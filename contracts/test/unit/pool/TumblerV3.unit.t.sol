@@ -44,7 +44,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
-    function test_U_TU_01_constructor_works_as_expected() public {
+    function test_U_TU_01_constructor_works_as_expected() public view {
         assertEq(tumbler.pool(), address(pool), "Incorrect pool");
         assertEq(tumbler.underlying(), underlying, "Incorrect underlying");
         assertEq(tumbler.poolQuotaKeeper(), address(poolQuotaKeeper), "Incorrect poolQuotaKeeper");

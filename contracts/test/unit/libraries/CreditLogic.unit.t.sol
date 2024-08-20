@@ -114,7 +114,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt, uint256 newIndex,, uint128 newQuotaInterest, uint128 newQuotaFees) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -138,7 +138,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt,, uint256 profit,,) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -160,7 +160,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt, uint256 newIndex,,,) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -184,7 +184,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt,,, uint128 newQuotaInterest, uint128 newQuotaFees) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -217,7 +217,7 @@ contract CreditLogicUnitTest is TestHelper {
     }
 
     /// @notice U:[CL-4]: `calcLiquidationPayments` gives expected outputs
-    function test_U_CL_04_calcLiquidationPayments_case_test() public {
+    function test_U_CL_04_calcLiquidationPayments_case_test() public view {
         /// FEE INTEREST: 50%
         /// NORMAL LIQUIDATION PREMIUM: 4%
         /// NORMAL LIQUIDATION FEE: 1.5%
@@ -390,7 +390,7 @@ contract CreditLogicUnitTest is TestHelper {
     }
 
     /// @notice U:[CL-5]: `getLiquidationThreshold` gives expected outputs
-    function test_U_CL_05_getLiquidationThreshold_case_test() public {
+    function test_U_CL_05_getLiquidationThreshold_case_test() public view {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({
                 name: "LIQUIDATION THRESHOLD RAMP IN THE FUTURE",
