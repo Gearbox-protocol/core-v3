@@ -14,7 +14,6 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
@@ -24,13 +23,17 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAdapter} from "../interfaces/base/IAdapter.sol";
 
+// TRAITS
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
+
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
 /// @dev Most of the functions can only be accessed by configurator or timelock controller
-contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;
@@ -57,7 +60,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
     constructor(address _creditManager)
-        ACLNonReentrantTrait(ACLNonReentrantTrait(CreditManagerV3(_creditManager).pool()).acl())
+        ControlledTrait(ControlledTrait(CreditManagerV3(_creditManager).pool()).acl())
     {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]

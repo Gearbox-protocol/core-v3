@@ -7,7 +7,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ACLNonReentrantTrait} from "../../../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../../../traits/ACLTrait.sol";
+import {SanityCheckTrait} from "../../../traits/SanityCheckTrait.sol";
 
 // interfaces
 
@@ -16,7 +17,7 @@ import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
 
 /// @title Gauge fore new 4626 pools
-contract GaugeMock is ACLNonReentrantTrait {
+contract GaugeMock is ACLTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -32,7 +33,7 @@ contract GaugeMock is ACLNonReentrantTrait {
 
     /// @dev Constructor
 
-    constructor(address acl, address _pool) ACLNonReentrantTrait(acl) nonZeroAddress(_pool) {
+    constructor(address acl, address _pool) ACLTrait(acl) nonZeroAddress(_pool) {
         pool = PoolV3(payable(_pool)); // F:[P4-01]
     }
 

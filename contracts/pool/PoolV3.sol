@@ -16,6 +16,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 // INTERFACES
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
@@ -25,8 +26,10 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
@@ -49,7 +52,16 @@ struct DebtParams {
 ///         (nearly all tokens with decimals between 6 and 18 work)
 /// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
 ///      dead address before allowing borrowing
-contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
+contract PoolV3 is
+    ERC4626,
+    ERC20Permit,
+    Pausable,
+    SanityCheckTrait,
+    ControlledTrait,
+    ContractsRegisterTrait,
+    ReentrancyGuardTrait,
+    IPoolV3
+{
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -119,7 +131,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ControlledTrait(acl_) // U:[LP-1A]
         ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
@@ -740,6 +752,18 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
         withdrawFee = newWithdrawFee.toUint16(); // U:[LP-26B]
         emit SetWithdrawFee(newWithdrawFee); // U:[LP-26B]
+    }
+
+    /// @notice Pauses contract, can only be called by an account with pausable admin role
+    /// @dev Reverts if contract is already paused
+    function pause() external override pausableAdminsOnly {
+        _pause();
+    }
+
+    /// @notice Unpauses contract, can only be called by an account with unpausable admin role
+    /// @dev Reverts if contract is already unpaused
+    function unpause() external override unpausableAdminsOnly {
+        _unpause();
     }
 
     /// @dev Sets new total debt limit
