@@ -256,7 +256,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     // ------------------ //
 
     /// @notice U:[PO-6]: `_getTokenReserveKey` works as expected
-    function test_U_PO_06_getTokenReserveKey_works_as_expected(address token) public {
+    function test_U_PO_06_getTokenReserveKey_works_as_expected(address token) public view {
         address expectedKey = address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))));
         assertEq(priceOracle.exposed_getTokenReserveKey(token), expectedKey);
     }

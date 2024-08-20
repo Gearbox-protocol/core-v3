@@ -287,7 +287,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         }
 
         address cf = creditFacade();
-        if (targetContract == creditFacade() || adapter == creditFacade()) {
+        if (targetContract == cf || adapter == cf) {
             revert TargetContractNotAllowedException(); // I:[CC-10C]
         }
 

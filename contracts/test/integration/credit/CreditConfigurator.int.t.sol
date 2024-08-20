@@ -62,7 +62,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
-    ) internal {
+    ) internal view {
         (
             ,
             uint16 feeLiquidation2,

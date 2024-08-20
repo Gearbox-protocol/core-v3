@@ -659,8 +659,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
         vm.roll(block.number + 1);
 
-        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
-
         calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
             MultiCall({
