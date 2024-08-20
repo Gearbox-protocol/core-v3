@@ -34,21 +34,11 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
 
     /// @dev Ensures that given address is a registered pool
     function _ensureRegisteredPool(address addr) internal view {
-        if (!_isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
+        if (!IContractsRegister(contractsRegister).isPool(addr)) revert RegisteredPoolOnlyException();
     }
 
     /// @dev Ensures that given address is a registered credit manager
     function _ensureRegisteredCreditManager(address addr) internal view {
-        if (!_isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
-    }
-
-    /// @dev Whether given address is a registered pool
-    function _isRegisteredPool(address addr) internal view returns (bool) {
-        return IContractsRegister(contractsRegister).isPool(addr);
-    }
-
-    /// @dev Whether given address is a registered credit manager
-    function _isRegisteredCreditManager(address addr) internal view returns (bool) {
-        return IContractsRegister(contractsRegister).isCreditManager(addr);
+        if (!IContractsRegister(contractsRegister).isCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
 }

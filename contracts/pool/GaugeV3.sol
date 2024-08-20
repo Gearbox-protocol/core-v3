@@ -51,6 +51,12 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Whether gauge is frozen and rates cannot be updated
     bool public override epochFrozen;
 
+    /// @dev Ensures that function caller is voter
+    modifier onlyVoter() {
+        _revertIfCallerNotVoter(); // U:[GA-2]
+        _;
+    }
+
     /// @notice Constructor
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
@@ -63,12 +69,6 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
         emit SetFrozenEpoch(true); // U:[GA-1]
-    }
-
-    /// @dev Ensures that function caller is voter
-    modifier onlyVoter() {
-        _revertIfCallerNotVoter(); // U:[GA-2]
-        _;
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper

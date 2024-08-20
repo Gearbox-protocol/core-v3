@@ -100,10 +100,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _;
     }
 
-    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
-    }
-
     /// @notice Constructor
     /// @param acl_ ACL contract address
     /// @param contractsRegister_ Contracts register address
@@ -279,8 +275,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
-    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
+        return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`
@@ -798,5 +794,9 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @dev Converts `uint256` to `uint128`, preserves maximum value
     function _convertToU128(uint256 limit) internal pure returns (uint128) {
         return (limit == type(uint256).max) ? type(uint128).max : limit.toUint128();
+    }
+
+    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 }

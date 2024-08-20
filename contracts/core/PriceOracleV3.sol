@@ -132,7 +132,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @notice Applies on-demand price feed updates, see `PriceUpdate` for details
     /// @custom:tests U:[PO-5]
-    function updatePrices(PriceUpdate[] calldata updates) external {
+    function updatePrices(PriceUpdate[] calldata updates) external override {
         unchecked {
             uint256 len = updates.length;
             for (uint256 i; i < len; ++i) {
