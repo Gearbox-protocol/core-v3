@@ -472,7 +472,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls Array of `(target, callData)` tuples representing a sequence of calls to perform
     ///        - if `target` is this contract's address, `callData` must be an ABI-encoded calldata of a method
     ///          from `ICreditFacadeV3Multicall`, which is dispatched and handled appropriately
-    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`
+    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`, and returns a flag
+    ///          that indicates whether safety measures should apply (which include safe pricing in collateral check
+    ///          and a check that there are no enabled forbidden tokens by the end of the multicall)
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens before the multicall
     /// @param flags Flags that dictate multicall behaviour, including what methods are allowed to be called and
     ///        whether to execute collateral check after calls

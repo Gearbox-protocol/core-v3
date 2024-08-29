@@ -1303,7 +1303,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return amount;
     }
 
-    /// @dev Internal wrapper for `creditAccount.safeTransfer` call to redice contract size
+    /// @dev Internal wrapper for `creditAccount.safeTransfer` call to reduce contract size
     function _safeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
         ICreditAccountV3(creditAccount).safeTransfer(token, to, amount);
     }
