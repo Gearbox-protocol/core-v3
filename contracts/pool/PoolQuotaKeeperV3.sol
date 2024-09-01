@@ -481,6 +481,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             revert TokenIsNotQuotedException(); // U:[PQK-11]
         }
 
+        if (limit > uint96(type(int96).max)) {
+            revert IncorrectParameterException(); // U:[PQK-12]
+        }
+
         if (tokenQuotaParams.limit != limit) {
             tokenQuotaParams.limit = limit; // U:[PQK-12]
             emit SetTokenLimit(token, limit); // U:[PQK-12]

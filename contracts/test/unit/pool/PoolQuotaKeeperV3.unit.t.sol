@@ -356,6 +356,9 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
 
+        vm.expectRevert(IncorrectParameterException.selector);
+        pqk.setTokenLimit(DUMB_ADDRESS, 2 ** 95);
+
         vm.expectEmit(true, true, false, true);
         emit SetTokenLimit(DUMB_ADDRESS, limit);
 
