@@ -105,7 +105,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     uint128 internal totalBorrowedInBlock;
 
     /// @notice Bot list address
-    address public override botList;
+    address public immutable override botList;
 
     /// @notice Credit account debt limits packed into a single slot
     DebtLimits public override debtLimits;
@@ -163,7 +163,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) ACLNonReentrantTrait(_acl) {
+    ) ACLNonReentrantTrait(_acl) nonZeroAddress(_botList) {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]
@@ -798,17 +798,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         maxDebtPerBlockMultiplier = newMaxDebtPerBlockMultiplier; // U:[FA-49]
         lastBlockBorrowed = uint64(block.number); // U:[FA-49]
         totalBorrowedInBlock = type(uint128).max; // U:[FA-49]
-    }
-
-    /// @notice Sets the new bot list
-    /// @param newBotList New bot list address
-    /// @dev Reverts if caller is not credit configurator
-    function setBotList(address newBotList)
-        external
-        override
-        creditConfiguratorOnly // U:[FA-6]
-    {
-        botList = newBotList; // U:[FA-50]
     }
 
     /// @notice Sets the new max cumulative loss

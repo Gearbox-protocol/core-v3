@@ -469,29 +469,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
     }
 
-    /// @notice Sets the new bot list contract in the credit facade
-    /// @param newBotList New bot list
-    function setBotList(address newBotList)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        _setBotList(newBotList); // I:[CC-33]
-    }
-
-    /// @dev `setBotList` implementation
-    function _setBotList(address botList) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-        if (botList == cf.botList()) return;
-        cf.setBotList(botList); // I:[CC-33]
-        emit SetBotList(botList); // I:[CC-33]
-    }
-
     /// @notice Upgrades a facade connected to the credit manager
     /// @param newCreditFacade New credit facade
     /// @param migrateParams Whether to migrate old credit facade params
     /// @dev Reverts if `newCreditFacade` is incompatible with credit manager
     /// @dev Reverts if `newCreditFacade` is one of allowed adapters or their target contracts
+    /// @dev Special care must be taken in case `newCreditFacade`'s bot list differs from the old one
     function setCreditFacade(address newCreditFacade, bool migrateParams)
         external
         override
@@ -524,9 +507,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
                 _setExpirationDate(prevCreditFacade.expirationDate()); // I:[CC-22]
             }
-
-            address botList = prevCreditFacade.botList();
-            if (botList != address(0)) _setBotList(botList); // I:[CC-22]
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]

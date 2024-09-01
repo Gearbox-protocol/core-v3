@@ -216,9 +216,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotList(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -808,8 +805,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             if (expirable) {
-                CreditFacadeV3 initialCf =
-                    new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), true);
+                CreditFacadeV3 initialCf = new CreditFacadeV3(
+                    address(acl), address(creditManager), address(botList), address(0), address(0), true
+                );
 
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
@@ -824,13 +822,11 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             creditConfigurator.setMaxCumulativeLoss(1e18);
 
             vm.prank(CONFIGURATOR);
-            creditConfigurator.setBotList(DUMB_ADDRESS);
-
-            vm.prank(CONFIGURATOR);
             creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
-            CreditFacadeV3 cf =
-                new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), expirable);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl), address(creditManager), address(botList), address(0), address(0), expirable
+            );
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -870,8 +866,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(maxCumulativeLoss2, migrateSettings ? maxCumulativeLoss : 0, "Incorrect maxCumulativeLoss");
 
-            assertEq(cf.botList(), migrateSettings ? DUMB_ADDRESS : address(0), "Bot list was not transferred");
-
             vm.revertTo(snapshot);
         }
     }
@@ -881,7 +875,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.startPrank(CONFIGURATOR);
 
         CreditFacadeV3 cf =
-            new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), false);
+            new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), false);
         AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
         TargetContractMock target = new TargetContractMock();
 
@@ -922,8 +916,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             vm.stopPrank();
 
-            CreditFacadeV3 cf =
-                new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), false);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl), address(creditManager), address(botList), address(0), address(0), false
+            );
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
@@ -1147,8 +1142,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-32] resetCumulativeLoss works correctly
     function test_I_CC_32_resetCumulativeLoss_works_correctly() public creditTest {
-        CreditFacadeV3Harness cf =
-            new CreditFacadeV3Harness(address(acl), address(creditManager), address(0), address(0), address(0), false);
+        CreditFacadeV3Harness cf = new CreditFacadeV3Harness(
+            address(acl), address(creditManager), address(botList), address(0), address(0), false
+        );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setCreditFacade(address(cf), true);
@@ -1164,18 +1160,5 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         (uint256 loss,) = cf.lossParams();
 
         assertEq(loss, 0, "Cumulative loss was not reset");
-    }
-
-    /// @dev I:[CC-33]: setBotList upgrades the bot list correctly
-    function test_I_CC_33_setBotList_upgrades_priceOracle_correctly() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-
-        vm.expectEmit(true, false, false, false);
-        emit SetBotList(DUMB_ADDRESS);
-
-        creditConfigurator.setBotList(DUMB_ADDRESS);
-
-        assertEq(creditFacade.botList(), DUMB_ADDRESS);
-        vm.stopPrank();
     }
 }

@@ -62,9 +62,6 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a new price oracle is set in the credit manager
     event SetPriceOracle(address indexed priceOracle);
 
-    /// @notice Emitted when a new bot list is set in the credit facade
-    event SetBotList(address indexed botList);
-
     /// @notice Emitted when a new facade is connected to the credit manager
     event SetCreditFacade(address indexed creditFacade);
 
@@ -150,8 +147,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // -------- //
 
     function setPriceOracle(address newPriceOracle) external;
-
-    function setBotList(address newBotList) external;
 
     function setCreditFacade(address newCreditFacade, bool migrateParams) external;
 
