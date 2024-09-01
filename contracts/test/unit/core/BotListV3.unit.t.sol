@@ -53,17 +53,16 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
         BotMock(bot).setRequiredPermissions(1);
 
-        vm.expectRevert(InsufficientBotPermissionsException.selector);
+        vm.expectRevert(IncorrectBotPermissionsException.selector);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
-        BotMock(bot).setRequiredPermissions(0);
 
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, true);
 
         vm.expectRevert(InvalidBotException.selector);
         vm.prank(creditFacade);
-        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
+        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, false);
@@ -81,6 +80,8 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         address[] memory bots = botList.activeBots(creditAccount);
         assertEq(bots.length, 1, "Incorrect active bots array length");
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
+
+        BotMock(bot).setRequiredPermissions(2);
 
         vm.prank(creditFacade);
         activeBotsRemaining = botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
@@ -110,9 +111,11 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
     /// @dev U:[BL-2]: `eraseAllBotPermissions` works correctly
     function test_U_BL_02_eraseAllBotPermissions_works_correctly() public {
+        BotMock(bot).setRequiredPermissions(1);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
+        BotMock(otherBot).setRequiredPermissions(2);
         vm.prank(creditFacade);
         uint256 activeBotsRemaining =
             botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 2});
