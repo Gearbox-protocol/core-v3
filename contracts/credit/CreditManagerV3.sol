@@ -804,7 +804,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
                     // mask with only the LSB of `tokensToCheckMask` enabled
-                    tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
+                    tokenMask = tokensToCheckMask.lsbMask();
                 }
 
                 (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
@@ -845,7 +845,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle = priceOracle;
         uint256 totalValueUSD;
         while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask & uint256(-int256(remainingTokensMask));
+            uint256 tokenMask = remainingTokensMask.lsbMask();
             remainingTokensMask ^= tokenMask;
 
             address token = getTokenByMask(tokenMask);

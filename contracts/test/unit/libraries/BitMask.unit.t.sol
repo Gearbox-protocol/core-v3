@@ -63,4 +63,16 @@ contract BitMaskUnitTest is TestHelper {
         mask = mask.enableDisable(0, 1 << bit);
         assertEq(mask, 0, "Disable doesn't work");
     }
+
+    /// @notice U:[BM-6]: `lsbMask` works correctly
+    function test_U_BM_06_lsbMask_works_correctly(uint256 mask) public {
+        uint256 lsbMask = mask.lsbMask();
+        if (lsbMask == 0) {
+            assertEq(mask, 0, "Zero LSB for non-zero mask");
+            return;
+        }
+        assertEq(lsbMask.calcEnabledTokens(), 1, "LSB mask has more than one enabled bit");
+        assertEq(mask & lsbMask, lsbMask, "LSB is not enabled");
+        assertEq(mask & (lsbMask - 1), 0, "LSB is not least");
+    }
 }

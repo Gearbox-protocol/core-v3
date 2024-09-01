@@ -106,7 +106,7 @@ library BalancesLogic {
         unchecked {
             uint256 i;
             while (tokensMask != 0) {
-                uint256 tokenMask = tokensMask & uint256(-int256(tokensMask));
+                uint256 tokenMask = tokensMask.lsbMask();
                 tokensMask ^= tokenMask;
 
                 address token = getTokenByMaskFn(tokenMask);
