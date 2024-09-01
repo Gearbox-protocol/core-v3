@@ -55,6 +55,12 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
         epochLength = epochLength_;
     }
 
+    /// @notice Whether `token` is added
+    /// @custom:tests U:[TU-2]
+    function isTokenAdded(address token) external view override returns (bool) {
+        return _tokensSet.contains(token);
+    }
+
     /// @notice Returns all supported tokens
     /// @custom:tests U:[TU-2]
     function getTokens() external view override returns (address[] memory) {

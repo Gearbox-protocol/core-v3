@@ -422,11 +422,26 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         external
         override
         configuratorOnly // U:[PQK-2]
+        nonZeroAddress(_gauge) // U:[PQK-8]
     {
-        if (gauge != _gauge) {
-            gauge = _gauge; // U:[PQK-8]
-            emit SetGauge(_gauge); // U:[PQK-8]
+        if (gauge == _gauge) return;
+
+        if (IRateKeeper(_gauge).pool() != pool) {
+            revert IncompatibleGaugeException(); // U:[PQK-8]
         }
+
+        uint256 len = quotaTokensSet.length();
+        for (uint256 i; i < len;) {
+            if (!IRateKeeper(gauge).isTokenAdded(quotaTokensSet.at(i))) {
+                revert TokenIsNotQuotedException(); // U:[PQK-8]
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        gauge = _gauge; // U:[PQK-8]
+        emit SetGauge(_gauge); // U:[PQK-8]
     }
 
     /// @notice Adds an address to the set of allowed credit managers

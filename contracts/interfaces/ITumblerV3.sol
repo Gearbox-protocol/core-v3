@@ -15,8 +15,6 @@ interface ITumblerV3Events {
 
 /// @title Tumbler V3 interface
 interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
-    function pool() external view returns (address);
-
     function underlying() external view returns (address);
 
     function poolQuotaKeeper() external view returns (address);
