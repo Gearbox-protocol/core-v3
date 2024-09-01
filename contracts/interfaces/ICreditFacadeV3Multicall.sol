@@ -119,7 +119,7 @@ interface ICreditFacadeV3Multicall {
     function decreaseDebt(uint256 amount) external;
 
     /// @notice Updates account's quota for a token
-    /// @param token Token to update the quota for
+    /// @param token Collateral token to update the quota for (can't be underlying)
     /// @param quotaChange Desired quota change in underlying token units (`type(int96).min` to disable quota)
     /// @param minQuota Minimum resulting account's quota for token required not to revert
     /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero

@@ -55,6 +55,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     mapping(address => mapping(address => AccountQuota)) internal accountQuotas;
 
     /// @notice Address of the gauge
+    /// @dev Any contract that implements the `IRateKeeper` interface can be used everywhere where
+    ///      the term "gauge" is mentioned, the older name stays for backward compatibility
     address public override gauge;
 
     /// @notice Timestamp of the last quota rates update
@@ -90,8 +92,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Updates credit account's quota for a token
     ///         - Updates account's interest index
-    ///         - Updates account's quota by requested delta subject to the total quota limit (which is considered
-    ///           to be zero for tokens added to the quota keeper but not yet activated via `updateRates`)
+    ///         - Updates account's quota by requested delta subject to the total quota limit
     ///         - Checks that the resulting quota is no less than the user-specified min desired value
     ///           and no more than system-specified max allowed value
     ///         - Updates pool's quota revenue
@@ -131,6 +132,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) =
             _getTokenQuotaParamsOrRevert(tokenQuotaParams);
+        if (rate == 0) revert TokenIsNotQuotedException(); // U:[PQK-14]
 
         uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
@@ -142,7 +144,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         quotaChange = requestedChange;
         if (quotaChange > 0) {
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-            quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+            quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
             fees = uint128(uint256(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR); // U:[PQK-15]
 
@@ -242,6 +244,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
                 (uint16 rate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams); // U:[PQK-17]
+                if (rate == 0) revert TokenIsNotQuotedException(); // U:[PQK-17]
 
                 accountQuota.cumulativeIndexLU =
                     QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate_); // U:[PQK-17]
@@ -359,6 +362,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Adds a new quota token
     /// @param token Address of the token
+    /// @custom:expects Gauge ensures that `token` is not pool's underlying
     function addQuotaToken(address token)
         external
         override
@@ -394,6 +398,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         for (uint256 i; i < len;) {
             address token = tokens[i];
             uint16 rate = rates[i];
+            if (rate == 0) revert IncorrectParameterException(); // U:[PQK-7B]
 
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
             (uint16 prevRate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
