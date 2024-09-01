@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
-import {ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ManageDebtAction, CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
@@ -31,6 +31,18 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _revertIfOutOfDebtPerBlockLimit(amount);
     }
 
+    function revertIfNotLiquidatable(address creditAccount) external view returns (CollateralDebtData memory, bool) {
+        return _revertIfNotLiquidatable(creditAccount);
+    }
+
+    function calcPartialLiquidationPayments(uint256 amount, address token, address priceOracle, bool isExpired)
+        external
+        view
+        returns (uint256, uint256, uint256)
+    {
+        return _calcPartialLiquidationPayments(amount, token, priceOracle, isExpired);
+    }
+
     function setLastBlockBorrowed(uint64 _lastBlockBorrowed) external {
         lastBlockBorrowed = _lastBlockBorrowed;
     }
@@ -51,7 +63,7 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _revertIfOutOfDebtLimits(debt, action);
     }
 
-    function isExpired() external view returns (bool) {
+    function isExpiredInt() external view returns (bool) {
         return _isExpired();
     }
 }

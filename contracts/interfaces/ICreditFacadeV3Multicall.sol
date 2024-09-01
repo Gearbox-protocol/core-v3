@@ -135,6 +135,8 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method can also be called during liquidation
     /// @dev Withdrawals are prohibited in multicalls if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals activate safe pricing (min of main and reserve feeds) in collateral check
+    /// @dev If `token` is a phantom token, it's withdrawn first, and its `depositedToken` is then sent to the recipient.
+    ///      Although an adapter call is made in process, permission for external calls is not required.
     function withdrawCollateral(address token, uint256 amount, address to) external;
 
     /// @notice Sets advanced collateral check parameters

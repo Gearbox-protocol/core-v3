@@ -31,6 +31,7 @@ import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
+import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -288,6 +289,11 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         address nonQuotedToken = tokenTestSuite.addressOf(Tokens.wstETH);
         vm.expectRevert(TokenIsNotQuotedException.selector);
         creditConfigurator.addCollateralToken(nonQuotedToken, 9300);
+
+        address phantomToken = address(new PhantomTokenMock(address(0), address(0), "Test Token", "TEST"));
+        priceOracle.setPriceFeed(phantomToken, address(new PriceFeedMock(1e8, 8)), 1);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditConfigurator.addCollateralToken(phantomToken, 9300);
 
         vm.stopPrank();
     }

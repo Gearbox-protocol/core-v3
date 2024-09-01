@@ -22,6 +22,7 @@ import {ICreditConfiguratorV3, AllowanceAction} from "../interfaces/ICreditConfi
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAdapter} from "../interfaces/base/IAdapter.sol";
+import {IPhantomToken} from "../interfaces/base/IPhantomToken.sol";
 
 // TRAITS
 import {ControlledTrait} from "../traits/ControlledTrait.sol";
@@ -97,6 +98,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     /// @dev Reverts if `token` is underlying
     /// @dev Reverts if `token` is not quoted in the quota keeper
     /// @dev Reverts if `liquidationThreshold` is greater than underlying's LT
+    /// @dev If `token` is a phantom token, reverts if its `depositedToken` is not added to the credit manager
+    /// @dev If `token` is a phantom token, an adapter for its `target` implementing `IPhantomTokenWithdrawer` interface
+    ///       must later be connected in order for withdrawals to work properly
     /// @dev `liquidationThreshold` can be zero to allow users to deposit connector tokens to credit accounts and swap
     ///      them into actual collateral and to withdraw reward tokens sent to credit accounts by integrated protocols
     function addCollateralToken(address token, uint16 liquidationThreshold)
@@ -118,6 +122,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         catch {
             revert IncorrectTokenContractException(); // I:[CC-3]
         }
+
+        try IPhantomToken(token).getPhantomTokenInfo() returns (address, address depositedToken) {
+            _getTokenMaskOrRevert(depositedToken); // I:[CC-3]
+        } catch {}
 
         if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).priceFeeds(token) == address(0)) {
             revert PriceFeedDoesNotExistException(); // I:[CC-3]
