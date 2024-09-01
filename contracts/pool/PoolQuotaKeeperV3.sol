@@ -48,7 +48,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev The list of all quoted tokens
     EnumerableSet.AddressSet internal quotaTokensSet;
 
-    /// @notice Mapping from token to global token quota params
+    /// @dev Mapping from token to global token quota params
     mapping(address => TokenQuotaParams) internal totalQuotaParams;
 
     /// @dev Mapping from (creditAccount, token) to account's token quota params

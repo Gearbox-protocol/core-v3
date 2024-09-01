@@ -98,10 +98,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Maximum amount that can be borrowed by a credit manager in a single block, as a multiple of `maxDebt`
     uint8 public override maxDebtPerBlockMultiplier = DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER;
 
-    /// @notice Last block when underlying was borrowed by a credit manager
+    /// @dev Last block when underlying was borrowed by a credit manager
     uint64 internal lastBlockBorrowed;
 
-    /// @notice The total amount borrowed by a credit manager in `lastBlockBorrowed`
+    /// @dev The total amount borrowed by a credit manager in `lastBlockBorrowed`
     uint128 internal totalBorrowedInBlock;
 
     /// @notice Bot list address

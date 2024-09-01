@@ -14,16 +14,16 @@ abstract contract ACLTrait is SanityCheckTrait {
     /// @notice ACL contract address
     address public immutable acl;
 
-    /// @notice Constructor
-    /// @param _acl ACL contract address
-    constructor(address _acl) nonZeroAddress(_acl) {
-        acl = _acl;
-    }
-
     /// @dev Ensures that function caller has configurator role
     modifier configuratorOnly() {
         _ensureCallerIsConfigurator();
         _;
+    }
+
+    /// @notice Constructor
+    /// @param _acl ACL contract address
+    constructor(address _acl) nonZeroAddress(_acl) {
+        acl = _acl;
     }
 
     /// @dev Reverts if the caller is not the configurator

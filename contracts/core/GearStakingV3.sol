@@ -45,13 +45,19 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     mapping(address => WithdrawalData) internal withdrawalData;
 
     /// @notice Mapping from address to its status as allowed voting contract
-    mapping(address => VotingContractStatus) public allowedVotingContract;
+    mapping(address => VotingContractStatus) public override allowedVotingContract;
 
     /// @notice Address of a new staking contract that can be migrated to
     address public override successor;
 
     /// @notice Address of the previous staking contract that is migrated from
     address public override migrator;
+
+    /// @dev Ensures that function is called by migrator
+    modifier migratorOnly() {
+        if (msg.sender != migrator) revert CallerNotMigratorException();
+        _;
+    }
 
     /// @notice Constructor
     /// @param owner_ Contract owner
@@ -62,12 +68,6 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
         gear = gear_; // U:[GS-1]
         firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
         transferOwnership(owner_); // U:[GS-1]
-    }
-
-    /// @dev Ensures that function is called by migrator
-    modifier migratorOnly() {
-        if (msg.sender != migrator) revert CallerNotMigratorException();
-        _;
     }
 
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes
