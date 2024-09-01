@@ -249,12 +249,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(type(uint8).max);
 
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(1);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(type(uint96).max);
-
         (address collateral,) = creditManager.collateralTokenByMask(1 << token1);
 
         tokenTestSuite.mint(collateral, USER, type(uint96).max);
@@ -345,7 +339,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
     }
 
     /// @dev I:[OCA-13]: openCreditAccount with zero debt works correctly
-    function test_I_OCA_14_openCreditAccount_sets_zero_debt_flag() public creditTest {
+    function test_I_OCA_13_openCreditAccount_sets_zero_debt_flag() public creditTest {
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         MultiCall[] memory calls = MultiCallBuilder.build();
@@ -360,6 +354,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
-        assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
+        assertEq(
+            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
+        );
     }
 }

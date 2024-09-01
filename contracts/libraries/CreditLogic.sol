@@ -113,23 +113,12 @@ library CreditLogic {
         view
         returns (uint16)
     {
-        uint40 timestampRampEnd = timestampRampStart + rampDuration;
-        if (block.timestamp <= timestampRampStart) {
-            return ltInitial; // U:[CL-5]
-        } else if (block.timestamp < timestampRampEnd) {
-            return _getRampingLiquidationThreshold(ltInitial, ltFinal, timestampRampStart, timestampRampEnd); // U:[CL-5]
-        } else {
-            return ltFinal; // U:[CL-5]
-        }
-    }
+        if (block.timestamp <= timestampRampStart) return ltInitial; // U:[CL-5]
 
-    /// @dev Computes the LT during the ramping process
-    function _getRampingLiquidationThreshold(
-        uint16 ltInitial,
-        uint16 ltFinal,
-        uint40 timestampRampStart,
-        uint40 timestampRampEnd
-    ) internal view returns (uint16) {
+        uint40 timestampRampEnd = timestampRampStart + rampDuration;
+        if (block.timestamp >= timestampRampEnd) return ltFinal; // U:[CL-5]
+
+        // cast is safe since LT is between `ltInitial` and `ltFinal`, both of which are `uint16`
         return uint16(
             (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
                 / (timestampRampEnd - timestampRampStart)

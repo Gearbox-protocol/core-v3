@@ -42,7 +42,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
         botList = new BotListV3(CONFIGURATOR);
         vm.prank(CONFIGURATOR);
-        botList.setCreditManagerApprovedStatus(creditManager, true);
+        botList.approveCreditManager(creditManager);
     }
 
     /// @notice U:[BL-1]: `setBotPermissions` works correctly
@@ -52,21 +52,18 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
 
         BotMock(bot).setRequiredPermissions(1);
+        BotMock(otherBot).setRequiredPermissions(1);
 
-        vm.expectRevert(InsufficientBotPermissionsException.selector);
+        vm.expectRevert(IncorrectBotPermissionsException.selector);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
-        BotMock(bot).setRequiredPermissions(0);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(otherBot);
 
         vm.expectRevert(InvalidBotException.selector);
         vm.prank(creditFacade);
-        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, false);
+        botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 1});
 
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(bot, creditManager, creditAccount, 1);
@@ -82,6 +79,8 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         assertEq(bots.length, 1, "Incorrect active bots array length");
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
 
+        BotMock(bot).setRequiredPermissions(2);
+
         vm.prank(creditFacade);
         activeBotsRemaining = botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
 
@@ -93,7 +92,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(bot);
 
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(bot, creditManager, creditAccount, 0);
@@ -110,9 +109,11 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
     /// @dev U:[BL-2]: `eraseAllBotPermissions` works correctly
     function test_U_BL_02_eraseAllBotPermissions_works_correctly() public {
+        BotMock(bot).setRequiredPermissions(1);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
+        BotMock(otherBot).setRequiredPermissions(2);
         vm.prank(creditFacade);
         uint256 activeBotsRemaining =
             botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 2});

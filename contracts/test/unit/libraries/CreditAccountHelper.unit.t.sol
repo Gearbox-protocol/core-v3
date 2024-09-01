@@ -35,7 +35,7 @@ contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
 
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
 
-        ICreditAccountV3(creditAccount).safeApprove(dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
@@ -44,17 +44,17 @@ contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
     function test_U_CAH_02_safeApprove_works_for_ERC20_with_approve_restrictions() public {
         address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
-        ICreditAccountV3(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveRevertToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
-        ICreditAccountV3(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveRevertToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
 
-        ICreditAccountV3(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveFalseToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
-        ICreditAccountV3(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveFalseToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }

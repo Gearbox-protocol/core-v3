@@ -12,7 +12,7 @@ import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
     AddressIsNotContractException,
     CallerNotCreditFacadeException,
-    InsufficientBotPermissionsException,
+    IncorrectBotPermissionsException,
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
 import {IBot} from "../interfaces/base/IBot.sol";
@@ -39,7 +39,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @notice Constructor
     /// @param owner_ Contract owner
     constructor(address owner_) {
-        _transferOwnership(owner_);
+        transferOwnership(owner_);
     }
 
     // ----------- //
@@ -90,7 +90,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         BotInfo storage info = _botInfo[bot];
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
         if (permissions != 0) {
-            if (IBot(bot).requiredPermissions() & ~permissions != 0) revert InsufficientBotPermissionsException();
+            if (IBot(bot).requiredPermissions() != permissions) revert IncorrectBotPermissionsException();
             if (info.forbidden) revert InvalidBotException();
             accountBots.add(bot);
         } else {
@@ -131,20 +131,20 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         return _botInfo[bot].forbidden;
     }
 
-    /// @notice Sets `bot`'s status to `forbidden`
-    function setBotForbiddenStatus(address bot, bool forbidden) external override onlyOwner {
+    /// @notice Forbid's `bot`
+    function forbidBot(address bot) external override onlyOwner {
         BotInfo storage info = _botInfo[bot];
-        if (info.forbidden != forbidden) {
-            info.forbidden = forbidden;
-            emit SetBotForbiddenStatus(bot, forbidden);
+        if (!info.forbidden) {
+            info.forbidden = true;
+            emit ForbidBot(bot);
         }
     }
 
-    /// @notice Sets `creditManager`'s status to `approved`
-    function setCreditManagerApprovedStatus(address creditManager, bool approved) external override onlyOwner {
-        if (approvedCreditManager[creditManager] != approved) {
-            approvedCreditManager[creditManager] = approved;
-            emit SetCreditManagerApprovedStatus(creditManager, approved);
+    /// @notice Approves `creditManager`
+    function approveCreditManager(address creditManager) external override onlyOwner {
+        if (!approvedCreditManager[creditManager]) {
+            approvedCreditManager[creditManager] = true;
+            emit ApproveCreditManager(creditManager);
         }
     }
 

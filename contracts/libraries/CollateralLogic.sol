@@ -102,10 +102,7 @@ library CollateralLogic {
     ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD) {
         uint256 balance = IERC20(token).safeBalanceOf(creditAccount);
 
-        if (balance > 1) {
-            unchecked {
-                --balance;
-            }
+        if (balance != 0) {
             valueUSD = convertToUSDFn(priceOracle, balance, token);
             weightedValueUSD = Math.min(valueUSD * liquidationThreshold / PERCENTAGE_FACTOR, quotaUSD);
         }

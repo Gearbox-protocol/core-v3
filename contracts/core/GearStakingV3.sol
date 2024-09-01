@@ -45,7 +45,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     mapping(address => WithdrawalData) internal withdrawalData;
 
     /// @notice Mapping from address to its status as allowed voting contract
-    mapping(address => VotingContractStatus) public allowedVotingContract;
+    mapping(address => VotingContractStatus) public override allowedVotingContract;
 
     /// @notice Address of a new staking contract that can be migrated to
     address public override successor;
@@ -53,20 +53,21 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Address of the previous staking contract that is migrated from
     address public override migrator;
 
-    /// @notice Constructor
-    /// @param owner_ Contract owner
-    /// @param gear_ GEAR token address
-    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start
-    constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
-        gear = gear_; // U:[GS-1]
-        firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
-        _transferOwnership(owner_); // U:[GS-1]
-    }
-
     /// @dev Ensures that function is called by migrator
     modifier migratorOnly() {
         if (msg.sender != migrator) revert CallerNotMigratorException();
         _;
+    }
+
+    /// @notice Constructor
+    /// @param owner_ Contract owner
+    /// @param gear_ GEAR token address
+    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start.
+    ///        Setting this too far into the future poses a risk of locking user deposits.
+    constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
+        gear = gear_; // U:[GS-1]
+        firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
+        transferOwnership(owner_); // U:[GS-1]
     }
 
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes
@@ -260,6 +261,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     function getCurrentEpoch() public view override returns (uint16) {
         if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-1]
         unchecked {
+            // cast is safe for the next millenium
             return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-1]
         }
     }

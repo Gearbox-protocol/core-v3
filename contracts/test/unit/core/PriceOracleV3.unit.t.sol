@@ -115,7 +115,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectRevert(ZeroAddressException.selector);
         priceOracle.setPriceFeed(token, address(0), 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         priceOracle.setPriceFeed(token, priceFeed, 0);
 
         // setting the price feed
@@ -343,17 +343,12 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectRevert(StalePriceException.selector);
         priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
-        // staleness check is skipped for updatable feed
-        vm.mockCall(priceFeed, abi.encodeCall(IUpdatablePriceFeed.updatable, ()), abi.encode(true));
-        bool skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
-        assertFalse(skipCheck, "skipCheck is unexpectedly true");
-
         // non-zero staleness period while skipCheck = true
         vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(true));
         vm.expectRevert(IncorrectParameterException.selector);
         priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
-        skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 0);
+        bool skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 0);
         assertTrue(skipCheck, "skipCheck is unexpectedly false");
     }
 

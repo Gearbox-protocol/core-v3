@@ -51,12 +51,17 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Whether gauge is frozen and rates cannot be updated
     bool public override epochFrozen;
 
+    /// @dev Ensures that function caller is voter
+    modifier onlyVoter() {
+        _revertIfCallerNotVoter(); // U:[GA-2]
+        _;
+    }
+
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
-    constructor(address _acl, address _pool, address _gearStaking)
-        ACLNonReentrantTrait(_acl)
+    constructor(address _pool, address _gearStaking)
+        ACLNonReentrantTrait(ACLNonReentrantTrait(_pool).acl())
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {
         pool = _pool; // U:[GA-1]
@@ -64,12 +69,6 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
         emit SetFrozenEpoch(true); // U:[GA-1]
-    }
-
-    /// @dev Ensures that function caller is voter
-    modifier onlyVoter() {
-        _revertIfCallerNotVoter(); // U:[GA-2]
-        _;
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper
@@ -109,13 +108,14 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
                 QuotaRateParams memory qrp = quotaRateParams[token]; // U:[GA-15]
 
-                uint96 votesLpSide = qrp.totalVotesLpSide; // U:[GA-15]
-                uint96 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
+                uint256 votesLpSide = qrp.totalVotesLpSide; // U:[GA-15]
+                uint256 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
                 uint256 totalVotes = votesLpSide + votesCaSide; // U:[GA-15]
 
+                // cast is safe since rate is between `minRate` and `maxRate` both of which are `uint16`
                 rates[i] = totalVotes == 0
                     ? qrp.minRate
-                    : uint16((uint256(qrp.minRate) * votesCaSide + uint256(qrp.maxRate) * votesLpSide) / totalVotes); // U:[GA-15]
+                    : uint16((qrp.minRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes); // U:[GA-15]
             }
         }
     }
@@ -252,7 +252,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOnly // U:[GA-3]
+        controllerOrConfiguratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
     }
@@ -263,7 +263,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOnly // U:[GA-3]
+        controllerOrConfiguratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }

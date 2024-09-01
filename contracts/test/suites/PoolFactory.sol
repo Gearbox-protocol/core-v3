@@ -57,13 +57,13 @@ contract PoolFactory is Test {
         });
 
         address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
-        gauge = new GaugeV3(acl, address(pool), gearStaking);
+        gauge = new GaugeV3(address(pool), gearStaking);
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
 
         vm.label(address(gauge), string.concat("GaugeV3-", config.symbol()));
 
-        poolQuotaKeeper = new PoolQuotaKeeperV3(acl, contractsRegister, payable(address(pool)));
+        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
 
         vm.prank(CONFIGURATOR);
         poolQuotaKeeper.setGauge(address(gauge));

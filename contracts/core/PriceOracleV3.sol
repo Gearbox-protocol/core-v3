@@ -22,13 +22,16 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 
 /// @title Price oracle V3
 /// @notice Acts as router that dispatches calls to corresponding price feeds.
-///         Underlying price feeds can be arbitrary, but they must adhere to Chainlink interface, i.e., implement
+///         - Underlying price feeds can be arbitrary, but they must adhere to Chainlink interface, i.e., implement
 ///         `latestRoundData` and always return answers with 8 decimals. They may also implement their own price
 ///         checks, in which case they may incidcate it by returning `skipPriceCheck = true`.
-///         Price oracle also provides "safe" pricing, which uses minimum of main and reserve feed answers. These
-///         two feeds are allowed to be the same, which effectively makes it trusted, but to reduce changes of
+///         - Price oracle also provides "safe" pricing, which uses minimum of main and reserve feed answers. These
+///         two feeds are allowed to be the same, which effectively makes it trusted, but to reduce chances of
 ///         this happening accidentally, reserve price feed must be explicitly set after the main one.
-///         Finally, this contract serves as register for updatable price feeds and can be used to apply batched
+///         The primary purpose of reserve price feeds is to upper-bound main ones during the collateral check after
+///         operations that allow users to offload mispriced tokens on Gearbox and withdraw underlying; they should
+///         not be used for general collateral evaluation, including decisions on whether accounts are liquidatable.
+///         - Finally, this contract serves as register for updatable price feeds and can be used to apply batched
 ///         on-demand price updates while ensuring that those are not calls to arbitrary contracts.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -129,7 +132,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @notice Applies on-demand price feed updates, see `PriceUpdate` for details
     /// @custom:tests U:[PO-5]
-    function updatePrices(PriceUpdate[] calldata updates) external {
+    function updatePrices(PriceUpdate[] calldata updates) external override {
         unchecked {
             uint256 len = updates.length;
             for (uint256 i; i < len; ++i) {
@@ -151,7 +154,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         override
         nonZeroAddress(token)
         nonZeroAddress(priceFeed)
-        controllerOnly
+        controllerOrConfiguratorOnly
     {
         PriceFeedParams memory params = priceFeedParams(token);
         if (params.priceFeed == address(0)) {
@@ -203,10 +206,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     /// @custom:tests U:[PO-5]
     function addUpdatablePriceFeed(address priceFeed) external override nonZeroAddress(priceFeed) configuratorOnly {
         if (!_isUpdatable(priceFeed)) revert PriceFeedIsNotUpdatableException();
-        if (!_updatablePriceFeedsSet.contains(priceFeed)) {
-            _updatablePriceFeedsSet.add(priceFeed);
-            emit AddUpdatablePriceFeed(priceFeed);
-        }
+        if (_updatablePriceFeedsSet.add(priceFeed)) emit AddUpdatablePriceFeed(priceFeed);
     }
 
     // --------- //

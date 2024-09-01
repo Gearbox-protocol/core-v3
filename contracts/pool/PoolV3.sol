@@ -41,8 +41,14 @@ struct DebtParams {
 }
 
 /// @title Pool V3
-/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
-/// @notice Pool shares implement EIP-2612 permits
+/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard and
+///         supporting EIP-2612 permits. Pool's underlying is expected to be your normal ERC-20 token:
+///         - no rebasing or any calculations that can affect transfers accuracy (fee-on-transfer tokens can
+///         be supported though by overriding `_amountWithFee` and `_amountMinusFee` functions)
+///         - such scale that amounts fit into `uint96` and are not sensitive to ~4 digits precision loss
+///         (nearly all tokens with decimals between 6 and 18 work)
+/// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
+///      dead address before allowing borrowing
 contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
@@ -53,9 +59,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
-
-    /// @notice Underlying token address
-    address public immutable override underlyingToken;
 
     /// @notice Protocol treasury address
     address public immutable override treasury;
@@ -97,10 +100,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _;
     }
 
-    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
-    }
-
     /// @notice Constructor
     /// @param acl_ ACL contract address
     /// @param contractsRegister_ Contracts register address
@@ -129,7 +128,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
-        underlyingToken = underlyingToken_; // U:[LP-1B]
+        if (bytes(name_).length == 0 || bytes(symbol_).length == 0) revert IncorrectParameterException(); // U:[LP-1A]
+
         treasury = treasury_; // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
@@ -151,9 +151,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         return _creditManagerSet.values();
     }
 
+    /// @notice Pool's underlying token, same as `asset()`
+    /// @dev Exists for backward compatibility
+    function underlyingToken() external view override returns (address) {
+        return asset(); // U:[LP-1B]
+    }
+
     /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
-        return IERC20(underlyingToken).safeBalanceOf(address(this)); // U:[LP-3]
+        return IERC20(asset()).safeBalanceOf(address(this)); // U:[LP-3]
     }
 
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
@@ -172,7 +178,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // ---------------- //
 
     /// @notice Total amount of underlying tokens managed by the pool, same as `expectedLiquidity`
-    /// @dev Since `totalAssets` doesn't depend on underlying balance, pool is not vulnerable to the inflation attack
     function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
@@ -186,7 +191,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 shares)
     {
         uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
@@ -200,7 +205,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         returns (uint256 shares)
     {
-        shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
+        shares = deposit(assets, receiver); // U:[LP-2A,2B,5A,5B,6]
         emit Refer(receiver, referralCode, assets); // U:[LP-6]
     }
 
@@ -213,7 +218,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 assets)
     {
         uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
@@ -227,11 +232,11 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         returns (uint256 assets)
     {
-        assets = mint(shares, receiver); // U:[LP-2A,2B,5,7]
+        assets = mint(shares, receiver); // U:[LP-2A,2B,5A,5B,7]
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
-    /// @notice Withdraws pool shares for given amount of underlying tokens
+    /// @notice Burns pool shares in exchange for given amount of underlying tokens
     /// @param assets Amount of underlying to withdraw
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -241,7 +246,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 shares)
     {
         uint256 assetsToUser = _amountWithFee(assets);
@@ -250,7 +255,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
-    /// @notice Redeems given number of pool shares for underlying tokens
+    /// @notice Redeems given number of pool shares in exchange for underlying tokens
     /// @param shares Number of pool shares to redeem
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -260,7 +265,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 assets)
     {
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
@@ -270,8 +275,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
-    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
+        return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`
@@ -320,7 +325,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     ///      - updates base interest rate and index
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
-        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
+        if (assetsReceived == 0 || shares == 0) revert AmountCantBeZeroException(); // U:[LP-5B]
+        IERC20(asset()).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
 
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
@@ -344,6 +350,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 amountToUser,
         uint256 shares
     ) internal {
+        if (assetsReceived == 0 || shares == 0) revert AmountCantBeZeroException(); // U:[LP-5B]
         if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[LP-8,9]
         _burn(owner, shares); // U:[LP-8,9]
 
@@ -353,24 +360,22 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
-        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
+        IERC20(asset()).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
-                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
+                IERC20(asset()).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
             }
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
     }
 
     /// @dev Internal conversion function (from assets to shares) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
         uint256 supply = totalSupply();
         return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
     }
 
     /// @dev Internal conversion function (from shares to assets) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         uint256 supply = totalSupply();
         return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
@@ -443,7 +448,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
         _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
 
-        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
+        IERC20(asset()).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
         emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
     }
 
@@ -694,7 +699,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
     {
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
@@ -706,7 +711,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
         registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
@@ -750,6 +755,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // INTERNALS //
     // --------- //
 
+    /// @dev Same as `ERC20._transfer` but reverts if contract is paused
+    function _transfer(address from, address to, uint256 amount)
+        internal
+        override
+        whenNotPaused // U:[LP-2A]
+    {
+        super._transfer(from, to, amount);
+    }
+
     /// @dev Returns amount of token that should be transferred to receive `amount`
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
@@ -780,5 +794,9 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @dev Converts `uint256` to `uint128`, preserves maximum value
     function _convertToU128(uint256 limit) internal pure returns (uint128) {
         return (limit == type(uint256).max) ? type(uint128).max : limit.toUint128();
+    }
+
+    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 }

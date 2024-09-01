@@ -132,8 +132,16 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
+        priceOracleMock.setPrice(underlying, 1e8);
+
         creditManager = new CreditManagerV3Harness(
-            address(poolMock), address(accountFactory), address(priceOracleMock), DEFAULT_FEE_INTEREST, name, isFeeToken
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            name,
+            isFeeToken
         );
         creditManager.setCreditFacade(address(this));
 
@@ -293,6 +301,40 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
     function test_U_CM_01_constructor_sets_correct_values() public creditManagerTest {
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            "",
+            isFeeToken
+        );
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            0,
+            DEFAULT_FEE_INTEREST,
+            name,
+            isFeeToken
+        );
+
+        PriceOracleMock priceOracleMock2 = new PriceOracleMock();
+        vm.expectRevert(IncorrectPriceException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock2),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            name,
+            isFeeToken
+        );
+
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
@@ -410,9 +452,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setCollateralTokenData(DUMB_ADDRESS, 0, 0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setMaxEnabledTokens(255);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -501,11 +540,20 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditAccount, expectedAccount, _testCaseErr("Incorrect credit account returned"));
 
-        (,, uint128 cumulativeQuotaInterest, uint128 quotaFees,, uint16 flags, uint64 lastDebtUpdate, address borrower)
-        = creditManager.creditAccountInfo(creditAccount);
+        (
+            ,
+            ,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
         assertEq(quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
+        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokensMask"));
         assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
@@ -542,9 +590,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: 0,
-            cumulativeIndexLastUpdate: 0,
-            cumulativeQuotaInterest: 0,
-            quotaFees: 0,
+            cumulativeIndexLastUpdate: 123,
+            cumulativeQuotaInterest: 123,
+            quotaFees: 123,
             enabledTokensMask: 0,
             flags: 123,
             borrower: address(0)
@@ -553,11 +601,22 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
         creditManager.closeCreditAccount(creditAccount);
 
-        (,,,, uint256 enabledTokensMask, uint16 flags, uint64 lastDebtUpdate, address borrower) =
-            creditManager.creditAccountInfo(creditAccount);
-        assertEq(enabledTokensMask, 0, "enabledTokensMask not cleared");
+        (
+            ,
+            uint256 cumulativeIndexLastUpdate,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(cumulativeIndexLastUpdate, 0, "cumulativeIndexLastUpdate not cleaned");
+        assertEq(cumulativeQuotaInterest, 1, "cumulativeQuotaInterest not cleaned");
+        assertEq(quotaFees, 0, "quotaFees not cleaned");
+        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, "enabledTokensMask not cleared");
         assertEq(borrower, address(0), "borrower not cleared");
-        assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
+        assertEq(lastDebtUpdate, 0, "lastDebtUpdate not cleared");
         assertEq(flags, 0, "flags not cleared");
 
         assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
@@ -1300,14 +1359,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint8 numberOfTokens
     ) public withFeeTokenCase creditManagerTest {
         amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
-        numberOfTokens = uint8(bound(numberOfTokens, 1, 20));
+        numberOfTokens = uint8(bound(numberOfTokens, 1, DEFAULT_MAX_ENABLED_TOKENS));
         enabledTokensMask = bound(enabledTokensMask, 1, 2 ** numberOfTokens - 1);
 
         // sets underlying price to 1 USD
         priceOracleMock.setPrice(underlying, 10 ** 8);
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(20);
 
         // sets up a credit account
         address creditAccount = DUMB_ADDRESS;
@@ -1531,9 +1587,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
 
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(3);
-
         CollateralDebtData memory collateralDebtData =
             creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
@@ -1639,14 +1692,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 underlyingBalance: debt,
                 linkBalance: 0,
-                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * (debt - 1),
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * (debt - 1) * LT_UNDERLYING / PERCENTAGE_FACTOR
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE") + 1,
+                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
                 expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR
             }),
@@ -1654,7 +1707,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 name: "One quoted token with balance > quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE") + 1,
+                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
                 expectedTwvUSD: vars.get("LINK_QUOTA_IN_USD")
             })
@@ -1741,9 +1794,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         _addQuotedToken({token: Tokens.CVX, lt: 20_00, quoted: 100_000, outstandingInterest: 30_000});
         uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.CVX});
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(3);
 
         GetQuotedTokenDataTestCase[4] memory cases = [
             GetQuotedTokenDataTestCase({
@@ -2030,12 +2080,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: address(0)
         });
 
-        uint8 maxEnabledTokens = uint8(uint256(keccak256(abi.encode((mask)))) % 255);
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(maxEnabledTokens);
-
-        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > maxEnabledTokens) {
+        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > DEFAULT_MAX_ENABLED_TOKENS) {
             vm.expectRevert(TooManyEnabledTokensException.selector);
             creditManager.saveEnabledTokensMask(creditAccount, mask);
         } else {
@@ -2190,14 +2235,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(lt, expectedLT, "Incorrect LT for weth");
 
         vm.stopPrank();
-    }
-
-    /// @dev U:[CM-44]: setMaxEnabledToken correctly sets value
-    function test_U_CM_44_setMaxEnabledTokens_works_correctly() public creditManagerTest {
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(255);
-
-        assertEq(creditManager.maxEnabledTokens(), 255, "Incorrect max enabled tokens");
     }
 
     //

@@ -32,6 +32,8 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     address public immutable override underlying;
 
     /// @notice Pool's quota keeper
+    /// @dev Unlike in `GaugeV3`, quota keeper is stored as immutable because even in an unlikely scenario
+    ///      of its migration replacing the tumbler is very simple as there are no user votes to move
     address public immutable override poolQuotaKeeper;
 
     /// @notice Epoch length in seconds
@@ -44,15 +46,20 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
     /// @param pool_ Pool whose quota rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address acl_, address pool_, uint256 epochLength_) ACLNonReentrantTrait(acl_) {
+    constructor(address pool_, uint256 epochLength_) ACLNonReentrantTrait(ACLNonReentrantTrait(pool_).acl()) {
         pool = pool_;
         underlying = IPoolV3(pool_).underlyingToken();
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();
         epochLength = epochLength_;
+    }
+
+    /// @notice Whether `token` is added
+    /// @custom:tests U:[TU-2]
+    function isTokenAdded(address token) external view override returns (bool) {
+        return _tokensSet.contains(token);
     }
 
     /// @notice Returns all supported tokens
@@ -76,7 +83,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
 
     /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
     ///         sets its rate to `rate`
-    /// @dev Reverts if `token` is zero address, pool's underlying or is already added
+    /// @dev Reverts if `token` is zero address, pool's underlying or is already added, or if `rate` is zero
     /// @custom:tests U:[TU-2]
     function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
         if (token == underlying || !_tokensSet.add(token)) revert TokenNotAllowedException();
@@ -91,21 +98,21 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     /// @dev Sets `token`'s rate to `rate`
     /// @dev Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
-    function setRate(address token, uint16 rate) external override controllerOnly {
+    function setRate(address token, uint16 rate) external override controllerOrConfiguratorOnly {
         if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
-        if (rate == 0) revert IncorrectParameterException();
         _setRate(token, rate);
     }
 
     /// @notice Updates rates in the quota keeper if time passed since the last update is greater than epoch length
     /// @custom:tests U:[TU-4], I:[QR-1]
-    function updateRates() external override controllerOnly {
+    function updateRates() external override controllerOrConfiguratorOnly {
         if (block.timestamp < IPoolQuotaKeeperV3(poolQuotaKeeper).lastQuotaRateUpdate() + epochLength) return;
         IPoolQuotaKeeperV3(poolQuotaKeeper).updateRates();
     }
 
     /// @dev `setRate` implementation
     function _setRate(address token, uint16 rate) internal {
+        if (rate == 0) revert IncorrectParameterException();
         if (_rates[token] == rate) return;
         _rates[token] = rate;
         emit SetRate(token, rate);

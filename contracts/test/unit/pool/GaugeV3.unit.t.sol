@@ -59,14 +59,14 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         gearStakingMock = new GearStakingMock();
         gearStakingMock.setCurrentEpoch(900);
 
-        gauge = new GaugeV3Harness(address(addressProvider), address(poolMock), address(gearStakingMock));
+        gauge = new GaugeV3Harness(address(poolMock), address(gearStakingMock));
     }
 
     /// @dev U:[GA-1]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
         vm.expectEmit(false, false, false, true);
         emit SetFrozenEpoch(true);
-        gauge = new GaugeV3Harness(address(addressProvider), address(poolMock), address(gearStakingMock));
+        gauge = new GaugeV3Harness(address(poolMock), address(gearStakingMock));
 
         assertEq(gauge.pool(), address(poolMock), "Incorrect pool");
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
@@ -74,7 +74,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertTrue(gauge.epochFrozen(), "Epoch not frozen");
 
         vm.expectRevert(ZeroAddressException.selector);
-        new GaugeV3Harness(address(addressProvider), address(poolMock), address(0));
+        new GaugeV3Harness(address(poolMock), address(0));
     }
 
     /// @dev U:[GA-2]: voterOnly functions reverts if called by non-voter
@@ -91,10 +91,10 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 

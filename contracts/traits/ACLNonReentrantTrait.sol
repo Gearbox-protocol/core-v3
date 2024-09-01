@@ -7,7 +7,8 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 import {IACL} from "../interfaces/IACL.sol";
 import {
-    CallerNotControllerException,
+    AddressIsNotContractException,
+    CallerNotControllerOrConfiguratorException,
     CallerNotPausableAdminException,
     CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
@@ -26,17 +27,9 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     address public controller;
 
     /// @dev Ensures that function caller is external controller or configurator
-    modifier controllerOnly() {
+    modifier controllerOrConfiguratorOnly() {
         _ensureCallerIsControllerOrConfigurator();
         _;
-    }
-
-    /// @dev Reverts if the caller is not controller or configurator
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsControllerOrConfigurator() internal view {
-        if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
-            revert CallerNotControllerException();
-        }
     }
 
     /// @dev Ensures that function caller has pausable admin role
@@ -45,33 +38,15 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         _;
     }
 
-    /// @dev Reverts if the caller is not pausable admin
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsPausableAdmin() internal view {
-        if (!_isPausableAdmin({account: msg.sender})) {
-            revert CallerNotPausableAdminException();
-        }
-    }
-
     /// @dev Ensures that function caller has unpausable admin role
     modifier unpausableAdminsOnly() {
         _ensureCallerIsUnpausableAdmin();
         _;
     }
 
-    /// @dev Reverts if the caller is not unpausable admin
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsUnpausableAdmin() internal view {
-        if (!_isUnpausableAdmin({account: msg.sender})) {
-            revert CallerNotUnpausableAdminException();
-        }
-    }
-
     /// @notice Constructor
     /// @param acl ACL contract address
-    constructor(address acl) ACLTrait(acl) {
-        controller = IACL(acl).owner();
-    }
+    constructor(address acl) ACLTrait(acl) {}
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
     function pause() external virtual pausableAdminsOnly {
@@ -83,20 +58,35 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         _unpause();
     }
 
-    /// @notice Sets new external controller, can only be called by configurator
+    /// @notice Sets new external controller contract, can only be called by configurator
     function setController(address newController) external configuratorOnly {
         if (controller == newController) return;
+        if (newController.code.length == 0) revert AddressIsNotContractException(newController);
         controller = newController;
         emit NewController(newController);
     }
 
-    /// @dev Checks whether given account has pausable admin role
-    function _isPausableAdmin(address account) internal view returns (bool) {
-        return IACL(acl).isPausableAdmin(account);
+    /// @dev Reverts if the caller is not controller or configurator
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsControllerOrConfigurator() internal view {
+        if (msg.sender != controller && !_isConfigurator(msg.sender)) {
+            revert CallerNotControllerOrConfiguratorException();
+        }
     }
 
-    /// @dev Checks whether given account has unpausable admin role
-    function _isUnpausableAdmin(address account) internal view returns (bool) {
-        return IACL(acl).isUnpausableAdmin(account);
+    /// @dev Reverts if the caller is not pausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsPausableAdmin() internal view {
+        if (!IACL(acl).isPausableAdmin(msg.sender)) {
+            revert CallerNotPausableAdminException();
+        }
+    }
+
+    /// @dev Reverts if the caller is not unpausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsUnpausableAdmin() internal view {
+        if (!IACL(acl).isUnpausableAdmin(msg.sender)) {
+            revert CallerNotUnpausableAdminException();
+        }
     }
 }

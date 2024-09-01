@@ -12,27 +12,6 @@ import {IncorrectParameterException} from "../interfaces/IExceptions.sol";
 ///         1 if i-th item is included into the set. For example, each token has a mask equal to 2**i, so set inclusion
 ///         can be checked by checking tokenMask & setMask != 0.
 library BitMask {
-    /// @dev Calculates an index of an item based on its mask (using a binary search)
-    /// @dev The input should always have only 1 bit set, otherwise the result may be unpredictable
-    function calcIndex(uint256 mask) internal pure returns (uint8 index) {
-        if (mask == 0) revert IncorrectParameterException(); // U:[BM-1]
-        uint16 lb = 0; // U:[BM-2]
-        uint16 ub = 256; // U:[BM-2]
-        uint16 mid = 128; // U:[BM-2]
-
-        unchecked {
-            while (true) {
-                uint256 newMask = 1 << mid;
-                if (newMask & mask != 0) return uint8(mid); // U:[BM-2]
-
-                if (newMask > mask) ub = mid; // U:[BM-2]
-
-                else lb = mid; // U:[BM-2]
-                mid = (lb + ub) >> 1; // U:[BM-2]
-            }
-        }
-    }
-
     /// @dev Calculates the number of `1` bits
     /// @param enabledTokensMask Bit mask to compute the number of `1` bits in
     function calcEnabledTokens(uint256 enabledTokensMask) internal pure returns (uint256 totalTokensEnabled) {
@@ -69,5 +48,13 @@ library BitMask {
         returns (uint256)
     {
         return (enabledTokensMask | bitsToEnable) & (~bitsToDisable); // U:[BM-5]
+    }
+
+    /// @dev Returns a mask with only the least significant bit of `mask` enabled
+    /// @dev This function can be used to efficiently iterate over enabled bits in a mask
+    function lsbMask(uint256 mask) internal pure returns (uint256) {
+        unchecked {
+            return mask & uint256(-int256(mask)); // U:[BM-6]
+        }
     }
 }

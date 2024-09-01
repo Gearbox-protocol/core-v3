@@ -35,7 +35,6 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // LIBRARIES
 import {
-    DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
@@ -59,7 +58,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using Math for uint256;
     using CreditLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
-    using CreditAccountHelper for ICreditAccountV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -83,7 +81,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     address public override priceOracle;
 
     /// @notice Maximum number of tokens that a credit account can have enabled as collateral
-    uint8 public override maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
+    uint8 public immutable override maxEnabledTokens;
 
     /// @notice Number of known collateral tokens
     uint8 public override collateralTokensCount;
@@ -149,24 +147,36 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _pool Address of the lending pool to connect this credit manager to
     /// @param _accountFactory Account factory address
     /// @param _priceOracle Price oracle address
+    /// @param _maxEnabledTokens Maximum number of tokens that a credit account can have enabled as collateral
     /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
-    /// @dev Sets `msg.sender` as credit configurator
+    /// @dev Checks that `_priceOracle` has a price for underlying
+    /// @dev Sets `msg.sender` as credit configurator, which MUST then pass the role to `CreditConfiguratorV3` contract
+    ///      once it's deployed via `setCreditConfigurator`. The latter performs crucial sanity checks, and configuring
+    ///      the credit manager without them might have dramatic consequences.
     constructor(
         address _pool,
         address _accountFactory,
         address _priceOracle,
+        uint8 _maxEnabledTokens,
         uint16 _feeInterest,
         string memory _name
     ) {
+        if (bytes(_name).length == 0 || _maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
+
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]
         priceOracle = _priceOracle; // U:[CM-1]
+        maxEnabledTokens = _maxEnabledTokens; // U:[CM-1]
         feeInterest = _feeInterest; // U:[CM-1]
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
+        try IPriceOracleV3(_priceOracle).getPrice(underlying) returns (uint256) {}
+        catch {
+            revert IncorrectPriceException(); // U:[CM-1]
+        }
         _addToken(underlying); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
@@ -207,6 +217,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 1)
         } // U:[CM-6]
 
+        newCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-6]
+
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
@@ -232,7 +244,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 0)
         } // U:[CM-7]
 
-        currentCreditAccountInfo.enabledTokensMask = 0; // U:[CM-7]
+        // the three following statements are redundant and kept for the sake of completeness:
+
+        // quota interest and fees are already unset after opening an account, fully liquidating it or
+        // fully repaying its debt, which are the only situations after which an account can be closed
+        // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // currentCreditAccountInfo.quotaFees = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 2)
+            sstore(slot, 1)
+        } // U:[CM-7]
+
+        // underlying is already the only enabled token since there is no quotas after opening an account,
+        // full liquidation automatically removes them and full debt repayment requires to remove them
+        currentCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-7]
+
+        // even without this line, interest index should never be used for calculations when account has no debt
+        currentCreditAccountInfo.cumulativeIndexLastUpdate = 0; // U:[CM-7]
 
         IAccountFactoryV3(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
@@ -248,6 +276,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Account to liquidate
     /// @param collateralDebtData A struct with account's debt and collateral data
     /// @param to Address to transfer underlying left after liquidation
+    /// @param isExpired Whether this is an expired account liquidation and lower premium should apply
     /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
@@ -283,7 +312,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         if (amountToPool != 0) {
-            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+            _safeTransfer({creditAccount: creditAccount, token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
         }
         _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
@@ -299,7 +328,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 amountToLiquidator = Math.min(remainingFunds - minRemainingFunds, underlyingBalance);
 
             if (amountToLiquidator != 0) {
-                ICreditAccountV3(creditAccount).transfer({token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
+                _safeTransfer({creditAccount: creditAccount, token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
 
                 remainingFunds -= amountToLiquidator; // U:[CM-8]
             }
@@ -323,7 +352,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Increases or decreases credit account's debt
-    /// @param creditAccount Account to increase/decrease debr for
+    /// @param creditAccount Account to increase/decrease debt for
     /// @param amount Amount of underlying to change the total debt by
     /// @param enabledTokensMask  Bitmask of account's enabled collateral tokens
     /// @param action Manage debt type, see `ManageDebtAction`
@@ -372,7 +401,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amount = maxRepayment; // U:[CM-11]
             }
 
-            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            _safeTransfer({creditAccount: creditAccount, token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
             uint256 profit;
@@ -454,7 +483,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256)
     {
         getTokenMaskOrRevert({token: token}); // U:[CM-26]
-        ICreditAccountV3(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
+        _safeTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount}); // U:[CM-27]
         return 0;
     }
 
@@ -664,7 +693,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
         cdd.debt = currentCreditAccountInfo.debt; // U:[CM-20]
-        cdd.cumulativeIndexLastUpdate = currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
+        // interest index is meaningless when account has no debt
+        cdd.cumulativeIndexLastUpdate = cdd.debt == 0 ? 0 : currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
         cdd.cumulativeIndexNow = IPoolV3(pool).baseInterestIndex(); // U:[CM-20]
 
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
@@ -774,7 +804,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
                     // mask with only the LSB of `tokensToCheckMask` enabled
-                    tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
+                    tokenMask = tokensToCheckMask.lsbMask();
                 }
 
                 (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
@@ -815,7 +845,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle = priceOracle;
         uint256 totalValueUSD;
         while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask & uint256(-int256(remainingTokensMask));
+            uint256 tokenMask = remainingTokensMask.lsbMask();
             remainingTokensMask ^= tokenMask;
 
             address token = getTokenByMask(tokenMask);
@@ -1197,16 +1227,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @notice Sets a new max number of enabled tokens
-    /// @param _maxEnabledTokens The new max number of enabled tokens
-    function setMaxEnabledTokens(uint8 _maxEnabledTokens)
-        external
-        override
-        creditConfiguratorOnly // U:[CM-4]
-    {
-        maxEnabledTokens = _maxEnabledTokens; // U:[CM-44]
-    }
-
     /// @notice Sets the link between the adapter and the target contract
     /// @param adapter Address of the adapter contract to use to access the third-party contract,
     ///        passing `address(0)` will forbid accessing `targetContract`
@@ -1269,7 +1289,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         getTokenMaskOrRevert({token: token}); // U:[CM-15]
-        ICreditAccountV3(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
+        CreditAccountHelper.safeApprove({creditAccount: creditAccount, token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
@@ -1282,6 +1302,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
+    }
+
+    /// @dev Internal wrapper for `creditAccount.safeTransfer` call to reduce contract size
+    function _safeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
+        ICreditAccountV3(creditAccount).safeTransfer(token, to, amount);
     }
 
     /// @dev Internal wrapper for `creditAccount.execute` call to reduce contract size

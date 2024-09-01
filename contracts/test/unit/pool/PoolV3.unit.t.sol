@@ -11,6 +11,7 @@ import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
 import {ILinearInterestRateModelV3} from "../../../interfaces/ILinearInterestRateModelV3.sol";
+import {IInterestRateModel} from "../../../interfaces/base/IInterestRateModel.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
@@ -121,8 +122,32 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // GENERAL //
     // ------- //
 
-    /// @notice U:[LP-1A]: Constructor reverts on zero addresses
-    function test_U_LP_01A_constructor_reverts_on_zero_addresses() public {
+    /// @notice U:[LP-1A]: Constructor reverts on empty parameters
+    function test_U_LP_01A_constructor_reverts_on_empty_parameters() public {
+        vm.expectRevert(IncorrectParameterException.selector);
+        new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
+            underlyingToken_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: address(interestRateModel),
+            totalDebtLimit_: type(uint256).max,
+            name_: "",
+            symbol_: "dUSDC"
+        });
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
+            underlyingToken_: address(underlying),
+            treasury_: treasury,
+            interestRateModel_: address(interestRateModel),
+            totalDebtLimit_: type(uint256).max,
+            name_: "diesel USD Coin",
+            symbol_: ""
+        });
+
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
             acl: address(addressProvider),
@@ -131,8 +156,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -143,8 +168,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -155,8 +180,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             treasury_: treasury,
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
-            name_: "",
-            symbol_: ""
+            name_: "diesel USD Coin",
+            symbol_: "dUSDC"
         });
     }
 
@@ -197,6 +222,12 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_02A_external_functions_revert_on_pause() public {
         vm.prank(configurator);
         pool.pause();
+
+        vm.expectRevert("Pausable: paused");
+        pool.transfer({to: user, amount: 0});
+
+        vm.expectRevert("Pausable: paused");
+        pool.transferFrom({from: user, to: user, amount: 0});
 
         vm.expectRevert("Pausable: paused");
         pool.deposit({assets: 1, receiver: user});
@@ -280,10 +311,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setCreditManagerDebtLimit({creditManager: address(0), newLimit: 0});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -319,8 +350,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // ERC-4626 LENDING //
     // ---------------- //
 
-    /// @notice U:[LP-5]: `{deposit|mint|withdraw|redeem}` functions revert on zero address receiver
-    function test_U_LP_05_lending_functions_revert_on_zero_address_receiver() public {
+    /// @notice U:[LP-5A]: `{deposit|mint|withdraw|redeem}` functions revert on zero address receiver
+    function test_U_LP_05A_lending_functions_revert_on_zero_address_receiver() public {
         vm.startPrank(user);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -340,6 +371,40 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         vm.expectRevert(ZeroAddressException.selector);
         pool.redeem({shares: 1, receiver: address(0), owner: user});
+        vm.stopPrank();
+    }
+
+    /// @notice U:[LP-5B]: `{deposit|mint|withdraw|redeem}` functions revert on zero amounts
+    function test_U_LP_05B_lending_functions_revert_on_zero_amounts() public {
+        vm.startPrank(user);
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.deposit({assets: 0, receiver: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.depositWithReferral({assets: 0, receiver: user, referralCode: 0});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.mint({shares: 0, receiver: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.mintWithReferral({shares: 0, receiver: user, referralCode: 0});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.withdraw({assets: 0, receiver: user, owner: user});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.redeem({shares: 0, receiver: user, owner: user});
+
+        pool.hackTransferFee(5000);
+
+        // user receives 0 shares
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.deposit({assets: 2, receiver: user});
+
+        // user receives 0 assets
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        pool.redeem({shares: 1, receiver: user, owner: user});
         vm.stopPrank();
     }
 
@@ -796,7 +861,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_12_creditManagerBorrowable_works_as_expected() public {
         // for the next two cases, `irm.availableToBorrow` should not be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
+            interestRateModel, abi.encode(IInterestRateModel.availableToBorrow.selector), "should not be called"
         );
 
         // case: total debt limit is fully used
@@ -809,9 +874,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.creditManagerBorrowable(creditManager), 0, "Incorrect borrowable (CM debt limit fully used)");
 
         // for the next three cases, let `irm.availableToBorrow` always return 500
-        vm.mockCall(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
-        );
+        vm.mockCall(interestRateModel, abi.encode(IInterestRateModel.availableToBorrow.selector), abi.encode(500));
 
         // case: `irm.availableToBorrow` is the smallest
         pool.hackCreditManagerBorrowed(creditManager, 0);

@@ -317,7 +317,7 @@ contract MultiCallIntegrationTest is
         // TODO: add enable / disable cases
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));

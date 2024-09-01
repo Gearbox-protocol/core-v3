@@ -31,7 +31,12 @@ import {PoolFactory} from "../suites/PoolFactory.sol";
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
-import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
+import {
+    IPoolV3DeployConfig,
+    CreditManagerV3DeployParams,
+    CollateralTokenHuman,
+    PriceFeedConfig
+} from "../interfaces/ICreditConfig.sol";
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
@@ -214,7 +219,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         vm.startPrank(CONFIGURATOR);
         GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
-        if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
+        if (chainId == 1337 || chainId == 31337) {
+            PriceFeedConfig[] memory priceFeeds = tokenTestSuite.getPriceFeeds();
+            uint256 len = priceFeeds.length;
+            for (uint256 i; i < len; ++i) {
+                gp.priceOracle().setPriceFeed(
+                    priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod
+                );
+            }
+        }
         addressProvider = gp.addressProvider();
         vm.stopPrank();
 
@@ -383,6 +396,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
+                maxEnabledTokens: cmParams.maxEnabledTokens,
                 feeInterest: cmParams.feeInterest,
                 name: cmParams.name
             });
@@ -392,8 +406,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             creditConfigurator = cmf.creditConfigurator();
 
             vm.startPrank(CONFIGURATOR);
-            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
-            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
+            creditConfigurator.setDebtLimits(cmParams.minDebt, cmParams.maxDebt);
             creditConfigurator.setFees(
                 cmParams.feeLiquidation,
                 cmParams.liquidationPremium,
@@ -401,6 +414,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.liquidationPremiumExpired
             );
             vm.stopPrank();
+            vm.roll(block.number + 1);
 
             _addCollateralTokens(cmParams.collateralTokens);
 
@@ -421,7 +435,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
 
             vm.prank(CONFIGURATOR);
-            botList.setCreditManagerApprovedStatus(address(creditManager), true);
+            botList.approveCreditManager(address(creditManager));
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");
@@ -494,16 +508,23 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         return creditFacade.openCreditAccount(
             onBehalfOf,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
-                })
-            ),
+            debt == 0
+                ? MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
+                    })
+                )
+                : MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
+                    })
+                ),
             referralCode
         );
     }
@@ -547,8 +568,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _makeAccountsLiquitable() internal {
-        vm.prank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
+        uint256 idx = creditManager.collateralTokensCount() - 1;
+        while (idx != 0) {
+            address token = creditManager.getTokenByMask(1 << (idx--));
+            creditConfigurator.setLiquidationThreshold(token, 0);
+        }
         creditConfigurator.setFees(200, 9000, 100, 9500);
+        vm.stopPrank();
 
         // switch to new block to be able to close account
         vm.roll(block.number + 1);

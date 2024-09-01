@@ -46,6 +46,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
@@ -58,7 +59,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         _setBotPermissions(USER, creditAccount, bot, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
@@ -95,7 +96,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.botMulticall(creditAccount, calls);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(bot);
 
         vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (bot)));
         vm.prank(bot);
@@ -107,6 +108,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         vm.expectCall(
             address(creditManager),

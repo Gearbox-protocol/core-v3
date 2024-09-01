@@ -48,13 +48,15 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev The list of all quoted tokens
     EnumerableSet.AddressSet internal quotaTokensSet;
 
-    /// @notice Mapping from token to global token quota params
+    /// @dev Mapping from token to global token quota params
     mapping(address => TokenQuotaParams) internal totalQuotaParams;
 
     /// @dev Mapping from (creditAccount, token) to account's token quota params
     mapping(address => mapping(address => AccountQuota)) internal accountQuotas;
 
     /// @notice Address of the gauge
+    /// @dev Any contract that implements the `IRateKeeper` interface can be used everywhere where
+    ///      the term "gauge" is mentioned, the older name stays for backward compatibility
     address public override gauge;
 
     /// @notice Timestamp of the last quota rates update
@@ -73,12 +75,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
-    /// @param _contractsRegister Contracts register address
     /// @param _pool Pool address
-    constructor(address _acl, address _contractsRegister, address _pool)
-        ACLNonReentrantTrait(_acl)
-        ContractsRegisterTrait(_contractsRegister)
+    constructor(address _pool)
+        ACLNonReentrantTrait(ACLNonReentrantTrait(_pool).acl())
+        ContractsRegisterTrait(ContractsRegisterTrait(_pool).contractsRegister())
     {
         pool = _pool; // U:[PQK-1]
         underlying = IPoolV3(_pool).asset(); // U:[PQK-1]
@@ -90,8 +90,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Updates credit account's quota for a token
     ///         - Updates account's interest index
-    ///         - Updates account's quota by requested delta subject to the total quota limit (which is considered
-    ///           to be zero for tokens added to the quota keeper but not yet activated via `updateRates`)
+    ///         - Updates account's quota by requested delta subject to the total quota limit
     ///         - Checks that the resulting quota is no less than the user-specified min desired value
     ///           and no more than system-specified max allowed value
     ///         - Updates pool's quota revenue
@@ -131,6 +130,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) =
             _getTokenQuotaParamsOrRevert(tokenQuotaParams);
+        if (rate == 0) revert TokenIsNotQuotedException(); // U:[PQK-14]
 
         uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
@@ -142,7 +142,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         quotaChange = requestedChange;
         if (quotaChange > 0) {
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-            quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+            quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
             fees = uint128(uint256(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR); // U:[PQK-15]
 
@@ -154,9 +154,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
             if (quotaChange == type(int96).min) {
+                // `quoted` is at most `type(int96).max` so cast is safe
                 quotaChange = -int96(quoted);
             }
 
+            // `-quotaChange` is non-negative and at most `type(int96).max` so cast is safe
             uint96 absoluteChange = uint96(-quotaChange);
             newQuoted = quoted - absoluteChange;
             tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
@@ -206,6 +208,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
                 tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
                 accountQuota.quota = 0; // U:[PQK-16]
+                // `quoted` is at most `type(int96).max` so cast is safe
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 
@@ -242,6 +245,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
                 (uint16 rate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams); // U:[PQK-17]
+                if (rate == 0) revert TokenIsNotQuotedException(); // U:[PQK-17]
 
                 accountQuota.cumulativeIndexLU =
                     QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate_); // U:[PQK-17]
@@ -359,6 +363,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Adds a new quota token
     /// @param token Address of the token
+    /// @custom:expects Gauge ensures that `token` is not pool's underlying
     function addQuotaToken(address token)
         external
         override
@@ -394,6 +399,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         for (uint256 i; i < len;) {
             address token = tokens[i];
             uint16 rate = rates[i];
+            if (rate == 0) revert IncorrectParameterException(); // U:[PQK-7B]
 
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
             (uint16 prevRate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
@@ -422,11 +428,26 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         external
         override
         configuratorOnly // U:[PQK-2]
+        nonZeroAddress(_gauge) // U:[PQK-8]
     {
-        if (gauge != _gauge) {
-            gauge = _gauge; // U:[PQK-8]
-            emit SetGauge(_gauge); // U:[PQK-8]
+        if (gauge == _gauge) return;
+
+        if (IRateKeeper(_gauge).pool() != pool) {
+            revert IncompatibleGaugeException(); // U:[PQK-8]
         }
+
+        uint256 len = quotaTokensSet.length();
+        for (uint256 i; i < len;) {
+            if (!IRateKeeper(gauge).isTokenAdded(quotaTokensSet.at(i))) {
+                revert TokenIsNotQuotedException(); // U:[PQK-8]
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        gauge = _gauge; // U:[PQK-8]
+        emit SetGauge(_gauge); // U:[PQK-8]
     }
 
     /// @notice Adds an address to the set of allowed credit managers
@@ -454,7 +475,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function setTokenLimit(address token, uint96 limit)
         external
         override
-        controllerOnly // U:[PQK-2]
+        controllerOrConfiguratorOnly // U:[PQK-2]
     {
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
         _setTokenLimit(tokenQuotaParams, token, limit);
@@ -464,6 +485,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
         if (!isInitialised(tokenQuotaParams)) {
             revert TokenIsNotQuotedException(); // U:[PQK-11]
+        }
+
+        if (limit > uint96(type(int96).max)) {
+            revert IncorrectParameterException(); // U:[PQK-12]
         }
 
         if (tokenQuotaParams.limit != limit) {
@@ -478,7 +503,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function setTokenQuotaIncreaseFee(address token, uint16 fee)
         external
         override
-        controllerOnly // U:[PQK-2]
+        controllerOrConfiguratorOnly // U:[PQK-2]
     {
         if (fee > PERCENTAGE_FACTOR) {
             revert IncorrectParameterException();

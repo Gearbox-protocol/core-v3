@@ -7,13 +7,8 @@ import {IInterestRateModel} from "./base/IInterestRateModel.sol";
 
 /// @title Linear interest rate model V3 interface
 interface ILinearInterestRateModelV3 is IInterestRateModel {
+    /// @dev Linear IRM is stateless so the overriden function is marked as `view`
     function calcBorrowRate(uint256 expectedLiquidity, uint256 availableLiquidity, bool checkOptimalBorrowing)
-        external
-        view
-        override
-        returns (uint256);
-
-    function availableToBorrow(uint256 expectedLiquidity, uint256 availableLiquidity)
         external
         view
         override

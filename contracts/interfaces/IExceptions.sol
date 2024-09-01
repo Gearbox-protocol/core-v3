@@ -85,6 +85,9 @@ error CreditManagerCantBorrowException();
 /// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 
+/// @notice Thrown when attempting to connect a gauge to an incompatible pool quota keeper
+error IncompatibleGaugeException();
+
 /// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();
 
@@ -149,6 +152,9 @@ error IncompatibleContractException();
 
 /// @notice Thrown if attempting to forbid an adapter that is not registered in the credit manager
 error AdapterIsNotRegisteredException();
+
+/// @notice Thrown if new credit configurator's set of allowed adapters differs from the current one
+error IncorrectAdaptersSetException();
 
 // ------------- //
 // CREDIT FACADE //
@@ -237,7 +243,7 @@ error CallerNotCreditManagerException();
 error CallerNotCreditFacadeException();
 
 /// @notice Thrown on attempting to call an access restricted function not as controller or configurator
-error CallerNotControllerException();
+error CallerNotControllerOrConfiguratorException();
 
 /// @notice Thrown on attempting to pause a contract without pausable admin rights
 error CallerNotPausableAdminException();
@@ -293,7 +299,7 @@ error ParameterChangedAfterQueuedTxException();
 error InvalidBotException();
 
 /// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
-error InsufficientBotPermissionsException();
+error IncorrectBotPermissionsException();
 
 // --------------- //
 // ACCOUNT FACTORY //

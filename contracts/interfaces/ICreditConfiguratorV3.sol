@@ -50,9 +50,6 @@ interface ICreditConfiguratorV3Events {
     // CREDIT MANAGER //
     // -------------- //
 
-    /// @notice Emitted when a new maximum number of enabled tokens is set in the credit manager
-    event SetMaxEnabledTokens(uint8 maxEnabledTokens);
-
     /// @notice Emitted when new fee parameters are set in the credit manager
     event UpdateFees(
         uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
@@ -64,9 +61,6 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when a new price oracle is set in the credit manager
     event SetPriceOracle(address indexed priceOracle);
-
-    /// @notice Emitted when a new bot list is set in the credit facade
-    event SetBotList(address indexed botList);
 
     /// @notice Emitted when a new facade is connected to the credit manager
     event SetCreditFacade(address indexed creditFacade);
@@ -148,15 +142,11 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
         uint16 liquidationPremiumExpired
     ) external;
 
-    function setMaxEnabledTokens(uint8 newMaxEnabledTokens) external;
-
     // -------- //
     // UPGRADES //
     // -------- //
 
     function setPriceOracle(address newPriceOracle) external;
-
-    function setBotList(address newBotList) external;
 
     function setCreditFacade(address newCreditFacade, bool migrateParams) external;
 
@@ -166,9 +156,7 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // CREDIT FACADE //
     // ------------- //
 
-    function setMinDebtLimit(uint128 newMinDebt) external;
-
-    function setMaxDebtLimit(uint128 newMaxDebt) external;
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
 

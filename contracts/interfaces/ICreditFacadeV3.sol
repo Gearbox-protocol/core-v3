@@ -147,8 +147,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    function setBotList(address newBotList) external;
-
     function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss) external;
 
     function setTokenAllowance(address token, AllowanceAction allowance) external;

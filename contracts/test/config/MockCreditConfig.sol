@@ -62,18 +62,19 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         _gaugeRates.push(GaugeRate({token: Tokens.CVX, minRate: 1, maxRate: 10_000}));
         _gaugeRates.push(GaugeRate({token: Tokens.STETH, minRate: 1, maxRate: 10_000}));
 
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDC, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDT, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.WETH, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.LINK, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CRV, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CVX, quotaIncreaseFee: 0, limit: type(uint96).max}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.STETH, quotaIncreaseFee: 0, limit: type(uint96).max}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDC, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDT, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.WETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.LINK, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CRV, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CVX, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.STETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
 
         CreditManagerV3DeployParams storage cp = _creditManagers.push();
 
         cp.minDebt = uint128(getAccountAmount / 2);
         cp.maxDebt = uint128(10 * getAccountAmount);
+        cp.maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
         cp.feeInterest = DEFAULT_FEE_INTEREST;
         cp.feeLiquidation = DEFAULT_FEE_LIQUIDATION;
         cp.liquidationPremium = DEFAULT_LIQUIDATION_PREMIUM;

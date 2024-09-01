@@ -74,14 +74,22 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method is available in all kinds of multicalls
     function compareBalances() external;
 
-    /// @notice Adds collateral to account
+    /// @notice Adds collateral to account.
+    ///         Only the underlying token counts towards account's collateral value by default, while all other tokens
+    ///         must be enabled as collateral by "purchasing" quota for it. Holding non-enabled token on account with
+    ///         non-zero debt poses a risk of losing it entirely to the liquidator. Adding non-enabled tokens is still
+    ///         supported to allow users to later swap them into enabled ones in the same multicall.
     /// @param token Token to add
     /// @param amount Amount to add
     /// @dev Requires token approval from caller to the credit manager
     /// @dev This method can also be called during liquidation
     function addCollateral(address token, uint256 amount) external;
 
-    /// @notice Adds collateral to account using signed EIP-2612 permit message
+    /// @notice Adds collateral to account using signed EIP-2612 permit message.
+    ///         Only the underlying token counts towards account's collateral value by default, while all other tokens
+    ///         must be enabled as collateral by "purchasing" quota for it. Holding non-enabled token on account with
+    ///         non-zero debt poses a risk of losing it entirely to the liquidator. Adding non-enabled tokens is still
+    ///         supported to allow users to later swap them into enabled ones in the same multicall.
     /// @param token Token to add
     /// @param amount Amount to add
     /// @param deadline Permit deadline
@@ -94,7 +102,7 @@ interface ICreditFacadeV3Multicall {
     /// @param amount Underlying amount to borrow
     /// @dev Increasing debt is prohibited when closing an account
     /// @dev Increasing debt is prohibited if it was previously updated in the same block
-    /// @dev The resulting debt amount must be within allowed range
+    /// @dev The resulting debt amount must be within allowed limits
     /// @dev Increasing debt is prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev After debt increase, total amount borrowed by the credit manager in the current block must not exceed
     ///      the limit defined in the facade
@@ -104,13 +112,14 @@ interface ICreditFacadeV3Multicall {
     /// @param amount Underlying amount to repay, value above account's total debt indicates full repayment
     /// @dev Decreasing debt is prohibited when opening an account
     /// @dev Decreasing debt is prohibited if it was previously updated in the same block
-    /// @dev The resulting debt amount must be within allowed range or zero
+    /// @dev The resulting debt amount must be above allowed minimum or zero (maximum is not checked here
+    ///      to allow small repayments and partial liquidations in case configurator lowers it)
     /// @dev Full repayment brings account into a special mode that skips collateral checks and thus requires
     ///      an account to have no potential debt sources, e.g., all quotas must be disabled
     function decreaseDebt(uint256 amount) external;
 
     /// @notice Updates account's quota for a token
-    /// @param token Token to update the quota for
+    /// @param token Collateral token to update the quota for (can't be underlying)
     /// @param quotaChange Desired quota change in underlying token units (`type(int96).min` to disable quota)
     /// @param minQuota Minimum resulting account's quota for token required not to revert
     /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
@@ -139,9 +148,6 @@ interface ICreditFacadeV3Multicall {
     /// @notice Sets `bot`'s permissions to manage account to `permissions`
     /// @param bot Bot to set permissions for
     /// @param permissions A bitmask encoding bot permissions
-    /// @dev Reverts if `permissions` has unexpected bits enabled (including `SET_BOT_PERMISSIONS_PERMISSION`,
-    ///      that would have been way too tricky) or some bits required by `bot` disabled
-    /// @dev Reverts if account has more active bots than allowed after changing permissions
-    /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
+    /// @dev Reverts if `permissions` has unexpected bits enabled or doesn't match permissions required by `bot`
     function setBotPermissions(address bot, uint192 permissions) external;
 }

@@ -26,8 +26,8 @@ struct BalanceDelta {
 }
 
 enum Comparison {
-    GREATER,
-    LESS
+    GREATER_OR_EQUAL,
+    LESS_OR_EQUAL
 }
 
 /// @title Balances logic library
@@ -48,8 +48,8 @@ library BalancesLogic {
         returns (bool)
     {
         uint256 current = IERC20(token).safeBalanceOf(creditAccount);
-        return (comparison == Comparison.GREATER && current >= value)
-            || (comparison == Comparison.LESS && current <= value); // U:[BLL-1]
+        return (comparison == Comparison.GREATER_OR_EQUAL && current >= value)
+            || (comparison == Comparison.LESS_OR_EQUAL && current <= value); // U:[BLL-1]
     }
 
     /// @dev Returns an array of expected token balances after operations
@@ -106,7 +106,7 @@ library BalancesLogic {
         unchecked {
             uint256 i;
             while (tokensMask != 0) {
-                uint256 tokenMask = tokensMask & uint256(-int256(tokensMask));
+                uint256 tokenMask = tokensMask.lsbMask();
                 tokensMask ^= tokenMask;
 
                 address token = getTokenByMaskFn(tokenMask);

@@ -75,7 +75,7 @@ contract QuotasLogicUnitTest is TestHelper {
             CalcAccruedQuotaInterestCase({
                 cumulativeIndexNow: uint192(RAY),
                 cumulativeIndexLU: uint192(RAY),
-                quoted: type(uint96).max,
+                quoted: uint96(type(int96).max),
                 expectedInterest: 0
             }),
             CalcAccruedQuotaInterestCase({
