@@ -30,7 +30,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
     // TESTS
     //
 
-    // U:[LIM-1]: start parameters are correct
+    /// @notice U:[LIM-1]: start parameters are correct
     function test_U_LIM_01_start_parameters_correct() public {
         (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
             irm.getModelParameters();
@@ -55,7 +55,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
         uint16 R_slope3;
     }
 
-    // U:[LIM-2]: linear model constructor reverts for incorrect params
+    /// @notice U:[LIM-2]: linear model constructor reverts for incorrect params
     function test_U_LIM_02_linear_model_constructor_reverts_for_incorrect_params() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
@@ -177,7 +177,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
         bool expectedRevert;
     }
 
-    // U:[LIM-3]: linear model computes available to borrow and borrow rate correctly
+    /// @notice U:[LIM-3]: linear model computes available to borrow and borrow rate correctly
     function test_U_LIM_03_linear_model_computes_available_to_borrow_and_borrow_rate_correctly() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
@@ -259,7 +259,8 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 /// EXPECTED VALUES
                 // R_base only
                 expectedBorrowRate: 15_00 * RAY / PERCENTAGE_FACTOR,
-                expectedAvailableToBorrow: 100,
+                // borrowing all 100 brings utilization to 100%, while borrowing 99 leaves it at 90%
+                expectedAvailableToBorrow: 99,
                 expectedRevert: false
             }),
             LinearCalculationsCase({
@@ -457,6 +458,26 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 testCase.expectedAvailableToBorrow,
                 _testCaseErr(testCase.name, "availableToBorrow isn't computed correcty")
             );
+        }
+    }
+
+    /// @notice U:[LIM-4]: `calcBorrowRate` allows to borrow `availableToBorrow`
+    function test_U_LIM_04_calcBorrowRate_allows_to_borrow_availableToBorrow(
+        uint256 expectedLiquidity,
+        uint256 availableLiquidity
+    ) public {
+        expectedLiquidity = bound(expectedLiquidity, 0, 1e36);
+        availableLiquidity = bound(availableLiquidity, 0, expectedLiquidity);
+        uint256 amount = irm.availableToBorrow(expectedLiquidity, availableLiquidity);
+
+        if (amount != 0) {
+            // it allows to borrow `availableToBorrow`
+            irm.calcBorrowRate(expectedLiquidity, availableLiquidity - amount, true);
+
+            // it doesn't allow to borrow more
+            uint256 amountWithBuffer = amount > 100 ? amount * 101 / 100 : amount + 1;
+            vm.expectRevert(BorrowingMoreThanU2ForbiddenException.selector);
+            irm.calcBorrowRate(expectedLiquidity, availableLiquidity - amountWithBuffer, true);
         }
     }
 }
