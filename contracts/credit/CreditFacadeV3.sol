@@ -783,18 +783,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param newMaxDebtPerBlockMultiplier New max debt per block multiplier, `type(uint8).max` to disable the check
     /// @dev Reverts if caller is not credit configurator
     /// @dev Reverts if `maxDebt * maxDebtPerBlockMultiplier` doesn't fit into `uint128`
+    /// @dev Prevents further borrowing in the current block unless this check is disabled
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if ((uint256(newMaxDebtPerBlockMultiplier) * newMaxDebt) >= type(uint128).max) {
+        if ((uint256(newMaxDebtPerBlockMultiplier) * newMaxDebt) > type(uint128).max) {
             revert IncorrectParameterException(); // U:[FA-49]
         }
 
         debtLimits.minDebt = newMinDebt; // U:[FA-49]
         debtLimits.maxDebt = newMaxDebt; // U:[FA-49]
         maxDebtPerBlockMultiplier = newMaxDebtPerBlockMultiplier; // U:[FA-49]
+        lastBlockBorrowed = uint64(block.number); // U:[FA-49]
+        totalBorrowedInBlock = type(uint128).max; // U:[FA-49]
     }
 
     /// @notice Sets the new bot list
