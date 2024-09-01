@@ -156,9 +156,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
             if (quotaChange == type(int96).min) {
+                // `quoted` is at most `type(int96).max` so cast is safe
                 quotaChange = -int96(quoted);
             }
 
+            // `-quotaChange` is non-negative and at most `type(int96).max` so cast is safe
             uint96 absoluteChange = uint96(-quotaChange);
             newQuoted = quoted - absoluteChange;
             tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
@@ -208,6 +210,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
                 tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
                 accountQuota.quota = 0; // U:[PQK-16]
+                // `quoted` is at most `type(int96).max` so cast is safe
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 

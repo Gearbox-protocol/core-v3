@@ -376,7 +376,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
     ) internal {
-        uint16 newLTUnderlying = uint16(liquidationDiscount - feeLiquidation); // I:[CC-18]
+        uint16 newLTUnderlying = liquidationDiscount - feeLiquidation; // I:[CC-18]
         (, uint16 ltUnderlying) =
             CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: UNDERLYING_TOKEN_MASK});
 

@@ -113,6 +113,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
                 uint256 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
                 uint256 totalVotes = votesLpSide + votesCaSide; // U:[GA-15]
 
+                // cast is safe since rate is between `minRate` and `maxRate` both of which are `uint16`
                 rates[i] = totalVotes == 0
                     ? qrp.minRate
                     : uint16((qrp.minRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes); // U:[GA-15]
