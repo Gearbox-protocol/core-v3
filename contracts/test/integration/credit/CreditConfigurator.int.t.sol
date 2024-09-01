@@ -1099,6 +1099,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 1);
 
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, type(uint40).max - 1 days, 2 days);
+
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
         vm.expectCall(
