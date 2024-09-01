@@ -109,13 +109,13 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
                 QuotaRateParams memory qrp = quotaRateParams[token]; // U:[GA-15]
 
-                uint96 votesLpSide = qrp.totalVotesLpSide; // U:[GA-15]
-                uint96 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
+                uint256 votesLpSide = qrp.totalVotesLpSide; // U:[GA-15]
+                uint256 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
                 uint256 totalVotes = votesLpSide + votesCaSide; // U:[GA-15]
 
                 rates[i] = totalVotes == 0
                     ? qrp.minRate
-                    : uint16((uint256(qrp.minRate) * votesCaSide + uint256(qrp.maxRate) * votesLpSide) / totalVotes); // U:[GA-15]
+                    : uint16((qrp.minRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes); // U:[GA-15]
             }
         }
     }

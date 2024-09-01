@@ -324,7 +324,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount: creditAccount,
             tokensMask: collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK),
             balances: initialBalances,
-            comparison: Comparison.LESS
+            comparison: Comparison.LESS_OR_EQUAL
         });
         if (failedToken != address(0)) revert RemainingTokenBalanceIncreasedException(failedToken); // U:[FA-14]
 
@@ -472,7 +472,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls Array of `(target, callData)` tuples representing a sequence of calls to perform
     ///        - if `target` is this contract's address, `callData` must be an ABI-encoded calldata of a method
     ///          from `ICreditFacadeV3Multicall`, which is dispatched and handled appropriately
-    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`
+    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`, and returns a flag
+    ///          that indicates whether safety measures should apply (which include safe pricing in collateral check
+    ///          and a check that there are no enabled forbidden tokens by the end of the multicall)
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens before the multicall
     /// @param flags Flags that dictate multicall behaviour, including what methods are allowed to be called and
     ///        whether to execute collateral check after calls
@@ -521,7 +523,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
                         if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
                         address failedToken =
-                            BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER);
+                            BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER_OR_EQUAL);
                         if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
                         expectedBalances = new Balance[](0); // U:[FA-23]
                     }
@@ -598,7 +600,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
         if (expectedBalances.length != 0) {
-            address failedToken = BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER);
+            address failedToken =
+                BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER_OR_EQUAL);
             if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
         }
 
@@ -618,7 +621,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount: creditAccount,
                 tokensMask: enabledForbiddenTokensMask,
                 balances: forbiddenBalances,
-                comparison: Comparison.LESS
+                comparison: Comparison.LESS_OR_EQUAL
             });
             if (failedToken != address(0)) revert ForbiddenTokenBalanceIncreasedException(failedToken); // U:[FA-45]
 
