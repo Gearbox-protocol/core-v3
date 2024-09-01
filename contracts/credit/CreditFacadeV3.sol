@@ -10,6 +10,7 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 // INTERFACES
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
@@ -46,7 +47,9 @@ import {
 } from "../libraries/Constants.sol";
 
 // TRAITS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -62,7 +65,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 ///         quota size validation, pausing on large protocol losses, Degen NFT whitelist mode, and forbidden tokens
 ///         (they count towards account value, but having them enabled as collateral restricts available actions and
 ///         activates a safer version of collateral check).
-contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardTrait, SanityCheckTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
@@ -157,7 +160,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
     constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
-        ACLNonReentrantTrait(ACLNonReentrantTrait(ICreditManagerV3(_creditManager).pool()).acl())
+        ACLTrait(ACLTrait(ICreditManagerV3(_creditManager).pool()).acl())
         nonZeroAddress(_botList)
     {
         creditManager = _creditManager; // U:[FA-1]
@@ -843,6 +846,18 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         } else {
             _emergencyLiquidatorsSet.remove(liquidator);
         } // U:[FA-53]
+    }
+
+    /// @notice Pauses contract, can only be called by an account with pausable admin role
+    /// @dev Reverts if contract is already paused
+    function pause() external override pausableAdminsOnly {
+        _pause();
+    }
+
+    /// @notice Unpauses contract, can only be called by an account with unpausable admin role
+    /// @dev Reverts if contract is already unpaused
+    function unpause() external override unpausableAdminsOnly {
+        _unpause();
     }
 
     // --------- //

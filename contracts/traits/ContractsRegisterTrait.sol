@@ -4,13 +4,16 @@
 pragma solidity ^0.8.17;
 
 import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
-import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
-
-import {SanityCheckTrait} from "./SanityCheckTrait.sol";
+import {
+    AddressIsNotContractException,
+    RegisteredCreditManagerOnlyException,
+    RegisteredPoolOnlyException,
+    ZeroAddressException
+} from "../interfaces/IExceptions.sol";
 
 /// @title Contracts register trait
 /// @notice Trait that simplifies validation of pools and credit managers
-abstract contract ContractsRegisterTrait is SanityCheckTrait {
+abstract contract ContractsRegisterTrait {
     /// @notice Contracts register contract address
     address public immutable contractsRegister;
 
@@ -28,7 +31,9 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
 
     /// @notice Constructor
     /// @param _contractsRegister Contracts register address
-    constructor(address _contractsRegister) nonZeroAddress(_contractsRegister) {
+    constructor(address _contractsRegister) {
+        if (_contractsRegister == address(0)) revert ZeroAddressException();
+        if (_contractsRegister.code.length == 0) revert AddressIsNotContractException(_contractsRegister);
         contractsRegister = _contractsRegister;
     }
 
