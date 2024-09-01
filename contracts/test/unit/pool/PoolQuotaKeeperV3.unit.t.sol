@@ -91,7 +91,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
     //
 
     /// @notice U:[PQK-1]: constructor sets parameters correctly
-    function test_U_PQK_01_constructor_sets_parameters_correctly() public {
+    function test_U_PQK_01_constructor_sets_parameters_correctly() public view {
         assertEq(address(poolMock), pqk.pool(), "Incorrect poolMock address");
         assertEq(underlying, pqk.underlying(), "Incorrect poolMock address");
     }

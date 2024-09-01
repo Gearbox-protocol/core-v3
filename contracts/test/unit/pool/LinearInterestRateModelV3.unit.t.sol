@@ -31,7 +31,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
     //
 
     /// @notice U:[LIM-1]: start parameters are correct
-    function test_U_LIM_01_start_parameters_correct() public {
+    function test_U_LIM_01_start_parameters_correct() public view {
         (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
             irm.getModelParameters();
 

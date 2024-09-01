@@ -16,6 +16,8 @@ contract AccountFactoryMock is Test, IAccountFactoryV3 {
     /// @dev Contract version
     uint256 public version;
 
+    bytes32 public constant override contractType = "AF_MOCK";
+
     address public usedAccount;
 
     address public returnedAccount;

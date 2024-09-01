@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "./base/IVersion.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 
 /// @notice Price feed params
 /// @param priceFeed Price feed address
@@ -37,7 +38,7 @@ interface IPriceOracleV3Events {
 }
 
 /// @title Price oracle V3 interface
-interface IPriceOracleV3 is IVersion, IPriceOracleV3Events {
+interface IPriceOracleV3 is IVersion, IControlledTrait, IPriceOracleV3Events {
     function getTokens() external view returns (address[] memory);
 
     function priceFeeds(address token) external view returns (address priceFeed);

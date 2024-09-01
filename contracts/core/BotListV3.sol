@@ -27,6 +27,9 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "BL";
+
     /// @notice Credit manager's approved status
     mapping(address => bool) public override approvedCreditManager;
 

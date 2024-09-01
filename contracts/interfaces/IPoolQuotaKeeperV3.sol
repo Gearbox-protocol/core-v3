@@ -3,6 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {IControlledTrait} from "./base/IControlledTrait.sol";
+import {IContractsRegisterTrait} from "./base/IContractsRegisterTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 struct TokenQuotaParams {
@@ -42,7 +44,7 @@ interface IPoolQuotaKeeperV3Events {
 }
 
 /// @title Pool quota keeper V3 interface
-interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
+interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion, IControlledTrait, IContractsRegisterTrait {
     function pool() external view returns (address);
 
     function underlying() external view returns (address);

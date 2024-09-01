@@ -3,7 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IACL} from "../interfaces/IACL.sol";
+import {IACL} from "../interfaces/base/IACL.sol";
+import {IACLTrait} from "../interfaces/base/IACLTrait.sol";
 import {
     AddressIsNotContractException,
     CallerNotConfiguratorException,
@@ -14,9 +15,9 @@ import {
 
 /// @title ACL trait
 /// @notice Utility class for ACL (access-control list) consumers
-abstract contract ACLTrait {
+abstract contract ACLTrait is IACLTrait {
     /// @notice ACL contract address
-    address public immutable acl;
+    address public immutable override acl;
 
     /// @dev Ensures that function caller has configurator role
     modifier configuratorOnly() {
