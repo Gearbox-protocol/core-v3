@@ -150,6 +150,9 @@ error IncompatibleContractException();
 /// @notice Thrown if attempting to forbid an adapter that is not registered in the credit manager
 error AdapterIsNotRegisteredException();
 
+/// @notice Thrown if new credit configurator's set of allowed adapters differs from the current one
+error IncorrectAdaptersSetException();
+
 // ------------- //
 // CREDIT FACADE //
 // ------------- //

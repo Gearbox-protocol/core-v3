@@ -6,7 +6,8 @@ pragma solidity ^0.8.17;
 import {AdapterType} from "@gearbox-protocol/sdk-gov/contracts/AdapterType.sol";
 
 /// @title Adapter interface
-/// @notice Generic interface for an adapter that can be used to interact with external protocols
+/// @notice Generic interface for an adapter that can be used to interact with external protocols.
+///         Adapters can be assumed to be non-malicious since they are developed by Gearbox DAO.
 interface IAdapter {
     /// @notice Adapter type
     function _gearboxAdapterType() external view returns (AdapterType);
@@ -16,8 +17,10 @@ interface IAdapter {
     function _gearboxAdapterVersion() external view returns (uint16);
 
     /// @notice Credit manager this adapter is connected to
+    /// @dev Assumed to be an immutable state variable
     function creditManager() external view returns (address);
 
     /// @notice Target contract adapter helps to interact with
+    /// @dev Assumed to be an immutable state variable
     function targetContract() external view returns (address);
 }
