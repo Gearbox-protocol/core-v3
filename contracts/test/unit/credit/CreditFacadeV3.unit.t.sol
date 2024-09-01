@@ -15,6 +15,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
@@ -293,7 +294,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setCumulativeLossParams(0, false);
+        creditFacade.setLossLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
@@ -638,7 +639,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({
+        uint256 loss = creditFacade.liquidateCreditAccount({
             creditAccount: creditAccount,
             to: FRIEND,
             calls: MultiCallBuilder.build(
@@ -648,6 +649,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 )
             )
         });
+        assertEq(loss, 0, "Non-zero loss");
     }
 
     /// @dev U:[FA-17]: liquidateCreditAccount correctly handles loss
@@ -663,38 +665,25 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setLiquidateCreditAccountReturns(0, 100);
 
-        vm.startPrank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 10);
-        creditFacade.setCumulativeLossParams(150, true);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
-        vm.stopPrank();
+        // loss forbids borrowing, anyone can call
+        vm.prank(FRIEND);
+        uint256 loss =
+            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+        assertEq(loss, 100, "Incorrect loss");
+        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");
 
-        // first liquidation with loss
-        vm.prank(LIQUIDATOR);
+        vm.etch(LIQUIDATOR, "CODE");
+        vm.prank(CONFIGURATOR);
+        creditFacade.setLossLiquidator(LIQUIDATOR);
+
+        // only the loss liquidator can call
+        vm.expectRevert(CallerNotLossLiquidatorException.selector);
+        vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (uint128 cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 100, "Incorrect cumulative loss after first liquidation");
-        assertFalse(creditFacade.paused(), "Paused too early");
-
-        // liquidation with loss that breaks cumulative loss limit
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 200, "Incorrect cumulative loss after second liquidation");
-        assertTrue(creditFacade.paused(), "Not paused after breaking cumulative loss limit");
-
-        // emergency liquidation with loss after cumulative loss limit is already broken
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 300, "Incorrect cumulative loss after third liquidation");
-        assertTrue(creditFacade.paused(), "Not paused after breaking cumulative loss limit");
+        assertEq(loss, 100, "Incorrect loss");
     }
 
     //
@@ -1868,33 +1857,23 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
     }
 
-    /// @dev U:[FA-51]: setCumulativeLossParams works properly
-    function test_U_FA_51_setCumulativeLossParams_works_properly() public notExpirableCase {
-        (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss) = creditFacade.lossParams();
+    /// @dev U:[FA-51]: `setLossLiquidator` works properly
+    function test_U_FA_51_setLossLiquidator_works_properly() public notExpirableCase {
+        assertEq(creditFacade.lossLiquidator(), address(0), "SETUP: incorrect loss liquidator");
 
-        assertEq(maxCumulativeLoss, 0, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
+        vm.prank(CONFIGURATOR);
+        creditFacade.setLossLiquidator(DUMB_ADDRESS);
 
-        creditFacade.setCurrentCumulativeLoss(500);
-        (currentCumulativeLoss,) = creditFacade.lossParams();
+        address liquidator = address(new GeneralMock());
+        vm.prank(CONFIGURATOR);
+        creditFacade.setLossLiquidator(liquidator);
 
-        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
+        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setCumulativeLossParams(200, false);
-
-        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 200, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setCumulativeLossParams(400, true);
-
-        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 400, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
+        creditFacade.setLossLiquidator(address(0));
+        assertEq(creditFacade.lossLiquidator(), address(0), "Loss liquidator not unset");
     }
 
     /// @dev U:[FA-52]: setTokenAllowance works properly
@@ -1924,27 +1903,27 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-53]: setEmergencyLiquidator works properly
     function test_U_FA_53_setEmergencyLiquidator_works_properly() public notExpirableCase {
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             false,
-            "SETUP: incorrect canLiquidateWhilePaused for LIQUIDATOR"
+            "SETUP: incorrect isEmergencyLiquidator for LIQUIDATOR"
         );
 
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
 
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             true,
-            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
         );
 
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
 
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             false,
-            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
         );
     }
 }
