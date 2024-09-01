@@ -1681,14 +1681,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 underlyingBalance: debt,
                 linkBalance: 0,
-                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * (debt - 1),
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * (debt - 1) * LT_UNDERLYING / PERCENTAGE_FACTOR
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE") + 1,
+                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
                 expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR
             }),
@@ -1696,7 +1696,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 name: "One quoted token with balance > quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE") + 1,
+                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
                 expectedTwvUSD: vars.get("LINK_QUOTA_IN_USD")
             })
