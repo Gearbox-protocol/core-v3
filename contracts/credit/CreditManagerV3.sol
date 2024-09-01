@@ -163,7 +163,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint16 _feeInterest,
         string memory _name
     ) {
-        if (_maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
+        if (bytes(_name).length == 0 || _maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
 
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]

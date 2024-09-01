@@ -56,7 +56,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Constructor
     /// @param owner_ Contract owner
     constructor(address owner_) {
-        _transferOwnership(owner_);
+        transferOwnership(owner_);
     }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.

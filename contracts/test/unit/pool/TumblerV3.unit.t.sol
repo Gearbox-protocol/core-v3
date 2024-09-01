@@ -40,7 +40,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        tumbler = new TumblerV3(address(addressProvider), address(pool), 1 days);
+        tumbler = new TumblerV3(address(pool), 1 days);
     }
 
     /// @notice U:[TU-1]: Constructor works as expected

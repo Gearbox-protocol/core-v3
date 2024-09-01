@@ -150,21 +150,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
-    constructor(
-        address _acl,
-        address _creditManager,
-        address _botList,
-        address _weth,
-        address _degenNFT,
-        bool _expirable
-    ) ACLNonReentrantTrait(_acl) nonZeroAddress(_botList) {
+    constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
+        ACLNonReentrantTrait(ACLNonReentrantTrait(ICreditManagerV3(_creditManager).pool()).acl())
+        nonZeroAddress(_botList)
+    {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]

@@ -38,10 +38,10 @@ contract CreditManagerFactory {
 
         creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
 
-        creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, degenNFT, expirable);
+        creditFacade = new CreditFacadeV3(address(creditManager), botList, weth, degenNFT, expirable);
         creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager));
+        creditConfigurator = new CreditConfiguratorV3(address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
     }
 }

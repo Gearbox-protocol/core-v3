@@ -66,7 +66,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         poolMock = new PoolMock(address(addressProvider), underlying);
 
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(poolMock));
 
         poolMock.setPoolQuotaKeeper(address(pqk));
 
@@ -292,7 +292,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
     /// @notice U:[PQK-8]: setGauge works as expected
     function test_U_PQK_08_setGauge_works_as_expected() public {
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(poolMock));
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
@@ -332,7 +332,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
     /// @notice U:[PQK-10]: addCreditManager works as expected
     function test_U_PQK_10_addCreditManager_works_as_expected() public {
-        pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
+        pqk = new PoolQuotaKeeperV3(address(poolMock));
 
         address[] memory managers = pqk.creditManagers();
 

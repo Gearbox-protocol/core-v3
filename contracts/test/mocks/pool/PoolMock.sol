@@ -21,6 +21,8 @@ contract PoolMock {
 
     // Address repository
     address public addressProvider;
+    address public acl;
+    address public contractsRegister;
 
     // Total borrowed amount: https://dev.gearbox.fi/developers/pool/economy/total-borrowed
     uint256 public totalBorrowed;
@@ -80,6 +82,8 @@ contract PoolMock {
 
     constructor(address _addressProvider, address _underlyingToken) {
         addressProvider = _addressProvider;
+        acl = _addressProvider;
+        contractsRegister = _addressProvider;
         underlyingToken = _underlyingToken;
         asset = _underlyingToken;
         borrowAPY_RAY = RAY / 10;

@@ -54,10 +54,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
+    constructor(address _creditManager)
+        ACLNonReentrantTrait(ACLNonReentrantTrait(CreditManagerV3(_creditManager).pool()).acl())
+    {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 

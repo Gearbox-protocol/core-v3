@@ -165,7 +165,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
-            address(addressProvider),
             address(creditManagerMock),
             address(botListMock),
             tokenTestSuite.addressOf(Tokens.WETH),
@@ -187,14 +186,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
 
         vm.expectRevert(ZeroAddressException.selector);
-        new CreditFacadeV3Harness(
-            address(addressProvider),
-            address(creditManagerMock),
-            address(0),
-            address(0),
-            address(degenNFTMock),
-            expirable
-        );
+        new CreditFacadeV3Harness(address(creditManagerMock), address(0), address(0), address(degenNFTMock), expirable);
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause

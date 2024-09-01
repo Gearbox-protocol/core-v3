@@ -132,6 +132,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
+        if (bytes(name_).length == 0 || bytes(symbol_).length == 0) revert IncorrectParameterException(); // U:[LP-1A]
+
         treasury = treasury_; // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]

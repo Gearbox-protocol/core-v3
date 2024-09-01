@@ -61,7 +61,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
         gear = gear_; // U:[GS-1]
         firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
-        _transferOwnership(owner_); // U:[GS-1]
+        transferOwnership(owner_); // U:[GS-1]
     }
 
     /// @dev Ensures that function is called by migrator

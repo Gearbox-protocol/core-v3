@@ -39,7 +39,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @notice Constructor
     /// @param owner_ Contract owner
     constructor(address owner_) {
-        _transferOwnership(owner_);
+        transferOwnership(owner_);
     }
 
     // ----------- //
