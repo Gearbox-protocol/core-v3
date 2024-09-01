@@ -983,6 +983,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint16 minHealthFactor,
         bool useSafePrices
     ) internal {
+        // older credit managers do not enable underlying token upon opening an account so it is done here
         ICreditManagerV3(creditManager).fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask.enable(UNDERLYING_TOKEN_MASK),
