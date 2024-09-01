@@ -191,7 +191,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 shares)
     {
         uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
@@ -205,7 +205,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         returns (uint256 shares)
     {
-        shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
+        shares = deposit(assets, receiver); // U:[LP-2A,2B,5A,5B,6]
         emit Refer(receiver, referralCode, assets); // U:[LP-6]
     }
 
@@ -218,7 +218,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 assets)
     {
         uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
@@ -232,7 +232,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         returns (uint256 assets)
     {
-        assets = mint(shares, receiver); // U:[LP-2A,2B,5,7]
+        assets = mint(shares, receiver); // U:[LP-2A,2B,5A,5B,7]
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
@@ -246,7 +246,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 shares)
     {
         uint256 assetsToUser = _amountWithFee(assets);
@@ -265,7 +265,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
-        nonZeroAddress(receiver) // U:[LP-5]
+        nonZeroAddress(receiver) // U:[LP-5A]
         returns (uint256 assets)
     {
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
@@ -325,6 +325,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     ///      - updates base interest rate and index
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
+        if (assetsReceived == 0 || shares == 0) revert AmountCantBeZeroException(); // U:[LP-5B]
         IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
 
         _updateBaseInterest({
@@ -349,6 +350,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 amountToUser,
         uint256 shares
     ) internal {
+        if (assetsReceived == 0 || shares == 0) revert AmountCantBeZeroException(); // U:[LP-5B]
         if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[LP-8,9]
         _burn(owner, shares); // U:[LP-8,9]
 
