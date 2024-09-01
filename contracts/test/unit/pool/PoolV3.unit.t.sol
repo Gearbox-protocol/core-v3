@@ -11,6 +11,7 @@ import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
 import {ILinearInterestRateModelV3} from "../../../interfaces/ILinearInterestRateModelV3.sol";
+import {IInterestRateModel} from "../../../interfaces/base/IInterestRateModel.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
@@ -286,10 +287,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setCreditManagerDebtLimit({creditManager: address(0), newLimit: 0});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -836,7 +837,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_12_creditManagerBorrowable_works_as_expected() public {
         // for the next two cases, `irm.availableToBorrow` should not be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
+            interestRateModel, abi.encode(IInterestRateModel.availableToBorrow.selector), "should not be called"
         );
 
         // case: total debt limit is fully used
@@ -849,9 +850,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.creditManagerBorrowable(creditManager), 0, "Incorrect borrowable (CM debt limit fully used)");
 
         // for the next three cases, let `irm.availableToBorrow` always return 500
-        vm.mockCall(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
-        );
+        vm.mockCall(interestRateModel, abi.encode(IInterestRateModel.availableToBorrow.selector), abi.encode(500));
 
         // case: `irm.availableToBorrow` is the smallest
         pool.hackCreditManagerBorrowed(creditManager, 0);

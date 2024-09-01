@@ -56,7 +56,8 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Constructor
     /// @param owner_ Contract owner
     /// @param gear_ GEAR token address
-    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start
+    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start.
+    ///        Setting this too far into the future poses a risk of locking user deposits.
     constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
         gear = gear_; // U:[GS-1]
         firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]

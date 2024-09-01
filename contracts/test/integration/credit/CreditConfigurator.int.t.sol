@@ -236,30 +236,30 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidToken(DUMB_ADDRESS);
     }
 
-    /// @dev I:[CC-2B]: controllerOnly functions revert on non-pausable admin
-    function test_I_CC_02B_controllerOnly_functions_revert_on_non_controller() public creditTest {
-        vm.expectRevert(CallerNotControllerException.selector);
+    /// @dev I:[CC-2B]: controllerOrConfiguratorOnly functions revert on non-pausable admin
+    function test_I_CC_02B_controllerOrConfiguratorOnly_functions_revert_on_non_controller() public creditTest {
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.allowToken(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setDebtLimits(0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxCumulativeLoss(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.resetCumulativeLoss();
     }
 
