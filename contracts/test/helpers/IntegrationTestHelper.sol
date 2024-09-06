@@ -3,7 +3,6 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -21,6 +20,7 @@ import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeV3} from "../../pool/GaugeV3.sol";
+import {GearStakingV3} from "../../core/GearStakingV3.sol";
 import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
@@ -63,11 +63,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     // CORE
     IACL acl;
-    IAddressProviderV3 addressProvider;
     IContractsRegister cr;
     AccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     BotListV3 botList;
+    GearStakingV3 gearStaking;
 
     /// POOL & CREDIT MANAGER
     PoolV3 public pool;
@@ -182,8 +182,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     modifier attachTest() {
-        _attachCore();
-
         address creditManagerAddr;
 
         bool skipTest = false;
@@ -219,7 +217,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         weth = tokenTestSuite.addressOf(Tokens.WETH);
 
         vm.startPrank(CONFIGURATOR);
-        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
+        GenesisFactory gp = new GenesisFactory();
         if (chainId == 1337 || chainId == 31337) {
             PriceFeedConfig[] memory priceFeeds = tokenTestSuite.getPriceFeeds();
             uint256 len = priceFeeds.length;
@@ -229,39 +227,51 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 );
             }
         }
-        addressProvider = gp.addressProvider();
+
+        acl = IACL(address(gp.acl()));
+        priceOracle = gp.priceOracle();
+        accountFactory = gp.accountFactory();
+        botList = gp.botList();
+        cr = gp.contractsRegister();
+        gearStaking = gp.gearStaking();
+
         vm.stopPrank();
-
-        _initCoreContracts();
     }
 
-    function _attachCore() internal {
+    function _attachPool() internal {
         tokenTestSuite = new TokensTestSuite();
-        try vm.envAddress("ATTACH_ADDRESS_PROVIDER") returns (address val) {
-            addressProvider = IAddressProviderV3(val);
+        try vm.envAddress("ATTACH_POOL") returns (address val) {
+            _attachPool(val);
         } catch {
-            revert("ATTACH_ADDRESS_PROVIDER is not provided");
+            revert("ATTACH_POOL is not provided");
         }
-
-        console.log("Starting mainnet test with address provider: %s", address(addressProvider));
-        _initCoreContracts();
+        console.log("Starting attach test with pool: %s", address(pool));
     }
 
-    function _initCoreContracts() internal {
-        acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
-        cr = IContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
-        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10));
-        priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
-        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
-    }
-
-    function _attachPool(address _pool) internal returns (bool isCompatible) {
+    function _attachPool(address _pool) internal returns (bool success) {
         pool = PoolV3(_pool);
 
         poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
         gauge = GaugeV3(poolQuotaKeeper.gauge());
+        gearStaking = GearStakingV3(gauge.voter());
 
         underlying = pool.asset();
+
+        acl = IACL(pool.acl());
+        cr = IContractsRegister(pool.contractsRegister());
+
+        address[] memory cms = pool.creditManagers();
+
+        if (cms.length == 0) return false;
+
+        address cm = cms[0];
+
+        accountFactory = AccountFactoryV3(CreditManagerV3(cm).accountFactory());
+        priceOracle = IPriceOracleV3(CreditManagerV3(cm).priceOracle());
+
+        address cf = CreditManagerV3(cm).creditFacade();
+
+        botList = BotListV3(payable(CreditFacadeV3(cf).botList()));
 
         if (!anyUnderlying && underlying != tokenTestSuite.addressOf(underlyingT)) {
             return false;
@@ -270,7 +280,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         return true;
     }
 
-    function _attachCreditManager(address _creditManager) internal returns (bool isCompatible) {
+    function _attachCreditManager(address _creditManager) internal returns (bool success) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
@@ -288,6 +298,20 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         if (!anyDegenNFT && whitelisted != (_degenNFT != address(0))) {
             return false;
         }
+
+        _adjustPoolLiquidity();
+
+        if (_degenNFT != address(0)) {
+            address minter = DegenNFTMock(_degenNFT).minter();
+
+            vm.prank(minter);
+            DegenNFTMock(_degenNFT).mint(USER, 1000);
+        }
+
+        return true;
+    }
+
+    function _adjustPoolLiquidity() internal {
         if (configAccountAmount == 0) {
             uint256 minDebt;
             (minDebt, creditAccountAmount) = creditFacade.debtLimits();
@@ -313,7 +337,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 vm.prank(INITIAL_LP);
                 pool.deposit(depositAmount, INITIAL_LP);
 
-                address configurator = Ownable(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
+                address configurator = Ownable(address(acl)).owner();
                 uint256 currentLimit = pool.creditManagerDebtLimit(address(creditManager));
                 vm.prank(configurator);
                 pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + depositAmount);
@@ -324,15 +348,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         } else {
             creditAccountAmount = configAccountAmount;
         }
-
-        if (_degenNFT != address(0)) {
-            address minter = DegenNFTMock(_degenNFT).minter();
-
-            vm.prank(minter);
-            DegenNFTMock(_degenNFT).mint(USER, 1000);
-        }
-
-        return true;
     }
 
     function _deployPool(IPoolV3DeployConfig config) internal {
@@ -341,7 +356,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         underlying = tokenTestSuite.addressOf(underlyingT);
 
-        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, true, tokenTestSuite);
+        PoolFactory pf = new PoolFactory(
+            address(acl), address(cr), DUMB_ADDRESS, address(gearStaking), config, underlying, tokenTestSuite
+        );
 
         pool = pf.pool();
         gauge = pf.gauge();
@@ -357,7 +374,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.prank(INITIAL_LP);
         pool.deposit(initialBalance, INITIAL_LP);
 
-        AddressProviderV3ACLMock(address(addressProvider)).addPool(address(pool));
+        AddressProviderV3ACLMock(address(cr)).addPool(address(pool));
 
         vm.label(address(pool), "Pool");
     }
@@ -393,7 +410,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             }
 
             CreditManagerFactory cmf = new CreditManagerFactory({
-                addressProvider: address(addressProvider),
+                weth: weth,
+                accountFactory: address(accountFactory),
+                priceOracle: address(priceOracle),
+                botList: address(botList),
                 pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
@@ -419,7 +439,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             _addCollateralTokens(cmParams.collateralTokens);
 
-            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
+            AddressProviderV3ACLMock(address(cr)).addCreditManager(address(creditManager));
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);
