@@ -9,7 +9,7 @@ import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 /// @title Adapter Mock
 contract AdapterMock is IAdapter {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "AD_MOCK";
+    bytes32 public constant override contractType = "ADAPTER_MOCK";
 
     address public immutable override creditManager;
     address public immutable override targetContract;

@@ -72,7 +72,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "CF";
+    bytes32 public constant override contractType = "CREDIT_FACADE";
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
