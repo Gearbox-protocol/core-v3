@@ -155,7 +155,7 @@ contract PoolV3 is
 
     /// @notice Contract type
     function contractType() external view virtual override returns (bytes32) {
-        return "LP";
+        return "POOL";
     }
 
     /// @notice Pool shares decimals, matches underlying token decimals

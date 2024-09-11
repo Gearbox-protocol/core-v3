@@ -20,7 +20,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "CA";
+    bytes32 public constant override contractType = "CREDIT_ACCOUNT";
 
     /// @notice Account factory this account was deployed with
     address public immutable override factory;

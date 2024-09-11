@@ -11,7 +11,7 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 /// @notice Credit manager variation for USDT underlying with enabled transfer fees
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
     /// @notice Contract type
-    bytes32 public constant override contractType = "CM_USDT";
+    bytes32 public constant override contractType = "CREDIT_MANAGER_USDT";
 
     constructor(
         address _pool,

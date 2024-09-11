@@ -15,7 +15,7 @@ enum FlagState {
 /// @notice Used for test purposes only
 contract PriceFeedMock is IPriceFeed {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "PF_MOCK";
+    bytes32 public constant override contractType = "PRICE_FEED_MOCK";
 
     int256 private price;
     uint8 public immutable override decimals;

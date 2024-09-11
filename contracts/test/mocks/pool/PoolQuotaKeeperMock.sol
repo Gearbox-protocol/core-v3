@@ -8,7 +8,7 @@ import {TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeep
 contract PoolQuotaKeeperMock {
     uint256 public constant version = 3_10;
 
-    bytes32 public constant contractType = "QK_MOCK";
+    bytes32 public constant contractType = "POOL_QUOTA_KEEPER_MOCK";
 
     /// @dev Address provider
     address public immutable underlying;

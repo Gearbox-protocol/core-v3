@@ -33,7 +33,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "GS";
+    bytes32 public constant override contractType = "GEAR_STAKING";
 
     /// @notice Address of the GEAR token
     address public immutable override gear;

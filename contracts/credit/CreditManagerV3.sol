@@ -184,7 +184,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Contract type
     function contractType() external view virtual override returns (bytes32) {
-        return "CM";
+        return "CREDIT_MANAGER";
     }
 
     // ------------------ //

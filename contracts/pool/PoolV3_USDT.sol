@@ -10,7 +10,7 @@ import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 /// @notice Pool variation for USDT underlying with enabled transfer fees
 contract PoolV3_USDT is PoolV3, USDT_Transfer {
     /// @notice Contract type
-    bytes32 public constant override contractType = "LP_USDT";
+    bytes32 public constant override contractType = "POOL_USDT";
 
     constructor(
         address acl_,
