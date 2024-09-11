@@ -364,9 +364,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         gauge = pf.gauge();
         poolQuotaKeeper = pf.poolQuotaKeeper();
 
-        vm.warp(block.timestamp + 7 days);
-        vm.prank(CONFIGURATOR);
-        gauge.updateEpoch();
+        vm.prank(address(gauge));
+        poolQuotaKeeper.updateRates();
 
         tokenTestSuite.mint(underlying, INITIAL_LP, initialBalance);
         tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
