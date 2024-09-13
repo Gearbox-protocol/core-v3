@@ -34,7 +34,7 @@ contract QuotaRatesIntegrationTest is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(pool));
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        tumbler = new TumblerV3(address(pool), 1 days);
+        tumbler = new TumblerV3(address(quotaKeeper), 1 days);
         quotaKeeper.setGauge(address(tumbler));
     }
 
