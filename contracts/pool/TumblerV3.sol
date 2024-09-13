@@ -50,13 +50,15 @@ contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param pool_ Pool whose quota rates to set by this contract
+    /// @param poolQuotaKeeper_ Quota keeper of the pool whose rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address pool_, uint256 epochLength_) ControlledTrait(ControlledTrait(pool_).acl()) {
-        pool = pool_;
-        underlying = IPoolV3(pool_).underlyingToken();
-        poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();
+    constructor(address poolQuotaKeeper_, uint256 epochLength_)
+        ControlledTrait(ControlledTrait(IPoolQuotaKeeperV3(poolQuotaKeeper_).pool()).acl())
+    {
+        pool = IPoolQuotaKeeperV3(poolQuotaKeeper_).pool();
+        underlying = IPoolQuotaKeeperV3(poolQuotaKeeper_).underlying();
+        poolQuotaKeeper = poolQuotaKeeper_;
         epochLength = epochLength_;
     }
 
