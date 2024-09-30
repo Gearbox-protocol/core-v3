@@ -940,25 +940,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setLiquidateCreditAccountReturns(0, 100);
 
-        // loss forbids borrowing, anyone can call
-        vm.prank(FRIEND);
-        uint256 loss =
-            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-        assertEq(loss, 100, "Incorrect loss");
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");
-
-        vm.etch(LIQUIDATOR, "CODE");
-        vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(LIQUIDATOR);
-
         // only the loss liquidator can call
         vm.expectRevert(CallerNotLossLiquidatorException.selector);
         vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
+        vm.etch(LIQUIDATOR, "CODE");
+        vm.prank(CONFIGURATOR);
+        creditFacade.setLossLiquidator(LIQUIDATOR);
+
+        // loss forbids borrowing
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+        uint256 loss =
+            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
         assertEq(loss, 100, "Incorrect loss");
+        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");
     }
 
     //
@@ -2236,10 +2232,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setLossLiquidator(liquidator);
 
         assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(address(0));
-        assertEq(creditFacade.lossLiquidator(), address(0), "Loss liquidator not unset");
     }
 
     /// @dev U:[FA-52]: setTokenAllowance works properly

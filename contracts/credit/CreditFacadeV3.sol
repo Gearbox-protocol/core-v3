@@ -348,8 +348,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 
-            address lossLiquidator_ = lossLiquidator;
-            if (lossLiquidator_ != address(0) && msg.sender != lossLiquidator_) {
+            if (msg.sender != lossLiquidator) {
                 revert CallerNotLossLiquidatorException(); // U:[FA-17]
             }
         }
@@ -376,7 +375,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @dev Reverts if `token` is underlying or if `token` is a phantom token and its `depositedToken` is underlying
     /// @dev If `token` is a phantom token, it's withdrawn first, and its `depositedToken` is then sent to the liquidator.
     ///      Both `seizedAmount` and `minSeizedAmount` refer to `depositedToken` in this case.
-    /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough here
+    /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, although here
     ///      they are actually used to repay debt. Unclaimed rewards are safe since adapter calls are not allowed.
     function partiallyLiquidateCreditAccount(
         address creditAccount,
@@ -802,8 +801,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     {
         if (adapter == address(0) || target == address(0)) revert TargetContractNotAllowedException(); // U:[FA-38]
 
-        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) _setActiveCreditAccount(creditAccount); // U:[FA-38]
-        flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
+            _setActiveCreditAccount(creditAccount); // U:[FA-38]
+            flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG; // U:[FA-38]
+        }
 
         bool useSafePrices = abi.decode(adapter.functionCall(callData), (bool)); // U:[FA-38]
         if (useSafePrices) flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-38,45]
@@ -857,13 +858,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @notice Sets the new loss liquidator
     /// @param newLossLiquidator New loss liquidator
     /// @dev Reverts if caller is not credit configurator
-    /// @dev Reverts if `newLossLiquidator` is not a contract, unless it's zero address
+    /// @dev Reverts if `newLossLiquidator` is not a contract
     function setLossLiquidator(address newLossLiquidator)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if (newLossLiquidator != address(0) && newLossLiquidator.code.length == 0) {
+        if (newLossLiquidator.code.length == 0) {
             revert AddressIsNotContractException(newLossLiquidator); // U:[FA-51]
         }
         lossLiquidator = newLossLiquidator; // U:[FA-51]
@@ -902,6 +903,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
+    /// @dev Pause blocks all user entrypoints to the contract.
+    ///      Liquidations remain open only to emergency and loss liquidators.
     /// @dev Reverts if contract is already paused
     function pause() external override pausableAdminsOnly {
         _pause();

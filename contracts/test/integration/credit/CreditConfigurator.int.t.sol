@@ -1032,6 +1032,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-26]: setLossLiquidator works correctly
     function test_I_CC_26_setLossLiquidator_works_correctly() public creditTest {
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setLossLiquidator(address(0));
+
         address liquidator = makeAddr("LOSS_LIQUIDATOR");
         vm.etch(liquidator, "DUMMY_CODE");
 

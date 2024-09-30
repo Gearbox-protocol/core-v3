@@ -514,7 +514,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
-            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
+            address lossLiquidator = prevCreditFacade.lossLiquidator();
+            if (lossLiquidator != address(0)) _setLossLiquidator(lossLiquidator); // I:[CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
@@ -646,11 +647,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     }
 
     /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
-    /// @param newLossLiquidator New loss liquidator, must be a contract or zero address
+    /// @param newLossLiquidator New loss liquidator, must be a contract
     function setLossLiquidator(address newLossLiquidator)
         external
         override
         configuratorOnly // I:[CC-2]
+        nonZeroAddress(newLossLiquidator) // I:[CC-26]
     {
         _setLossLiquidator(newLossLiquidator); // I:[CC-26]
     }

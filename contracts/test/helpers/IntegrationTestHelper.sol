@@ -414,6 +414,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.feeLiquidationExpired,
                 cmParams.liquidationPremiumExpired
             );
+
+            vm.etch(LIQUIDATOR, "DUMMY_CODE");
+            creditConfigurator.setLossLiquidator(LIQUIDATOR);
+
             vm.stopPrank();
             vm.roll(block.number + 1);
 
@@ -568,13 +572,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         );
     }
 
-    function _makeAccountsLiquitable() internal {
+    function _makeAccountsLiquidatable() internal {
         vm.startPrank(CONFIGURATOR);
         uint256 idx = creditManager.collateralTokensCount() - 1;
         while (idx != 0) {
             address token = creditManager.getTokenByMask(1 << (idx--));
             creditConfigurator.setLiquidationThreshold(token, 0);
         }
+        // FIXME: setting liquidation premium to 90% is not the cleanest way to make account liquidatable
         creditConfigurator.setFees(200, 9000, 100, 9500);
         vm.stopPrank();
 

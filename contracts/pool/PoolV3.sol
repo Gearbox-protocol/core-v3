@@ -56,10 +56,10 @@ contract PoolV3 is
     ERC4626,
     ERC20Permit,
     Pausable,
+    ReentrancyGuardTrait,
     SanityCheckTrait,
     ControlledTrait,
     ContractsRegisterTrait,
-    ReentrancyGuardTrait,
     IPoolV3
 {
     using Math for uint256;
@@ -758,6 +758,9 @@ contract PoolV3 is
     }
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
+    /// @dev Pause only blocks deposits, withdrawals and transfers.
+    ///      Borrowing and repayment can be paused on the credit side but are not blocked here
+    ///      to allow emergency liquidations to proceed.
     /// @dev Reverts if contract is already paused
     function pause() external override pausableAdminsOnly {
         _pause();
