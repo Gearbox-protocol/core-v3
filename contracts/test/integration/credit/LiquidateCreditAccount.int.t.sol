@@ -62,7 +62,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
-        _makeAccountsLiquitable();
+        _makeAccountsLiquidatable();
 
         // EXPECTED STACK TRACE & EVENTS
 
@@ -111,7 +111,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
-        _makeAccountsLiquitable();
+        _makeAccountsLiquidatable();
 
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
@@ -137,7 +137,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
 
         (address creditAccount,) = _openTestCreditAccount();
 
-        _makeAccountsLiquitable();
+        _makeAccountsLiquidatable();
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, INCREASE_DEBT_PERMISSION));
 
         vm.prank(LIQUIDATOR);

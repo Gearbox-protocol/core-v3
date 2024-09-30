@@ -41,8 +41,6 @@ interface IGaugeV3Events {
 
 /// @title Gauge V3 interface
 interface IGaugeV3 is IVotingContract, IRateKeeper, IControlledTrait, IGaugeV3Events {
-    function voter() external view returns (address);
-
     function updateEpoch() external;
 
     function epochLastUpdate() external view returns (uint16);

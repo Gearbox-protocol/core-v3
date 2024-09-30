@@ -432,7 +432,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         address[2] memory quotedTokens = [tokenTestSuite.addressOf(Tokens.USDT), tokenTestSuite.addressOf(Tokens.LINK)];
 
-        vm.prank(USER);
+        vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
