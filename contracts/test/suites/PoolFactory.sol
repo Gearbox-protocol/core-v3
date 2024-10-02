@@ -24,10 +24,12 @@ contract PoolFactory is Test {
     GaugeV3 public gauge;
 
     constructor(
-        address addressProvider,
+        address acl,
+        address contractsRegister,
+        address treasury,
+        address gearStaking,
         IPoolV3DeployConfig config,
         address underlying,
-        bool, /* supportQuotas */
         TokensTestSuite tokensTestSuite
     ) {
         LinearIRMV3DeployParams memory irmParams = config.irm();
@@ -41,22 +43,17 @@ contract PoolFactory is Test {
             irmParams._isBorrowingMoreU2Forbidden
         );
 
-        address acl = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
-        address contractsRegister =
-            IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
-
         pool = new PoolV3({
             acl_: acl,
             contractsRegister_: contractsRegister,
             underlyingToken_: underlying,
-            treasury_: IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL),
+            treasury_: treasury,
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
             name_: config.name(),
             symbol_: config.symbol()
         });
 
-        address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
         gauge = new GaugeV3(address(pool), gearStaking);
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);

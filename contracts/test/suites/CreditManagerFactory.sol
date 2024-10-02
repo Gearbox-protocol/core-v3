@@ -22,7 +22,10 @@ contract CreditManagerFactory {
     CreditConfiguratorV3 public creditConfigurator;
 
     constructor(
-        address addressProvider,
+        address weth,
+        address accountFactory,
+        address priceOracle,
+        address botList,
         address pool,
         address degenNFT,
         bool expirable,
@@ -30,11 +33,6 @@ contract CreditManagerFactory {
         uint16 feeInterest,
         string memory name
     ) {
-        address weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
-        address accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10);
-        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
-        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10);
-
         creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
 
         creditFacade = new CreditFacadeV3(address(creditManager), botList, weth, degenNFT, expirable);
