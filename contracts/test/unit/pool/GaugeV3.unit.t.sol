@@ -62,7 +62,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         gauge = new GaugeV3Harness(address(poolMock), address(gearStakingMock));
     }
 
-    /// @dev U:[GA-01]: constructor sets correct values
+    /// @dev U:[GA-1]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
         vm.expectEmit(false, false, false, true);
         emit SetFrozenEpoch(true);
@@ -77,7 +77,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         new GaugeV3Harness(address(poolMock), address(0));
     }
 
-    /// @dev U:[GA-02]: voterOnly functions reverts if called by non-voter
+    /// @dev U:[GA-2]: voterOnly functions reverts if called by non-voter
     function test_U_GA_02_voterOnly_functions_reverts_if_called_by_non_voter() public {
         vm.expectRevert(CallerNotVoterException.selector);
         gauge.vote(DUMB_ADDRESS, 12, "");
@@ -86,19 +86,19 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         gauge.unvote(DUMB_ADDRESS, 12, "");
     }
 
-    /// @dev U:[GA-03]: configuratorOnly functions reverts if called by non-configurator
+    /// @dev U:[GA-3]: configuratorOnly functions reverts if called by non-configurator
     function test_U_GA_03_configuratorOnly_functions_reverts_if_called_by_non_configurator() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 
-    /// @dev U:[GA-04]: addQuotaToken and quota rate function revert for incorrect params
+    /// @dev U:[GA-4]: addQuotaToken and quota rate function revert for incorrect params
     function test_U_GA_04_addQuotaToken_reverts_for_incorrect_params() public {
         address token = DUMB_ADDRESS;
         vm.startPrank(CONFIGURATOR);
@@ -138,7 +138,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.stopPrank();
     }
 
-    /// @dev U:[GA-05]: addQuotaToken works as expected
+    /// @dev U:[GA-5]: addQuotaToken works as expected
     function test_U_GA_05_addQuotaToken_works_as_expected() public {
         address token = makeAddr("TOKEN");
         uint16 minRate = 100;
@@ -178,7 +178,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         gauge.addQuotaToken(token2, minRate, maxRate);
     }
 
-    /// @dev U:[GA-06A]: changeQuotaMinRate works as expected
+    /// @dev U:[GA-6A]: changeQuotaMinRate works as expected
     function test_U_GA_06A_changeQuotaMinRate_works_as_expected() public {
         address token = makeAddr("TOKEN");
         uint16 minRate = 100;
@@ -212,7 +212,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(_minRate, minRate, "Incorrect minRate");
     }
 
-    /// @dev U:[GA-06B]: changeQuotaMaxRate works as expected
+    /// @dev U:[GA-6B]: changeQuotaMaxRate works as expected
     function test_U_GA_06B_changeQuotaMaxRate_works_as_expected() public {
         address token = makeAddr("TOKEN");
         uint16 maxRate = 3000;
@@ -246,7 +246,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(_maxRate, maxRate, "Incorrect maxRate");
     }
 
-    /// @dev U:[GA-08]: isTokenAdded works as expected
+    /// @dev U:[GA-8]: isTokenAdded works as expected
     function test_U_GA_08_isTokenAdded_works_as_expected() public {
         address token = makeAddr("TOKEN");
 
@@ -263,7 +263,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     // VOTE AND UNVOTE WORKS CORRECTLY
     //
 
-    // @dev U:[GA-10]: vote and unvote reverts in token isn't added
+    /// @dev U:[GA-10]: vote and unvote reverts in token isn't added
     function test_U_GA_10_vote_and_unvote_reverts_in_token_isnt_added() public {
         vm.startPrank(address(gearStakingMock));
         vm.expectRevert(TokenNotAllowedException.selector);
@@ -275,7 +275,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.stopPrank();
     }
 
-    // @dev U:[GA-11]: vote and unvote checks and updates epoch
+    /// @dev U:[GA-11]: vote and unvote checks and updates epoch
     function test_U_GA_11_vote_unvote_and_updates_epoch() public {
         address token = makeAddr("TOKEN");
 
@@ -304,7 +304,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.stopPrank();
     }
 
-    // @dev U:[GA-12]: vote correctly updates votes
+    /// @dev U:[GA-12]: vote correctly updates votes
     function test_U_GA_12_vote_correctly_updates_votes(uint96 votes) public {
         vm.assume(votes < type(uint96).max - 200);
 
@@ -337,7 +337,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
     }
 
-    // @dev U:[GA-13]: unvote correctly updates votes
+    /// @dev U:[GA-13]: unvote correctly updates votes
     function test_U_GA_13_unvote_correctly_updates_votes(uint96 votes) public {
         address token = makeAddr("TOKEN");
 
@@ -386,7 +386,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
     }
 
-    // @dev U:[GA-14]: updateEpoch updates epoch
+    /// @dev U:[GA-14]: updateEpoch updates epoch
     function test_U_GA_14_updateEpoch_updates_epoch() public {
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
@@ -410,7 +410,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         }
     }
 
-    // @dev U:[GA-15]: updateEpoch updates epoch
+    /// @dev U:[GA-15]: updateEpoch updates epoch
     function test_U_GA_15_updateEpoch_updates_epoch() public {
         address link = makeAddr("LINK");
         address pepe = makeAddr("PEPE");

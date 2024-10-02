@@ -7,7 +7,7 @@ import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 import {AccountQuota, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
-import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, WAD} from "../../../libraries/Constants.sol";
 
 /// @title Quotas logic test
 /// @notice U:[BM]: Unit tests for QuotasLogic library
@@ -75,7 +75,7 @@ contract QuotasLogicUnitTest is TestHelper {
             CalcAccruedQuotaInterestCase({
                 cumulativeIndexNow: uint192(RAY),
                 cumulativeIndexLU: uint192(RAY),
-                quoted: type(uint96).max,
+                quoted: uint96(type(int96).max),
                 expectedInterest: 0
             }),
             CalcAccruedQuotaInterestCase({

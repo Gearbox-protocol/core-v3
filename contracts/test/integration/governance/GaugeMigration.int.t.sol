@@ -5,9 +5,8 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PoolV3} from "../../../pool/PoolV3.sol";
-import {GaugeV3} from "../../../governance/GaugeV3.sol";
-import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../governance/GearStakingV3.sol";
+import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../core/GearStakingV3.sol";
+import {GaugeV3} from "../../../pool/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {CallerNotGaugeException} from "../../../interfaces/IExceptions.sol";
@@ -49,8 +48,7 @@ contract GaugeMigrationIntegrationTest is Test {
         vm.startPrank(configurator);
         // deploy address provider, staking and pool
         addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.setAddress(AP_GEAR_TOKEN, address(gear), false);
-        staking = new GearStakingV3(address(addressProvider), block.timestamp);
+        staking = new GearStakingV3(configurator, address(gear), block.timestamp);
         pool = new PoolMock(address(addressProvider), address(underlying));
 
         // deploy quota keeper and connect it to the pool
@@ -168,7 +166,7 @@ contract GaugeMigrationIntegrationTest is Test {
     function test_I_GAM_02_gaude_and_staking_migration_works_as_expected() public {
         // prepare new staking and gauge contracts
         vm.startPrank(configurator);
-        GearStakingV3 newStaking = new GearStakingV3(address(addressProvider), block.timestamp);
+        GearStakingV3 newStaking = new GearStakingV3(configurator, address(gear), block.timestamp);
         GaugeV3 newGauge = new GaugeV3(address(pool), address(newStaking));
 
         newStaking.setMigrator(address(staking));

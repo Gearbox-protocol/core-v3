@@ -3,17 +3,33 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-// EXCEPTIONS
-import "../../../interfaces/IExceptions.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IDegenNFT} from "../../../interfaces/base/IDegenNFT.sol";
+import {InsufficientBalanceException} from "../../../interfaces/IExceptions.sol";
 
-contract DegenNFTMock {
-    bool revertOnBurn;
+contract DegenNFTMock is ERC721, IDegenNFT {
+    address public minter;
 
-    function burn(address, uint256) external view {
-        if (revertOnBurn) revert InsufficientBalanceException();
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+        minter = msg.sender;
     }
 
-    function setRevertOnBurn(bool _revertOnBurn) external {
-        revertOnBurn = _revertOnBurn;
+    function mint(address to, uint256 amount) external {
+        uint256 balanceBefore = balanceOf(to);
+        for (uint256 i; i < amount; ++i) {
+            uint256 tokenId = (uint256(uint160(to)) << 40) + balanceBefore + i;
+            _mint(to, tokenId);
+        }
+    }
+
+    function burn(address from, uint256 amount) external {
+        uint256 balance = balanceOf(from);
+        if (balance < amount) {
+            revert InsufficientBalanceException();
+        }
+        for (uint256 i; i < amount; ++i) {
+            uint256 tokenId = (uint256(uint160(from)) << 40) + balance - i - 1;
+            _burn(tokenId);
+        }
     }
 }

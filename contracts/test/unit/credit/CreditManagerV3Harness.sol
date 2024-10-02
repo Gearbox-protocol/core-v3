@@ -9,15 +9,23 @@ import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
 import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     bool _enableTransferFee;
 
-    constructor(address _addressProvider, address _pool, string memory _name, bool enableTransferFee)
-        CreditManagerV3(_addressProvider, _pool, _name)
+    constructor(
+        address _pool,
+        address _accountFactory,
+        address _priceOracle,
+        uint8 _maxEnabledTokens,
+        uint16 _feeInterest,
+        string memory _name,
+        bool enableTransferFee
+    )
+        CreditManagerV3(_pool, _accountFactory, _priceOracle, _maxEnabledTokens, _feeInterest, _name)
         USDT_Transfer(IPoolV3(_pool).underlyingToken())
     {
         _enableTransferFee = enableTransferFee;
@@ -109,16 +117,7 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         address _poolQuotaKeeper
-    )
-        external
-        view
-        returns (
-            address[] memory quotaTokens,
-            uint256 outstandingQuotaInterest,
-            uint256[] memory quotas,
-            uint256 quotedMask
-        )
-    {
+    ) external view returns (address[] memory quotaTokens, uint256 outstandingQuotaInterest, uint256[] memory quotas) {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
     }
 

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
+import {IContractsRegisterTrait} from "./base/IContractsRegisterTrait.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 struct TokenQuotaParams {
     uint16 rate;
@@ -42,7 +44,7 @@ interface IPoolQuotaKeeperV3Events {
 }
 
 /// @title Pool quota keeper V3 interface
-interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
+interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion, IControlledTrait, IContractsRegisterTrait {
     function pool() external view returns (address);
 
     function underlying() external view returns (address);

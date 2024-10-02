@@ -6,10 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
-import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import {RAY} from "../../../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -19,32 +16,36 @@ import "../../../interfaces/IExceptions.sol";
  * @notice Used for testing purposes only.
  * @author Gearbox
  */
-contract PoolMock is IPoolService {
+contract PoolMock {
     using SafeERC20 for IERC20;
 
     // Address repository
-    AddressProvider public override addressProvider;
+    address public addressProvider;
+    address public acl;
+    address public contractsRegister;
 
     // Total borrowed amount: https://dev.gearbox.fi/developers/pool/economy/total-borrowed
-    uint256 public override totalBorrowed;
-    uint256 public override expectedLiquidityLimit;
+    uint256 public totalBorrowed;
+    uint256 public expectedLiquidityLimit;
 
-    address public override underlyingToken;
+    address public underlyingToken;
     address public asset;
 
+    address public treasury;
+
     // Credit Managers
-    address[] public override creditManagers;
+    address[] public creditManagers;
 
     // Diesel(LP) token address
-    address public override dieselToken;
+    address public dieselToken;
 
-    mapping(address => bool) public override creditManagersCanBorrow;
+    mapping(address => bool) public creditManagersCanBorrow;
 
     // Current borrow rate in RAY: https://dev.gearbox.fi/developers/pool/economy#borrow-apy
-    uint256 public override borrowAPY_RAY; // 10%
+    uint256 public borrowAPY_RAY; // 10%
 
     // Timestamp of last update
-    uint256 public override _timestampLU;
+    uint256 public _timestampLU;
 
     uint256 public lendAmount;
     address public lendAccount;
@@ -54,7 +55,7 @@ contract PoolMock is IPoolService {
     uint256 public repayLoss;
     uint256 public withdrawMultiplier;
 
-    uint256 public override withdrawFee;
+    uint256 public withdrawFee;
     uint256 public _expectedLiquidityLU;
     uint256 public calcLinearIndex_RAY;
     address public interestRateModel;
@@ -62,10 +63,10 @@ contract PoolMock is IPoolService {
     mapping(address => bool) public creditManagersCanRepay;
 
     // Cumulative index in RAY
-    uint256 public override _cumulativeIndex_RAY;
+    uint256 public _cumulativeIndex_RAY;
 
     // Contract version
-    uint256 public override version = 3_00;
+    uint256 public version = 3_10;
 
     uint96 public quotaRevenue;
 
@@ -80,7 +81,9 @@ contract PoolMock is IPoolService {
     }
 
     constructor(address _addressProvider, address _underlyingToken) {
-        addressProvider = AddressProvider(_addressProvider);
+        addressProvider = _addressProvider;
+        acl = _addressProvider;
+        contractsRegister = _addressProvider;
         underlyingToken = _underlyingToken;
         asset = _underlyingToken;
         borrowAPY_RAY = RAY / 10;
@@ -89,6 +92,10 @@ contract PoolMock is IPoolService {
 
     function setVersion(uint256 ver) external {
         version = ver;
+    }
+
+    function setTreasury(address _treasury) external {
+        treasury = _treasury;
     }
 
     function setPoolQuotaKeeper(address _poolQuotaKeeper) external {
@@ -103,7 +110,7 @@ contract PoolMock is IPoolService {
         return _cumulativeIndex_RAY;
     }
 
-    function calcLinearCumulative_RAY() public view override returns (uint256) {
+    function calcLinearCumulative_RAY() public view returns (uint256) {
         return _cumulativeIndex_RAY;
     }
 
@@ -113,7 +120,7 @@ contract PoolMock is IPoolService {
         quotaRevenue = uint96(_quotaRevenue);
     }
 
-    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external override {
+    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external {
         lendAmount = borrowedAmount;
         lendAccount = creditAccount;
 
@@ -121,13 +128,13 @@ contract PoolMock is IPoolService {
         IERC20(underlyingToken).safeTransfer(creditAccount, borrowedAmount); // T:[PS-14]
     }
 
-    function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external override {
+    function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external {
         repayAmount = borrowedAmount;
         repayProfit = profit;
         repayLoss = loss;
     }
 
-    function addLiquidity(uint256 amount, address onBehalfOf, uint256 referralCode) external override {}
+    function addLiquidity(uint256 amount, address onBehalfOf, uint256 referralCode) external {}
 
     /**
      * @dev Removes liquidity from pool
@@ -141,17 +148,17 @@ contract PoolMock is IPoolService {
      * @param amount Amount of tokens to be transfer
      * @param to Address to transfer liquidity
      */
-    function removeLiquidity(uint256 amount, address to) external override returns (uint256) {}
+    function removeLiquidity(uint256 amount, address to) external returns (uint256) {}
 
-    function expectedLiquidity() public pure override returns (uint256) {
+    function expectedLiquidity() public pure returns (uint256) {
         return 0; // T:[MPS-1]
     }
 
-    function availableLiquidity() public view override returns (uint256) {
+    function availableLiquidity() public view returns (uint256) {
         return IERC20(underlyingToken).balanceOf(address(this));
     }
 
-    function getDieselRate_RAY() public pure override returns (uint256) {
+    function getDieselRate_RAY() public pure returns (uint256) {
         return RAY; // T:[MPS-1]
     }
 
@@ -185,7 +192,7 @@ contract PoolMock is IPoolService {
      *
      * @return Quantity of connected credit Manager
      */
-    function creditManagersCount() external pure override returns (uint256) {
+    function creditManagersCount() external pure returns (uint256) {
         return 1; // T:[MPS-1]
     }
 
@@ -195,7 +202,7 @@ contract PoolMock is IPoolService {
      * @param amount Amount in underlyingToken tokens to be converted to diesel tokens
      * @return Amount in diesel tokens
      */
-    function toDiesel(uint256 amount) public pure override returns (uint256) {
+    function toDiesel(uint256 amount) public pure returns (uint256) {
         return (amount * RAY) / getDieselRate_RAY(); // T:[PS-24]
     }
 
@@ -205,7 +212,7 @@ contract PoolMock is IPoolService {
      * @param amount Amount in diesel tokens to be converted to diesel tokens
      * @return Amount in underlyingToken tokens
      */
-    function fromDiesel(uint256 amount) public pure override returns (uint256) {
+    function fromDiesel(uint256 amount) public pure returns (uint256) {
         return (amount * getDieselRate_RAY()) / RAY; // T:[PS-24]
     }
 

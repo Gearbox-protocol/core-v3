@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // ------- //
@@ -85,6 +85,9 @@ error CreditManagerCantBorrowException();
 /// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 
+/// @notice Thrown when attempting to connect a gauge to an incompatible pool quota keeper
+error IncompatibleGaugeException();
+
 /// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();
 
@@ -150,6 +153,9 @@ error IncompatibleContractException();
 /// @notice Thrown if attempting to forbid an adapter that is not registered in the credit manager
 error AdapterIsNotRegisteredException();
 
+/// @notice Thrown if new credit configurator's set of allowed adapters differs from the current one
+error IncorrectAdaptersSetException();
+
 // ------------- //
 // CREDIT FACADE //
 // ------------- //
@@ -161,10 +167,7 @@ error ForbiddenInWhitelistedModeException();
 error NotAllowedWhenNotExpirableException();
 
 /// @notice Thrown if a selector that doesn't match any allowed function is passed to the credit facade in a multicall
-error UnknownMethodException();
-
-/// @notice Thrown when trying to close an account with enabled tokens
-error CloseAccountWithEnabledTokensException();
+error UnknownMethodException(bytes4 selector);
 
 /// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
@@ -185,34 +188,40 @@ error ExpectedBalancesAlreadySetException();
 error ExpectedBalancesNotSetException();
 
 /// @notice Thrown if balance of at least one token is less than expected during a slippage check
-error BalanceLessThanExpectedException();
+error BalanceLessThanExpectedException(address token);
 
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
-error ForbiddenTokensException();
+error ForbiddenTokensException(uint256 forbiddenTokensMask);
 
-/// @notice Thrown when new forbidden tokens are enabled during the multicall
-error ForbiddenTokenEnabledException();
+/// @notice Thrown when forbidden token quota is increased during the multicall
+error ForbiddenTokenQuotaIncreasedException(address token);
 
 /// @notice Thrown when enabled forbidden token balance is increased during the multicall
-error ForbiddenTokenBalanceIncreasedException();
+error ForbiddenTokenBalanceIncreasedException(address token);
 
 /// @notice Thrown when the remaining token balance is increased during the liquidation
-error RemainingTokenBalanceIncreasedException();
+error RemainingTokenBalanceIncreasedException(address token);
 
 /// @notice Thrown if `botMulticall` is called by an address that is not approved by account owner or is forbidden
-error NotApprovedBotException();
+error NotApprovedBotException(address bot);
 
 /// @notice Thrown when attempting to perform a multicall action with no permission for it
 error NoPermissionException(uint256 permission);
 
 /// @notice Thrown when attempting to give a bot unexpected permissions
-error UnexpectedPermissionsException();
+error UnexpectedPermissionsException(uint256 permissions);
 
 /// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
 error CustomHealthFactorTooLowException();
 
 /// @notice Thrown when submitted collateral hint is not a valid token mask
-error InvalidCollateralHintException();
+error InvalidCollateralHintException(uint256 mask);
+
+/// @notice Thrown when trying to seize underlying token during partial liquidation
+error UnderlyingIsNotLiquidatableException();
+
+/// @notice Thrown when amount of collateral seized during partial liquidation is less than required
+error SeizedLessThanRequiredException(uint256 seizedAmount);
 
 // ------ //
 // ACCESS //
@@ -234,7 +243,7 @@ error CallerNotCreditManagerException();
 error CallerNotCreditFacadeException();
 
 /// @notice Thrown on attempting to call an access restricted function not as controller or configurator
-error CallerNotControllerException();
+error CallerNotControllerOrConfiguratorException();
 
 /// @notice Thrown on attempting to pause a contract without pausable admin rights
 error CallerNotPausableAdminException();
@@ -263,31 +272,18 @@ error CallerNotExecutorException();
 /// @notice Thrown on attempting to call an access restricted function not as veto admin
 error CallerNotVetoAdminException();
 
-// ------------------- //
-// CONTROLLER TIMELOCK //
-// ------------------- //
-
-/// @notice Thrown when the new parameter values do not satisfy required conditions
-error ParameterChecksFailedException();
-
-/// @notice Thrown when attempting to execute a non-queued transaction
-error TxNotQueuedException();
-
-/// @notice Thrown when attempting to execute a transaction that is either immature or stale
-error TxExecutedOutsideTimeWindowException();
-
-/// @notice Thrown when execution of a transaction fails
-error TxExecutionRevertedException();
-
-/// @notice Thrown when the value of a parameter on execution is different from the value on queue
-error ParameterChangedAfterQueuedTxException();
+/// @notice Thrown on attempting to perform liquidation with loss not through the loss liquidator contract
+error CallerNotLossLiquidatorException();
 
 // -------- //
 // BOT LIST //
 // -------- //
 
-/// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
+
+/// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
+error IncorrectBotPermissionsException();
 
 // --------------- //
 // ACCOUNT FACTORY //
@@ -308,6 +304,9 @@ error IncorrectPriceFeedException();
 
 /// @notice Thrown on attempting to interact with a price feed for a token not added to the price oracle
 error PriceFeedDoesNotExistException();
+
+/// @notice Thrown when trying to apply an on-demand price update to a non-updatable price feed
+error PriceFeedIsNotUpdatableException();
 
 /// @notice Thrown when price feed returns incorrect price for a token
 error IncorrectPriceException();

@@ -6,14 +6,12 @@ pragma solidity ^0.8.17;
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
-import {CreditManagerOpts} from "../../interfaces/ICreditConfiguratorV3.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 
 struct PriceFeedConfig {
     address token;
     address priceFeed;
     uint32 stalenessPeriod;
-    bool trusted;
 }
 
 struct LinearIRMV3DeployParams {
@@ -85,6 +83,8 @@ struct CreditManagerV3DeployParams {
     uint128 minDebt;
     /// @dev The maximal debt principal amount
     uint128 maxDebt;
+    /// @dev Max enabled tokens
+    uint8 maxEnabledTokens;
     /// @dev Percentage DAO fee on interest
     uint16 feeInterest;
     /// @dev Percentage DAO fee on liquidation amount for normal liquidations

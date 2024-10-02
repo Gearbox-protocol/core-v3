@@ -1,27 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 
 enum AllowanceAction {
     FORBID,
     ALLOW
-}
-
-/// @notice Struct with credit manager configuration parameters
-/// @param minDebt Minimum debt amount per account
-/// @param maxDebt Maximum debt amount per account
-/// @param degenNFT Whether to apply Degen NFT whitelist logic
-/// @param expirable Whether facade must be expirable
-/// @param name Credit manager name
-struct CreditManagerOpts {
-    uint128 minDebt;
-    uint128 maxDebt;
-    address degenNFT;
-    bool expirable;
-    string name;
 }
 
 interface ICreditConfiguratorV3Events {
@@ -50,9 +37,6 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a previously forbidden collateral token is allowed
     event AllowToken(address indexed token);
 
-    /// @notice Emitted when a token is made quoted
-    event QuoteToken(address indexed token);
-
     // -------- //
     // ADAPTERS //
     // -------- //
@@ -67,16 +51,9 @@ interface ICreditConfiguratorV3Events {
     // CREDIT MANAGER //
     // -------------- //
 
-    /// @notice Emitted when a new maximum number of enabled tokens is set in the credit manager
-    event SetMaxEnabledTokens(uint8 maxEnabledTokens);
-
     /// @notice Emitted when new fee parameters are set in the credit manager
     event UpdateFees(
-        uint16 feeInterest,
-        uint16 feeLiquidation,
-        uint16 liquidationPremium,
-        uint16 feeLiquidationExpired,
-        uint16 liquidationPremiumExpired
+        uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
     );
 
     // -------- //
@@ -85,9 +62,6 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when a new price oracle is set in the credit manager
     event SetPriceOracle(address indexed priceOracle);
-
-    /// @notice Emitted when a new bot list is set in the credit facade
-    event SetBotList(address indexed botList);
 
     /// @notice Emitted when a new facade is connected to the credit manager
     event SetCreditFacade(address indexed creditFacade);
@@ -105,11 +79,8 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a new max debt per block multiplier is set
     event SetMaxDebtPerBlockMultiplier(uint8 maxDebtPerBlockMultiplier);
 
-    /// @notice Emitted when a new max cumulative loss is set
-    event SetMaxCumulativeLoss(uint128 maxCumulativeLoss);
-
-    /// @notice Emitted when cumulative loss is reset to zero in the credit facade
-    event ResetCumulativeLoss();
+    /// @notice Emitted when new loss liquidator is set
+    event SetLossLiquidator(address indexed liquidator);
 
     /// @notice Emitted when a new expiration timestamp is set in the credit facade
     event SetExpirationDate(uint40 expirationDate);
@@ -122,9 +93,7 @@ interface ICreditConfiguratorV3Events {
 }
 
 /// @title Credit configurator V3 interface
-interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
-    function addressProvider() external view returns (address);
-
+interface ICreditConfiguratorV3 is IVersion, IControlledTrait, ICreditConfiguratorV3Events {
     function creditManager() external view returns (address);
 
     function creditFacade() external view returns (address);
@@ -150,8 +119,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
 
     function allowToken(address token) external;
 
-    function makeTokenQuoted(address token) external;
-
     // -------- //
     // ADAPTERS //
     // -------- //
@@ -167,22 +134,17 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // -------------- //
 
     function setFees(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationPremium,
         uint16 feeLiquidationExpired,
         uint16 liquidationPremiumExpired
     ) external;
 
-    function setMaxEnabledTokens(uint8 newMaxEnabledTokens) external;
-
     // -------- //
     // UPGRADES //
     // -------- //
 
-    function setPriceOracle(uint256 newVersion) external;
-
-    function setBotList(uint256 newVersion) external;
+    function setPriceOracle(address newPriceOracle) external;
 
     function setCreditFacade(address newCreditFacade, bool migrateParams) external;
 
@@ -192,21 +154,15 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // CREDIT FACADE //
     // ------------- //
 
-    function setMinDebtLimit(uint128 newMinDebt) external;
-
-    function setMaxDebtLimit(uint128 newMaxDebt) external;
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
 
     function forbidBorrowing() external;
 
-    function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss) external;
-
-    function resetCumulativeLoss() external;
+    function setLossLiquidator(address newLossLiquidator) external;
 
     function setExpirationDate(uint40 newExpirationDate) external;
-
-    function emergencyLiquidators() external view returns (address[] memory);
 
     function addEmergencyLiquidator(address liquidator) external;
 

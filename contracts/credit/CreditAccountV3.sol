@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
@@ -17,7 +17,10 @@ contract CreditAccountV3 is ICreditAccountV3 {
     using Address for address;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "CREDIT_ACCOUNT";
 
     /// @notice Account factory this account was deployed with
     address public immutable override factory;
@@ -37,13 +40,6 @@ contract CreditAccountV3 is ICreditAccountV3 {
     modifier creditManagerOnly() {
         _revertIfNotCreditManager();
         _;
-    }
-
-    /// @dev Reverts if `msg.sender` is not credit manager
-    function _revertIfNotCreditManager() internal view {
-        if (msg.sender != creditManager) {
-            revert CallerNotCreditManagerException();
-        }
     }
 
     /// @notice Constructor
@@ -90,5 +86,12 @@ contract CreditAccountV3 is ICreditAccountV3 {
         factoryOnly // U:[CA-2]
     {
         target.functionCall(data); // U:[CA-5]
+    }
+
+    /// @dev Reverts if `msg.sender` is not credit manager
+    function _revertIfNotCreditManager() internal view {
+        if (msg.sender != creditManager) {
+            revert CallerNotCreditManagerException();
+        }
     }
 }

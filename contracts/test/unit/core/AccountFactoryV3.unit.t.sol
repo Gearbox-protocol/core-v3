@@ -7,7 +7,6 @@ import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {IAccountFactoryV3Events} from "../../../interfaces/IAccountFactoryV3.sol";
 import {
-    CallerNotConfiguratorException,
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException,
@@ -15,7 +14,6 @@ import {
 } from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {AccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./AccountFactoryV3Harness.sol";
 
@@ -23,7 +21,6 @@ import {AccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./AccountFa
 /// @notice U:[AF]: Unit tests for account factory
 contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     AccountFactoryV3Harness accountFactory;
-    AddressProviderV3ACLMock addressProvider;
 
     address configurator;
     address creditManager;
@@ -32,12 +29,9 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         configurator = makeAddr("CONFIGURATOR");
         creditManager = makeAddr("CREDIT_MANAGER");
 
-        vm.startPrank(configurator);
-        addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.addCreditManager(creditManager);
-        accountFactory = new AccountFactoryV3Harness(address(addressProvider));
+        accountFactory = new AccountFactoryV3Harness(configurator);
+        vm.prank(configurator);
         accountFactory.addCreditManager(creditManager);
-        vm.stopPrank();
     }
 
     /// @notice U:[AF-1]: External functions have correct access
@@ -52,11 +46,11 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
             accountFactory.returnCreditAccount(address(0));
         }
         if (caller != configurator) {
-            vm.expectRevert(CallerNotConfiguratorException.selector);
+            vm.expectRevert("Ownable: caller is not the owner");
             accountFactory.addCreditManager(address(0));
         }
         if (caller != configurator) {
-            vm.expectRevert(CallerNotConfiguratorException.selector);
+            vm.expectRevert("Ownable: caller is not the owner");
             accountFactory.rescue(address(0), address(0), bytes(""));
         }
         vm.stopPrank();
@@ -131,22 +125,13 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         assertEq(accountFactory.factoryParams(creditManager).tail, uint40(tail) + 1, "Incorrect tail");
     }
 
-    /// @notice U:[AF-4A]: `addCreditManager` reverts on non-registered credit manager
-    function test_U_AF_04A_addCreditManager_reverts_on_non_registered_credit_manager(address manager) public {
-        vm.assume(manager != creditManager);
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
-        vm.prank(configurator);
-        accountFactory.addCreditManager(manager);
-    }
-
-    /// @notice U:[AF-4B]: `addCreditManager` reverts on already added credit manager
-    function test_U_AF_04B_addCreditManager_reverts_on_already_added_credit_manager(
+    /// @notice U:[AF-4A]: `addCreditManager` reverts on already added credit manager
+    function test_U_AF_04A_addCreditManager_reverts_on_already_added_credit_manager(
         address creditAccount,
         address manager
     ) public {
         vm.assume(manager != creditManager && creditAccount != address(0));
 
-        addressProvider.addCreditManager(manager);
         accountFactory.setFactoryParams(manager, creditAccount, 0, 0);
 
         vm.expectRevert(MasterCreditAccountAlreadyDeployedException.selector);
@@ -154,10 +139,9 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         accountFactory.addCreditManager(manager);
     }
 
-    /// @notice U:[AF-4C]: `addCreditManager` works correctly
-    function test_U_AF_04C_addCreditManager_works_correctly(address manager) public {
+    /// @notice U:[AF-4B]: `addCreditManager` works correctly
+    function test_U_AF_04B_addCreditManager_works_correctly(address manager) public {
         vm.assume(manager != creditManager);
-        addressProvider.addCreditManager(manager);
 
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(manager, address(0));
@@ -171,23 +155,8 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         assertEq(CreditAccountV3(account).creditManager(), manager, "Incorrect master account's creditManager");
     }
 
-    /// @notice U:[AF-5A]: `rescue` reverts on non-registered credit manager
-    function test_U_AF_05A_rescue_reverts_on_non_registered_credit_manager(address creditAccount, address manager)
-        public
-    {
-        vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE && manager != creditManager);
-
-        vm.mockCall(
-            creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).creditManager, ()), abi.encode(manager)
-        );
-
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
-        vm.prank(configurator);
-        accountFactory.rescue(creditAccount, address(0), bytes(""));
-    }
-
-    /// @notice U:[AF-5B]: `rescue` reverts when credit account is in use
-    function test_U_AF_05B_rescue_reverts_when_credit_account_is_in_use(address creditAccount, address borrower)
+    /// @notice U:[AF-5A]: `rescue` reverts when credit account is in use
+    function test_U_AF_05A_rescue_reverts_when_credit_account_is_in_use(address creditAccount, address borrower)
         public
     {
         vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE && borrower != address(0));
@@ -208,8 +177,8 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         accountFactory.rescue(creditAccount, address(0), bytes(""));
     }
 
-    /// @notice U:[AF-5C]: `rescue` works correctly
-    function test_U_AF_05C_rescue_works_correctly(address creditAccount, address target, bytes calldata data) public {
+    /// @notice U:[AF-5B]: `rescue` works correctly
+    function test_U_AF_05B_rescue_works_correctly(address creditAccount, address target, bytes calldata data) public {
         vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE);
 
         CreditAccountInfo memory info;
@@ -222,6 +191,9 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
             abi.encode(info)
         );
         vm.mockCall(creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).rescue, (target, data)), bytes(""));
+
+        vm.expectEmit(true, true, true, true);
+        emit Rescue(creditAccount, target, data);
 
         vm.expectCall(creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).rescue, (target, data)));
         vm.prank(configurator);

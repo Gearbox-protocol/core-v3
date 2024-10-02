@@ -8,8 +8,7 @@ import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, RAY, WAD} from "../../../libraries/Constants.sol";
 
 /// @title Credit logic unit test
 /// @notice U:[CL]: Unit tests for `CreditLogic` library
@@ -115,7 +114,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt, uint256 newIndex,, uint128 newQuotaInterest, uint128 newQuotaFees) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -139,7 +138,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt,, uint256 profit,,) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -161,7 +160,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt, uint256 newIndex,,,) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -185,7 +184,7 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) internal {
+    ) internal pure {
         (uint256 newDebt,,, uint128 newQuotaInterest, uint128 newQuotaFees) =
             CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
@@ -218,7 +217,7 @@ contract CreditLogicUnitTest is TestHelper {
     }
 
     /// @notice U:[CL-4]: `calcLiquidationPayments` gives expected outputs
-    function test_U_CL_04_calcLiquidationPayments_case_test() public {
+    function test_U_CL_04_calcLiquidationPayments_case_test() public view {
         /// FEE INTEREST: 50%
         /// NORMAL LIQUIDATION PREMIUM: 4%
         /// NORMAL LIQUIDATION FEE: 1.5%
@@ -391,7 +390,7 @@ contract CreditLogicUnitTest is TestHelper {
     }
 
     /// @notice U:[CL-5]: `getLiquidationThreshold` gives expected outputs
-    function test_U_CL_05_getLiquidationThreshold_case_test() public {
+    function test_U_CL_05_getLiquidationThreshold_case_test() public view {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({
                 name: "LIQUIDATION THRESHOLD RAMP IN THE FUTURE",

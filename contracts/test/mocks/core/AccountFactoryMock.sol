@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
-import {IAccountFactoryBase} from "../../../interfaces/IAccountFactoryV3.sol";
+import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {CreditAccountMock} from "../credit/CreditAccountMock.sol";
 
 // EXCEPTIONS
@@ -12,9 +12,11 @@ import {CreditAccountMock} from "../credit/CreditAccountMock.sol";
 import {Test} from "forge-std/Test.sol";
 
 /// @title Disposable credit accounts factory
-contract AccountFactoryMock is Test, IAccountFactoryBase {
+contract AccountFactoryMock is Test, IAccountFactoryV3 {
     /// @dev Contract version
     uint256 public version;
+
+    bytes32 public constant override contractType = "ACCOUNT_FACTORY_MOCK";
 
     address public usedAccount;
 
@@ -24,8 +26,6 @@ contract AccountFactoryMock is Test, IAccountFactoryBase {
         usedAccount = address(new CreditAccountMock());
 
         version = _version;
-
-        vm.label(usedAccount, "CREDIT_ACCOUNT");
     }
 
     /// @dev Provides a new credit account to a Credit Manager
@@ -37,4 +37,10 @@ contract AccountFactoryMock is Test, IAccountFactoryBase {
     function returnCreditAccount(address creditAccount) external override {
         returnedAccount = creditAccount;
     }
+
+    function delay() external pure override returns (uint40) {}
+
+    function addCreditManager(address) external pure override {}
+
+    function rescue(address, address, bytes calldata) external pure override {}
 }

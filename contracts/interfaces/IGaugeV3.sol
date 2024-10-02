@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-import {IVotingContractV3} from "./IVotingContractV3.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
+import {IRateKeeper} from "./base/IRateKeeper.sol";
+import {IVotingContract} from "./base/IVotingContract.sol";
 
 struct QuotaRateParams {
     uint16 minRate;
@@ -40,16 +40,16 @@ interface IGaugeV3Events {
 }
 
 /// @title Gauge V3 interface
-interface IGaugeV3 is IGaugeV3Events, IVotingContractV3, IVersion {
-    function pool() external view returns (address);
-
-    function voter() external view returns (address);
-
+interface IGaugeV3 is IVotingContract, IRateKeeper, IControlledTrait, IGaugeV3Events {
     function updateEpoch() external;
 
     function epochLastUpdate() external view returns (uint16);
 
-    function getRates(address[] calldata tokens) external view returns (uint16[] memory rates);
+    function getRates(address[] calldata tokens) external view override returns (uint16[] memory);
+
+    function vote(address user, uint96 votes, bytes calldata extraData) external override;
+
+    function unvote(address user, uint96 votes, bytes calldata extraData) external override;
 
     function userTokenVotes(address user, address token)
         external
@@ -68,8 +68,6 @@ interface IGaugeV3 is IGaugeV3Events, IVotingContractV3, IVersion {
     function epochFrozen() external view returns (bool);
 
     function setFrozenEpoch(bool status) external;
-
-    function isTokenAdded(address token) external view returns (bool);
 
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external;
 

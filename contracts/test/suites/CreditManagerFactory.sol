@@ -5,9 +5,13 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 
+import "../interfaces/IAddressProviderV3.sol";
+
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfiguratorV3, CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
+
+import {DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER} from "../../libraries/Constants.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -17,23 +21,24 @@ contract CreditManagerFactory {
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
 
-    constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        creditManager = new CreditManagerV3(_ap, _pool, opts.name);
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            opts.degenNFT,
-            opts.expirable
-        );
+    constructor(
+        address weth,
+        address accountFactory,
+        address priceOracle,
+        address botList,
+        address pool,
+        address degenNFT,
+        bool expirable,
+        uint8 maxEnabledTokens,
+        uint16 feeInterest,
+        string memory name
+    ) {
+        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
 
-        bytes memory configuratorByteCode =
-            abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));
+        creditFacade = new CreditFacadeV3(address(creditManager), botList, weth, degenNFT, expirable);
+        creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = CreditConfiguratorV3(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
-
+        creditConfigurator = new CreditConfiguratorV3(address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
-
-        Create2.deploy(0, salt, configuratorByteCode);
-
-        require(address(creditConfigurator.creditManager()) == address(creditManager), "Incorrect CM");
     }
 }

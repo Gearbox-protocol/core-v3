@@ -3,16 +3,18 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
-    uint256 public constant override version = 3_00;
+contract PoolQuotaKeeperMock {
+    uint256 public constant version = 3_10;
+
+    bytes32 public constant contractType = "POOL_QUOTA_KEEPER_MOCK";
 
     /// @dev Address provider
     address public immutable underlying;
 
     /// @dev Address of the protocol treasury
-    address public immutable override pool;
+    address public immutable pool;
 
     /// @dev Mapping from token address to its respective quota parameters
     TokenQuotaParams public totalQuotaParam;
@@ -98,7 +100,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function getQuotaAndOutstandingInterest(address, address token)
         external
         view
-        override
         returns (uint96 quoted, uint128 interest)
     {
         quoted = _quoted[token];
@@ -106,23 +107,31 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     /// @dev Returns cumulative index in RAY for a quoted token. Returns 0 for non-quoted tokens.
-    function cumulativeIndex(address token) public view override returns (uint192) {
+    function cumulativeIndex(address token) public view returns (uint192) {
         //        return totalQuotaParams[token].cumulativeIndexSince(lastQuotaRateUpdate);
     }
 
     /// @dev Returns quota rate in PERCENTAGE FORMAT
-    function getQuotaRate(address) external view override returns (uint16) {
+    function getQuotaRate(address) external view returns (uint16) {
         return totalQuotaParam.rate;
     }
 
     /// @dev Returns an array of all quoted tokens
-    function quotedTokens() external view override returns (address[] memory) {
+    function quotedTokens() external view returns (address[] memory) {
         //        return quotaTokensSet.values();
     }
 
     /// @dev Returns whether a token is quoted
-    function isQuotedToken(address) external view override returns (bool) {
+    function isQuotedToken(address) external view returns (bool) {
         return return_isQuotedToken;
+    }
+
+    function set_isQuotedToken(bool value) external {
+        return_isQuotedToken = value;
+    }
+
+    function set_lastQuotaRateUpdate(uint40 value) external {
+        lastQuotaRateUpdate = value;
     }
 
     /// @dev Returns quota parameters for a single (account, token) pair
@@ -132,7 +141,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     /// @notice Returns the current annual quota revenue to the pool
-    function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
+    function poolQuotaRevenue() external view virtual returns (uint256 quotaRevenue) {
         return 0;
     }
 

@@ -3,12 +3,13 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {
-    IGearStakingV3, MultiVote, EPOCHS_TO_WITHDRAW, VotingContractStatus
-} from "../../../interfaces/IGearStakingV3.sol";
+import {IGearStakingV3, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
+import {EPOCHS_TO_WITHDRAW} from "../../../libraries/Constants.sol";
 
 contract GearStakingMock is IGearStakingV3 {
-    uint256 public constant version = 3_00;
+    uint256 public constant version = 3_10;
+
+    bytes32 public constant override contractType = "GEAR_STAKING_MOCK";
 
     uint16 public getCurrentEpoch;
 

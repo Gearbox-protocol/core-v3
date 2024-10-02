@@ -13,22 +13,8 @@ import {TestHelper} from "../../lib/helper.sol";
 contract BitMaskUnitTest is TestHelper {
     using BitMask for uint256;
 
-    /// @notice U:[BM-1]: `calcIndex` reverts for zero value
-    function test_U_BM_01_calcIndex_reverts_for_zero_value() public {
-        vm.expectRevert(IncorrectParameterException.selector);
-        uint256(0).calcIndex();
-    }
-
-    /// @notice U:[BM-2]: `calcIndex` works correctly
-    function test_U_BM_02_calcIndex_works_correctly() public {
-        for (uint256 i = 0; i < 256; ++i) {
-            uint256 mask = 1 << i;
-            assertEq(mask.calcIndex(), i, "Incorrect index");
-        }
-    }
-
     /// @notice U:[BM-3]: `calcEnabledTokens` works correctly
-    function test_U_BM_03_calcEnabledTokens_works_correctly(uint8 bitsToEnable, uint256 randomValue) public {
+    function test_U_BM_03_calcEnabledTokens_works_correctly(uint8 bitsToEnable, uint256 randomValue) public pure {
         uint256 bitMask;
 
         for (uint256 i; i < bitsToEnable;) {
@@ -44,7 +30,7 @@ contract BitMaskUnitTest is TestHelper {
     }
 
     /// @notice U:[BM-4]: `enable` & `disable` works correctly
-    function test_U_BM_04_enable_and_disable_works_correctly(uint8 bit) public {
+    function test_U_BM_04_enable_and_disable_works_correctly(uint8 bit) public pure {
         uint256 mask;
         mask = mask.enable(1 << bit);
         assertEq(mask, 1 << bit, "Enable doesn't work");
@@ -54,7 +40,7 @@ contract BitMaskUnitTest is TestHelper {
     }
 
     /// @notice U:[BM-5]: `enableDisable` works correctly
-    function test_U_BM_05_enableDisable_works_correctly(uint8 bit) public {
+    function test_U_BM_05_enableDisable_works_correctly(uint8 bit) public pure {
         uint256 mask;
 
         mask = mask.enableDisable(1 << bit, 0);
@@ -64,36 +50,15 @@ contract BitMaskUnitTest is TestHelper {
         assertEq(mask, 0, "Disable doesn't work");
     }
 
-    /// @notice U:[BM-6]: `enable` & `disable` works correctly
-    function test_U_BM_06_enable_and_disable_works_correctly(uint8 bit) public {
-        uint256 mask;
-        mask = mask.enable(1 << bit, 0);
-        assertEq(mask, 0, "Enable doesn't work");
-
-        mask = mask.enable(1 << bit, 1 << bit);
-        assertEq(mask, 1 << bit, "Enable doesn't work");
-
-        mask = mask.disable(1 << bit, 0);
-        assertEq(mask, 1 << bit, "Disable doesn't work");
-
-        mask = mask.disable(1 << bit, 1 << bit);
-        assertEq(mask, 0, "Disable doesn't work");
-    }
-
-    /// @notice U:[BM-7]: `enableWithSkip` works correctly
-    function test_U_BM_07_enableWithSkip_works_correctly(uint8 bit) public {
-        uint256 mask;
-
-        mask = mask.enableDisable(1 << bit, 0, 0);
-        assertEq(mask, 0, "Enable doesn't work");
-
-        mask = mask.enableDisable(1 << bit, 0, 1 << bit);
-        assertEq(mask, 1 << bit, "Enable doesn't work");
-
-        mask = mask.enableDisable(0, 1 << bit, 0);
-        assertEq(mask, 1 << bit, "Disable doesn't work");
-
-        mask = mask.enableDisable(0, 1 << bit, 1 << bit);
-        assertEq(mask, 0, "Disable doesn't work");
+    /// @notice U:[BM-6]: `lsbMask` works correctly
+    function test_U_BM_06_lsbMask_works_correctly(uint256 mask) public pure {
+        uint256 lsbMask = mask.lsbMask();
+        if (lsbMask == 0) {
+            assertEq(mask, 0, "Zero LSB for non-zero mask");
+            return;
+        }
+        assertEq(lsbMask.calcEnabledTokens(), 1, "LSB mask has more than one enabled bit");
+        assertEq(mask & lsbMask, lsbMask, "LSB is not enabled");
+        assertEq(mask & (lsbMask - 1), 0, "LSB is not least");
     }
 }

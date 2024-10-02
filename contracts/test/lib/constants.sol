@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import {
-    WAD,
-    RAY,
-    DEFAULT_FEE_LIQUIDATION,
-    DEFAULT_LIQUIDATION_PREMIUM
-} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {WAD, RAY, DEFAULT_FEE_LIQUIDATION, DEFAULT_LIQUIDATION_PREMIUM} from "../../libraries/Constants.sol";
 import {Test} from "forge-std/Test.sol";
 
 uint16 constant DEFAULT_UNDERLYING_LT = 10000 - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM;
+uint16 constant DEFAULT_FEE_INTEREST = 50_00;
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
 
 address constant DUMB_ADDRESS = 0xC4375B7De8af5a38a93548eb8453a498222C4fF2;
 address constant DUMB_ADDRESS2 = 0x93548eB8453a498222C4FF2C4375b7De8af5A38a;

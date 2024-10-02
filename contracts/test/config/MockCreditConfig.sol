@@ -9,7 +9,6 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 import "forge-std/console.sol";
-import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 
 import {
     LinearIRMV3DeployParams,
@@ -23,21 +22,19 @@ import {
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
-import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "../../libraries/Constants.sol";
 
 contract MockCreditConfig is Test, IPoolV3DeployConfig {
-    string public id;
-    string public symbol;
-    string public name;
+    string public id = "mock-test-DAI";
+    string public symbol = "dDAIv3";
+    string public name = "Diesel DAI v3";
 
-    uint128 public minDebt;
-    uint128 public maxDebt;
     uint256 public chainId;
-
-    Tokens public underlying;
+    Tokens public underlying = Tokens.DAI;
     bool public constant supportsQuotas = true;
+    uint256 public constant getAccountAmount = DAI_ACCOUNT_AMOUNT;
 
-    PoolV3DeployParams _poolParams;
+    PoolV3DeployParams _poolParams = PoolV3DeployParams({withdrawalFee: 0, totalDebtLimit: type(uint256).max});
 
     LinearIRMV3DeployParams _irm = LinearIRMV3DeployParams({
         U_1: 80_00,
@@ -53,29 +50,31 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
     PoolQuotaLimit[] _quotaLimits;
     CreditManagerV3DeployParams[] _creditManagers;
 
-    constructor(TokensTestSuite tokenTestSuite_, Tokens _underlying) {
+    constructor() {
         NetworkDetector nd = new NetworkDetector();
         chainId = nd.chainId();
 
-        underlying = _underlying;
-        // underlying = tokenTestSuite_.addressOf(_underlying);
-        id = string(abi.encodePacked("mock-test-", tokenTestSuite_.symbols(_underlying)));
-        symbol = string(abi.encodePacked("d", tokenTestSuite_.symbols(_underlying)));
-        name = string(abi.encodePacked("diesel", tokenTestSuite_.symbols(_underlying)));
+        _gaugeRates.push(GaugeRate({token: Tokens.USDC, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.USDT, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.WETH, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.LINK, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.CRV, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.CVX, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: Tokens.STETH, minRate: 1, maxRate: 10_000}));
 
-        uint256 accountAmount = getAccountAmount();
-
-        _poolParams = PoolV3DeployParams({withdrawalFee: 0, totalDebtLimit: type(uint256).max});
-
-        // uint8 decimals = ERC20(tokenTestSuite_.addressOf(_underlying)).decimals();
-
-        minDebt = uint128(accountAmount / 2); //150_000 * (10 ** decimals));
-        maxDebt = uint128(10 * accountAmount);
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDC, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDT, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.WETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.LINK, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CRV, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CVX, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: Tokens.STETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
 
         CreditManagerV3DeployParams storage cp = _creditManagers.push();
 
-        cp.minDebt = minDebt;
-        cp.maxDebt = maxDebt;
+        cp.minDebt = uint128(getAccountAmount / 2);
+        cp.maxDebt = uint128(10 * getAccountAmount);
+        cp.maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
         cp.feeInterest = DEFAULT_FEE_INTEREST;
         cp.feeLiquidation = DEFAULT_FEE_LIQUIDATION;
         cp.liquidationPremium = DEFAULT_LIQUIDATION_PREMIUM;
@@ -85,38 +84,17 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         cp.expirable = false;
         cp.skipInit = false;
         cp.poolLimit = type(uint256).max;
-        cp.name = string.concat("Mock Credit Manager ", tokenTestSuite_.symbols(_underlying));
+        cp.name = "Mock Credit Manager DAI";
 
-        pushCollateralToken(_underlying, cp.collateralTokens);
+        CollateralTokenHuman[] storage cts = cp.collateralTokens;
+        cts.push(CollateralTokenHuman({token: Tokens.USDC, lt: 90_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.USDT, lt: 88_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.WETH, lt: 83_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.LINK, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.CRV, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.CVX, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: Tokens.STETH, lt: 73_00}));
     }
-
-    function pushCollateralToken(Tokens _underlying, CollateralTokenHuman[] storage cth) private {
-        CollateralTokenHuman[8] memory collateralTokenOpts = [
-            CollateralTokenHuman({token: Tokens.USDC, lt: 90_00}),
-            CollateralTokenHuman({token: Tokens.USDT, lt: 88_00}),
-            CollateralTokenHuman({token: Tokens.DAI, lt: 83_00}),
-            CollateralTokenHuman({token: Tokens.WETH, lt: 83_00}),
-            CollateralTokenHuman({token: Tokens.LINK, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.CRV, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.CVX, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.STETH, lt: 73_00})
-        ];
-
-        uint256 len = collateralTokenOpts.length;
-
-        for (uint256 i = 0; i < len; i++) {
-            if (collateralTokenOpts[i].token == _underlying) continue;
-            cth.push(collateralTokenOpts[i]);
-        }
-    }
-
-    function getAccountAmount() public view override returns (uint256) {
-        return (underlying == Tokens.DAI)
-            ? DAI_ACCOUNT_AMOUNT
-            : (underlying == Tokens.USDC) ? USDC_ACCOUNT_AMOUNT : WETH_ACCOUNT_AMOUNT;
-    }
-
-    // GETTERS
 
     function poolParams() external view override returns (PoolV3DeployParams memory) {
         return _poolParams;

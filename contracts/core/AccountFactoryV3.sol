@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
@@ -14,8 +15,6 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
-import {ACLTrait} from "../traits/ACLTrait.sol";
-import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @dev Struct holding factory and queue params for a credit manager
 /// @param masterCreditAccount Address of the contract to clone to create new accounts for the credit manager
@@ -41,9 +40,12 @@ struct QueuedAccount {
 ///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
 ///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
 ///           as protection against potential attacks involving reopening an account right after closing it
-contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
+contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "ACCOUNT_FACTORY";
 
     /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;
@@ -55,8 +57,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
+    /// @param owner_ Contract owner
+    constructor(address owner_) {
+        transferOwnership(owner_);
+    }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.
     ///         If there are no accounts that can be reused in the queue, deploys a new one.
@@ -114,15 +118,14 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     function addCreditManager(address creditManager)
         external
         override
-        configuratorOnly // U:[AF-1]
-        registeredCreditManagerOnly(creditManager) // U:[AF-4A]
+        onlyOwner // U:[AF-1]
     {
         if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
-            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4B]
+            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4A]
         }
-        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4C]
-        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4C]
-        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4C]
+        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4B]
+        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4B]
+        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4B]
     }
 
     /// @notice Executes function call from the account to the target contract with provided data,
@@ -133,18 +136,17 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     /// @param data Data to call the target contract with
     function rescue(address creditAccount, address target, bytes calldata data)
         external
-        configuratorOnly // U:[AF-1]
+        override
+        onlyOwner // U:[AF-1]
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
-        _ensureRegisteredCreditManager(creditManager); // U:[AF-5A]
 
         (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {
-            revert CreditAccountIsInUseException(); // U:[AF-5B]
+            revert CreditAccountIsInUseException(); // U:[AF-5A]
         }
 
-        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5C]
-
-        emit Rescue(creditAccount, target, data);
+        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5B]
+        emit Rescue(creditAccount, target, data); // U:[AF-5B]
     }
 }

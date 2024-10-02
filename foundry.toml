@@ -1,10 +1,10 @@
 [profile.default]
-libs = ['lib']
-out = 'forge-out'
-solc_version = '0.8.17'
-evm_version = 'shanghai'
 src = 'contracts'
-optimizer_runs = 12000
+libs = ['lib']
+out = 'out'
+solc_version = '0.8.17'
+evm_version = 'london'
+optimizer_runs = 1000
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 block_number = 120000 

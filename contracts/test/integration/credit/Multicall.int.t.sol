@@ -3,21 +3,17 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
-import {
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -40,7 +36,8 @@ contract MultiCallIntegrationTest is
     BalanceHelper,
     IntegrationTestHelper,
     ICreditManagerV3Events,
-    ICreditFacadeV3Events
+    ICreditFacadeV3Events,
+    IPoolV3Events
 {
     /// @dev I:[MC-1]: multicall reverts if borrower has no account
     function test_I_MC_01_multicall_reverts_if_credit_account_not_exists() public creditTest {
@@ -83,7 +80,7 @@ contract MultiCallIntegrationTest is
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
-        vm.expectRevert(UnknownMethodException.selector);
+        vm.expectRevert(abi.encodeWithSelector(UnknownMethodException.selector, (bytes4(DUMB_CALLDATA))));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -106,6 +103,7 @@ contract MultiCallIntegrationTest is
 
     /// @dev I:[MC-5]: addCollateral executes function as expected
     function test_I_MC_05_addCollateral_executes_actions_as_expected() public creditTest {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
 
         expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
@@ -123,12 +121,19 @@ contract MultiCallIntegrationTest is
         vm.expectEmit(true, true, false, true);
         emit AddCollateral(creditAccount, usdcToken, 512);
 
-        // TODO: change test
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, 512))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
             })
         );
 
@@ -144,6 +149,7 @@ contract MultiCallIntegrationTest is
         public
         creditTest
     {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
@@ -166,13 +172,18 @@ contract MultiCallIntegrationTest is
 
         vm.expectCall(
             address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
+
+        vm.expectCall(
+            address(creditManager),
             abi.encodeCall(
                 ICreditManagerV3.manageDebt, (creditAccount, 256, usdcMask | 1, ManageDebtAction.INCREASE_DEBT)
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit IncreaseDebt(creditAccount, 256);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Borrow(address(creditManager), creditAccount, 256);
 
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
@@ -194,6 +205,10 @@ contract MultiCallIntegrationTest is
                 }),
                 MultiCall({
                     target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (256))
                 })
             )
@@ -205,6 +220,7 @@ contract MultiCallIntegrationTest is
         public
         creditTest
     {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
@@ -227,13 +243,18 @@ contract MultiCallIntegrationTest is
 
         vm.expectCall(
             address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
+
+        vm.expectCall(
+            address(creditManager),
             abi.encodeCall(
                 ICreditManagerV3.manageDebt, (creditAccount, 256, usdcMask | 1, ManageDebtAction.DECREASE_DEBT)
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit DecreaseDebt(creditAccount, 256);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Repay(address(creditManager), 256, 0, 0);
 
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
@@ -252,6 +273,10 @@ contract MultiCallIntegrationTest is
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -292,7 +317,7 @@ contract MultiCallIntegrationTest is
         // TODO: add enable / disable cases
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
@@ -305,7 +330,7 @@ contract MultiCallIntegrationTest is
         vm.expectEmit(true, false, false, true);
         emit Execute(creditAccount, address(targetMock));
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -323,33 +348,6 @@ contract MultiCallIntegrationTest is
 
         vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
-    }
-
-    //
-    // ENABLE TOKEN
-    //
-
-    /// @dev I:[MC-10]: enable token works as expected
-    function test_I_MC_10_enable_token_is_correct() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, 100);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (usdcToken))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
     /// @dev I:[MC-11]: slippage check works correctly
@@ -394,7 +392,9 @@ contract MultiCallIntegrationTest is
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(BalanceLessThanExpectedException.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(BalanceLessThanExpectedException.selector, (i == 0 ? underlying : tokenLINK))
+            );
 
             creditFacade.multicall(
                 creditAccount,
@@ -407,13 +407,13 @@ contract MultiCallIntegrationTest is
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
-                            )
+                        )
                     })
                 )
             );
@@ -456,65 +456,6 @@ contract MultiCallIntegrationTest is
                 })
             )
         );
-    }
-
-    ///
-    /// ENABLE TOKEN
-    ///
-
-    /// @dev I:[MC-13]: enableToken works as expected
-    function test_I_MC_13_enableToken_works_as_expected() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    }
-
-    /// @dev I:[MC-14]: disableToken works as expected in a multicall
-    function test_I_MC_14_disableToken_works_as_expected_multicall() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
-                })
-            )
-        );
-
-        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.disableToken.selector, token));
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
     }
 
     //

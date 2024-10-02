@@ -3,25 +3,26 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
+import {PhantomTokenMock, PhantomTokenWithdrawerMock} from "../../mocks/token/PhantomTokenMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
-import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
+import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
@@ -32,20 +33,24 @@ import {
     ICreditManagerV3,
     CollateralCalcTask,
     CollateralDebtData,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
+    ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
+import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
+import {BitMask} from "../../../libraries/BitMask.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
-// DATA
-
 // CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {
+    BOT_PERMISSIONS_SET_FLAG,
+    DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+    PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS
+} from "../../../libraries/Constants.sol";
 
 // TESTS
 
@@ -70,11 +75,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
     PriceOracleMock priceOracleMock;
-    PoolMock poolMock;
-
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
+    address treasury;
     bool whitelisted;
 
     bool expirable;
@@ -129,13 +133,15 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
-        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        treasury = makeAddr("TREASURY");
+        poolMock.setTreasury(treasury);
 
         creditManagerMock =
             new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(poolMock)});
@@ -147,7 +153,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _withDegenNFT() internal {
         whitelisted = true;
-        degenNFTMock = new DegenNFTMock();
+        degenNFTMock = new DegenNFTMock("DegenNFT", "DNFT");
     }
 
     function _notExpirable() internal {
@@ -161,19 +167,29 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     function _deploy() internal {
-        poolMock.setVersion(3_00);
-        creditFacade = new CreditFacadeV3Harness(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(
+            address(creditManagerMock),
+            address(botListMock),
+            tokenTestSuite.addressOf(Tokens.WETH),
+            address(degenNFTMock),
+            expirable
+        );
 
         creditManagerMock.setCreditFacade(address(creditFacade));
     }
 
     /// @dev U:[FA-1]: constructor sets correct values
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
-        assertEq(address(creditFacade.creditManager()), address(creditManagerMock), "Incorrect creditManager");
+        assertEq(creditFacade.creditManager(), address(creditManagerMock), "Incorrect creditManager");
+        assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
+        assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
         assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(address(creditManagerMock), address(0), address(0), address(degenNFTMock), expirable);
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause
@@ -192,6 +208,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// @notice We'll check that it works for emergency liquidatior as exceptions in another test
         vm.expectRevert("Pausable: paused");
         creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            token: address(0),
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: DUMB_ADDRESS,
+            priceUpdates: new PriceUpdate[](0)
+        });
 
         vm.expectRevert("Pausable: paused");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -233,13 +259,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            token: address(0),
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: DUMB_ADDRESS,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-5]: Account management functions revert if account does not exist
@@ -252,9 +285,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-6]: all configurator functions revert if called by non-configurator
@@ -266,10 +296,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setBotList(address(1));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setCumulativeLossParams(0, false);
+        creditFacade.setLossLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
@@ -281,9 +308,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-7]: payable functions wraps eth to msg.sender
     function test_U_FA_07_payable_functions_wraps_eth_to_msg_sender() public notExpirableCase {
         vm.deal(USER, 3 ether);
+        creditManagerMock.setManageDebt(1 ether);
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
+        vm.roll(block.number + 1);
 
         address weth = tokenTestSuite.addressOf(Tokens.WETH);
 
@@ -299,7 +328,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, 1 ether))
                 })
-                ),
+            ),
             referralCode: 0
         });
 
@@ -330,35 +359,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 2, 2);
 
-        vm.prank(USER);
-
         vm.expectRevert(ForbiddenInWhitelistedModeException.selector);
+        vm.prank(USER);
         creditFacade.openCreditAccount({onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0});
 
-        degenNFTMock.setRevertOnBurn(true);
-
-        vm.prank(USER);
         vm.expectRevert(InsufficientBalanceException.selector);
+        vm.prank(USER);
         creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 
     /// @dev U:[FA-10]: openCreditAccount wokrs as expected
     function test_U_FA_10_openCreditAccount_works_as_expected() public notExpirableCase {
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(100, 200, 1);
-
-        uint256 debt = 200;
-
-        {
-            uint64 blockNow = 100;
-            creditFacade.setLastBlockBorrowed(blockNow);
-
-            vm.roll(blockNow);
-        }
-
-        uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
-
+        address token = makeAddr("token");
         address expectedCreditAccount = DUMB_ADDRESS;
+
         creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
@@ -369,16 +383,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectEmit(true, true, false, false);
         emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
 
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.manageDebt, (expectedCreditAccount, debt, 0, ManageDebtAction.INCREASE_DEBT)
-            )
-        );
-
-        vm.expectEmit(true, true, false, false);
-        emit IncreaseDebt({creditAccount: expectedCreditAccount, amount: debt});
-
         vm.expectEmit(true, false, false, false);
         emit FinishMultiCall();
 
@@ -386,7 +390,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             address(creditManagerMock),
             abi.encodeCall(
                 ICreditManagerV3.fullCollateralCheck,
-                (expectedCreditAccount, 0, new uint256[](0), PERCENTAGE_FACTOR, false)
+                (expectedCreditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 
@@ -396,14 +400,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 1))
                 })
-                ),
+            ),
             referralCode: REFERRAL_CODE
         });
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
-        assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + debt, "Debt in block was updated incorrectly");
     }
 
     /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
@@ -427,21 +430,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         if (!hasCalls) creditManagerMock.setRevertOnActiveAccount(true);
         if (!hasBotPermissions) botListMock.setRevertOnErase(true);
 
-        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.enabledTokensMaskOf, (creditAccount)));
+        if (hasCalls) {
+            vm.expectCall(
+                address(creditManagerMock), abi.encodeCall(ICreditManagerV3.enabledTokensMaskOf, (creditAccount))
+            );
+        }
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.closeCreditAccount, (creditAccount)));
 
         if (hasCalls) {
-            calls = MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
-            );
+            calls =
+                MultiCallBuilder.build(MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, ())}));
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(
-                address(botListMock),
-                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-            );
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
         }
 
         vm.expectEmit(true, true, true, true);
@@ -460,10 +463,18 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
         creditManagerMock.setBorrower(USER);
 
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        creditManagerMock.addToken(link, 1 << 1);
+
+        priceOracleMock.setPrice(dai, 1e8);
+        priceOracleMock.setPrice(link, 1e8);
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
         CollateralDebtData memory collateralDebtData;
         collateralDebtData.debt = 101;
         collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
+        collateralDebtData.twvUSD = 102;
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
         vm.prank(CONFIGURATOR);
@@ -472,8 +483,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
 
+        vm.expectRevert(CreditAccountNotLiquidatableException.selector);
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+
+        vm.expectRevert(CreditAccountNotLiquidatableException.selector);
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: link,
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
 
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
@@ -481,17 +504,40 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectRevert("Pausable: paused");
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+
+        vm.expectRevert("Pausable: paused");
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: link,
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
     }
 
     /// @dev U:[FA-13]: liquidateCreditAccount reverts if account is not liquidatable
-    function test_U_FA_13_liquidateCreditAccount_reverts_if_account_is_not_liquidatable() public allExpirableCases {
+    function test_U_FA_13_revertIfNotLiquidatable_works_as_expected() public allExpirableCases {
         address creditAccount = DUMB_ADDRESS;
         creditManagerMock.setBorrower(USER);
 
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        creditManagerMock.addToken(link, 1 << 1);
+
+        priceOracleMock.setPrice(dai, 1e8);
+        priceOracleMock.setPrice(link, 1e8);
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
+        if (expirable) {
+            vm.prank(CONFIGURATOR);
+            creditFacade.setExpirationDate(uint40(block.timestamp + 1));
+        }
+
         // no debt
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+        creditFacade.revertIfNotLiquidatable(creditAccount);
 
         // healthy, non-expired
         CollateralDebtData memory collateralDebtData;
@@ -500,18 +546,86 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         collateralDebtData.twvUSD = 101;
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
-        if (expirable) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setExpirationDate(uint40(block.timestamp + 1));
-        }
-
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+        creditFacade.revertIfNotLiquidatable(creditAccount);
+
+        // unhealthy, non-expired
+        collateralDebtData.twvUSD = 100;
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+        (, bool isUnhealthy) = creditFacade.revertIfNotLiquidatable(creditAccount);
+        assertTrue(isUnhealthy, "isUnhealthy is incorrectly false (unhealthy non-expired case)");
+
+        if (!expirable) return;
+
+        // unhealthy, expired
+        vm.prank(CONFIGURATOR);
+        creditFacade.setExpirationDate(uint40(block.timestamp - 1));
+
+        (, isUnhealthy) = creditFacade.revertIfNotLiquidatable(creditAccount);
+        assertTrue(isUnhealthy, "isUnhealthy is incorrectly false (unhealthy expired case)");
+
+        // healthy, expired
+        collateralDebtData.twvUSD = 101;
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+        (, isUnhealthy) = creditFacade.revertIfNotLiquidatable(creditAccount);
+        assertFalse(isUnhealthy, "isUnhealthy is incorrectly true (healthy expired case)");
     }
 
-    /// @dev U:[FA-14]: liquidateCreditAccount reverts if non-underlying balance increases in multicall
-    function test_U_FA_14_liquidateCreditAccount_reverts_if_non_underlying_balance_increases_in_multicall()
+    /// @dev U:[FA-14]: liquidateCreditAccount works as expected
+    function test_U_FA_14_liquidateCreditAccount_works_as_expected() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        creditManagerMock.setBorrower(USER);
+
+        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        creditManagerMock.addToken(usdc, 2);
+        creditManagerMock.addToken(weth, 4);
+        creditManagerMock.addToken(link, 8);
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = 101;
+        collateralDebtData.totalDebtUSD = 101;
+        collateralDebtData.twvUSD = 100;
+        collateralDebtData.enabledTokensMask = 2 | 4;
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+        creditManagerMock.setLiquidateCreditAccountReturns(123, 0);
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_COLLATERAL))
+        );
+
+        CollateralDebtData memory collateralDebtDataAfter = collateralDebtData;
+        collateralDebtDataAfter.enabledTokensMask = 1 | 2 | 4;
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.liquidateCreditAccount, (creditAccount, collateralDebtDataAfter, FRIEND, false)
+            )
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
+
+        vm.prank(LIQUIDATOR);
+        uint256 loss = creditFacade.liquidateCreditAccount({
+            creditAccount: creditAccount,
+            to: FRIEND,
+            calls: MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (link, 2))),
+                MultiCall(
+                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (usdc, 2, FRIEND))
+                )
+            )
+        });
+        assertEq(loss, 0, "Non-zero loss");
+    }
+
+    /// @dev U:[FA-14A]: liquidateCreditAccount reverts if non-underlying balance increases in multicall
+    function test_U_FA_14A_liquidateCreditAccount_reverts_if_non_underlying_balance_increases_in_multicall()
         public
         notExpirableCase
     {
@@ -538,116 +652,279 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK | linkMask;
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
-        for (uint256 i; i < 2; ++i) {
-            bool addNonUnderlying = i == 1;
-            if (addNonUnderlying) vm.expectRevert(RemainingTokenBalanceIncreasedException.selector);
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({
-                creditAccount: creditAccount,
-                to: FRIEND,
-                calls: MultiCallBuilder.build(
-                    MultiCall(
-                        address(adapter),
-                        abi.encodeCall(
-                            AdapterCallMock.makeCall,
-                            (addNonUnderlying ? link : dai, abi.encodeCall(ERC20Mock.mint, (creditAccount, 10)))
-                        )
-                    )
-                    )
-            });
-        }
-    }
-
-    /// @dev U:[FA-15]: liquidateCreditAccount correctly determines liquidation type
-    function test_U_FA_15_liquidateCreditAccount_correctly_determines_liquidation_type() public allExpirableCases {
-        address creditAccount = DUMB_ADDRESS;
-        creditManagerMock.setBorrower(USER);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.debt = 101;
-        collateralDebtData.totalDebtUSD = 101;
-
-        // unhealthy, non-expired
-        collateralDebtData.twvUSD = 100;
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-        assertFalse(creditManagerMock.liquidateIsExpired(), "isExpired on unhealthy non-expired liquidation");
-
-        if (expirable) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setExpirationDate(uint40(block.timestamp - 1));
-
-            // healthy, expired
-            collateralDebtData.twvUSD = 101;
-            creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-            assertTrue(creditManagerMock.liquidateIsExpired(), "isExpired on healthy expired liquidation");
-
-            // unhealthy, expired
-            collateralDebtData.twvUSD = 100;
-            creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-            assertFalse(creditManagerMock.liquidateIsExpired(), "isExpired on unhealthy expired liquidation");
-        }
-    }
-
-    /// @dev U:[FA-16]: liquidateCreditAccount works as expected
-    function test_U_FA_16_liquidateCreditAccount_works_as_expected() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-        creditManagerMock.setBorrower(USER);
-
-        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        creditManagerMock.addToken(usdc, 2);
-        creditManagerMock.addToken(weth, 4);
-        creditManagerMock.addToken(link, 8);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.debt = 101;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
-        collateralDebtData.enabledTokensMask = 2 | 4;
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-        creditManagerMock.setAddCollateral(8);
-        creditManagerMock.setWithdrawCollateral(4);
-        creditManagerMock.setLiquidateCreditAccountReturns(123, 0);
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_COLLATERAL))
-        );
-
-        CollateralDebtData memory collateralDebtDataAfter = collateralDebtData;
-        collateralDebtDataAfter.enabledTokensMask = 1 | 2;
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.liquidateCreditAccount, (creditAccount, collateralDebtDataAfter, FRIEND, false)
-            )
-        );
-
-        vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
+        vm.expectRevert(abi.encodeWithSelector(RemainingTokenBalanceIncreasedException.selector, (link)));
 
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({
             creditAccount: creditAccount,
             to: FRIEND,
             calls: MultiCallBuilder.build(
-                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (link, 2))),
                 MultiCall(
-                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (usdc, 2, FRIEND))
+                    address(adapter),
+                    abi.encodeCall(AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 10))))
                 )
-                )
+            )
         });
+    }
+
+    /// @dev U:[FA-15]: `_calcPartialLiquidationPayments` works as expected
+    function test_U_FA_15_calcPartialLiquidationPayments_works_as_expected() public notExpirableCase {
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        priceOracleMock.setPrice(dai, 1e8);
+        priceOracleMock.setPrice(link, 10e8);
+
+        (
+            ,
+            uint256 liquidationFee,
+            uint256 liquidationDiscount,
+            uint256 expiredLiquidationFee,
+            uint256 expiredLiquidationDiscount
+        ) = creditManagerMock.fees();
+        assertEq(liquidationDiscount, 96_00, "[setup]: Incorrect liquidation discount");
+        assertEq(liquidationFee, 1_50, "[setup]: Incorrect liquidation fee");
+        assertEq(expiredLiquidationDiscount, 98_00, "[setup]: Incorrect expired liquidation discount");
+        assertEq(expiredLiquidationFee, 1_00, "[setup]: Incorrect expired liquidation fee");
+
+        (uint256 repaidAmount, uint256 feeAmount, uint256 seizedAmount) = creditFacade.calcPartialLiquidationPayments({
+            amount: 1000e18,
+            token: link,
+            priceOracle: address(priceOracleMock),
+            isExpired: false
+        });
+
+        assertEq(repaidAmount, 985e18, "Incorrect repaidAmount (non-expired case)");
+        assertEq(feeAmount, 15e18, "Incorrect feeAmount (non-expired case)");
+        assertEq(
+            seizedAmount,
+            104166666666666666666, // 1000e18 / 10 * 100_00 / 96_00
+            "Incorrect seizedAmount (non-expired case)"
+        );
+
+        (repaidAmount, feeAmount, seizedAmount) = creditFacade.calcPartialLiquidationPayments({
+            amount: 1000e18,
+            token: link,
+            priceOracle: address(priceOracleMock),
+            isExpired: true
+        });
+
+        assertEq(repaidAmount, 990e18, "Incorrect repaidAmount (expired case)");
+        assertEq(feeAmount, 10e18, "Incorrect feeAmount (expired case)");
+        assertEq(
+            seizedAmount,
+            102040816326530612244, // 1000e18 / 10 * 100_00 / 98_00
+            "Incorrect seizedAmount (expired case)"
+        );
+    }
+
+    /// @dev U:[FA-16]: `partiallyLiquidateCreditAccount` works as expected
+    function test_U_FA_16_partiallyLiquidateCreditAccount_works_as_expected() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        creditManagerMock.setBorrower(USER);
+
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+
+        creditManagerMock.addToken(link, 2);
+
+        creditManagerMock.activateTransfers();
+        tokenTestSuite.mint(dai, LIQUIDATOR, 2000);
+        tokenTestSuite.mint(link, creditAccount, 200);
+        tokenTestSuite.approve(dai, LIQUIDATOR, address(creditManagerMock), type(uint256).max);
+        tokenTestSuite.approve(dai, creditAccount, address(creditManagerMock), type(uint256).max);
+        tokenTestSuite.approve(link, creditAccount, address(creditManagerMock), type(uint256).max);
+
+        priceOracleMock.setPrice(dai, 1e8);
+        priceOracleMock.setPrice(link, 10e8);
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = 101;
+        collateralDebtData.totalDebtUSD = 101;
+        collateralDebtData.twvUSD = 100;
+        collateralDebtData.enabledTokensMask = 1 | 2;
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+        vm.expectRevert(UnderlyingIsNotLiquidatableException.selector);
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: dai,
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(SeizedLessThanRequiredException.selector, 104));
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: link,
+            repaidAmount: 1000,
+            minSeizedAmount: 110,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.manageDebt, (creditAccount, 985, 1 | 2, ManageDebtAction.DECREASE_DEBT))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1 | 2, new uint256[](0), PERCENTAGE_FACTOR, false)
+            )
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit AddCollateral(creditAccount, dai, 1000);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawCollateral(creditAccount, dai, 15, treasury);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawCollateral(creditAccount, link, 104, FRIEND);
+
+        vm.expectEmit(true, true, true, true);
+        emit PartiallyLiquidateCreditAccount(creditAccount, link, LIQUIDATOR, 985, 104, 15);
+
+        vm.prank(LIQUIDATOR);
+        uint256 seizedAmount = creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: link,
+            repaidAmount: 1000,
+            minSeizedAmount: 100,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        assertEq(seizedAmount, 104, "Incorrect seizedAmount");
+    }
+
+    /// @dev U:[FA-16A]: `partiallyLiquidateCreditAccount` works as expected when liquidated token is phantom
+    function testU_FA_16A_partiallyLiqudiateCreditAccount_works_as_expected_with_phantom_token()
+        public
+        notExpirableCase
+    {
+        address creditAccount = DUMB_ADDRESS;
+        creditManagerMock.setBorrower(USER);
+
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        creditManagerMock.addToken(link, 2);
+
+        GeneralMock pDaiTarget = new GeneralMock();
+        PhantomTokenMock pDai = new PhantomTokenMock(address(pDaiTarget), dai, "Phantom DAI", "pDAI");
+        PhantomTokenWithdrawerMock pDaiWithdrawer =
+            new PhantomTokenWithdrawerMock(address(creditManagerMock), address(pDai));
+        creditManagerMock.addToken(address(pDai), 4);
+        creditManagerMock.setContractAllowance(address(pDaiWithdrawer), address(pDaiTarget));
+
+        GeneralMock pLinkTarget = new GeneralMock();
+        PhantomTokenMock pLink = new PhantomTokenMock(address(pLinkTarget), link, "Phantom LINK", "pLINK");
+        pLink.setExchangeRate(0.5e18);
+        PhantomTokenWithdrawerMock pLinkWithdrawer =
+            new PhantomTokenWithdrawerMock(address(creditManagerMock), address(pLink));
+        creditManagerMock.addToken(address(pLink), 8);
+        creditManagerMock.setContractAllowance(address(pLinkWithdrawer), address(pLinkTarget));
+
+        creditManagerMock.activateTransfers();
+        tokenTestSuite.mint(dai, LIQUIDATOR, 2000);
+        ERC20Mock(dai).set_minter(address(pDaiWithdrawer));
+        ERC20Mock(link).set_minter(address(pLinkWithdrawer));
+        pLink.mint(creditAccount, 200);
+        tokenTestSuite.approve(dai, LIQUIDATOR, address(creditManagerMock), type(uint256).max);
+        tokenTestSuite.approve(dai, creditAccount, address(creditManagerMock), type(uint256).max);
+        tokenTestSuite.approve(link, creditAccount, address(creditManagerMock), type(uint256).max);
+
+        priceOracleMock.setPrice(dai, 1e8);
+        priceOracleMock.setPrice(link, 10e8);
+        priceOracleMock.setPrice(address(pDai), 1e8);
+        priceOracleMock.setPrice(address(pLink), 10e8);
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = 101;
+        collateralDebtData.totalDebtUSD = 101;
+        collateralDebtData.twvUSD = 100;
+        collateralDebtData.enabledTokensMask = 1 | 2 | 4 | 8;
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+        vm.expectRevert(UnderlyingIsNotLiquidatableException.selector);
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: address(pDai),
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(SeizedLessThanRequiredException.selector, 52));
+        vm.prank(LIQUIDATOR);
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: address(pLink),
+            repaidAmount: 1000,
+            minSeizedAmount: 55,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        vm.expectCall(
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.manageDebt, (creditAccount, 985, 1 | 2 | 4 | 8, ManageDebtAction.DECREASE_DEBT)
+            )
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (INACTIVE_CREDIT_ACCOUNT_ADDRESS))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck,
+                (creditAccount, 1 | 2 | 4 | 8, new uint256[](0), PERCENTAGE_FACTOR, false)
+            )
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit AddCollateral(creditAccount, dai, 1000);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawPhantomToken(creditAccount, address(pLink), 104);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawCollateral(creditAccount, dai, 15, treasury);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawCollateral(creditAccount, link, 52, FRIEND);
+
+        vm.expectEmit(true, true, true, true);
+        emit PartiallyLiquidateCreditAccount(creditAccount, link, LIQUIDATOR, 985, 52, 15);
+
+        vm.prank(LIQUIDATOR);
+        uint256 seizedAmount = creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: creditAccount,
+            token: address(pLink),
+            repaidAmount: 1000,
+            minSeizedAmount: 50,
+            to: FRIEND,
+            priceUpdates: new PriceUpdate[](0)
+        });
+
+        assertEq(seizedAmount, 52, "Incorrect seizedAmount");
     }
 
     /// @dev U:[FA-17]: liquidateCreditAccount correctly handles loss
@@ -663,38 +940,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setLiquidateCreditAccountReturns(0, 100);
 
-        vm.startPrank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 10);
-        creditFacade.setCumulativeLossParams(150, true);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
-        vm.stopPrank();
-
-        // first liquidation with loss
-        vm.prank(LIQUIDATOR);
+        // only the loss liquidator can call
+        vm.expectRevert(CallerNotLossLiquidatorException.selector);
+        vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (uint128 cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 100, "Incorrect cumulative loss after first liquidation");
-        assertFalse(creditFacade.paused(), "Paused too early");
+        vm.etch(LIQUIDATOR, "CODE");
+        vm.prank(CONFIGURATOR);
+        creditFacade.setLossLiquidator(LIQUIDATOR);
 
-        // liquidation with loss that breaks cumulative loss limit
+        // loss forbids borrowing
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 200, "Incorrect cumulative loss after second liquidation");
-        assertTrue(creditFacade.paused(), "Not paused after breaking cumulative loss limit");
-
-        // emergency liquidation with loss after cumulative loss limit is already broken
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden after liquidation with loss");
-        (cumulativeLoss,) = creditFacade.lossParams();
-        assertEq(cumulativeLoss, 300, "Incorrect cumulative loss after third liquidation");
-        assertTrue(creditFacade.paused(), "Not paused after breaking cumulative loss limit");
+        uint256 loss =
+            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
+        assertEq(loss, 100, "Incorrect loss");
+        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");
     }
 
     //
@@ -711,15 +971,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
         MultiCall[] memory calls;
 
-        uint256 enabledTokensMaskBefore = 123123123;
+        uint256 enabledTokensMask = 123123123;
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
-        creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
+        creditManagerMock.setEnabledTokensMask(enabledTokensMask);
         creditManagerMock.setBorrower(USER);
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
-
-        uint256 enabledTokensMaskAfter = enabledTokensMaskBefore;
 
         for (uint256 testCase = 0; testCase < 2; ++testCase) {
             bool botMulticallCase = testCase == 1;
@@ -728,7 +986,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 address(creditManagerMock),
                 abi.encodeCall(
                     ICreditManagerV3.fullCollateralCheck,
-                    (creditAccount, enabledTokensMaskAfter, new uint256[](0), PERCENTAGE_FACTOR, false)
+                    (creditAccount, enabledTokensMask, new uint256[](0), PERCENTAGE_FACTOR, false)
                 )
             );
 
@@ -755,31 +1013,27 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(creditAccount, calls);
 
-        botListMock.setBotStatusReturns(0, false, false);
+        botListMock.setBotStatusReturns(0, false);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(creditAccount, calls);
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
-        vm.expectRevert(NotApprovedBotException.selector);
-        creditFacade.botMulticall(creditAccount, calls);
-
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, true);
-
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(creditAccount, calls);
     }
 
     struct MultiCallPermissionTestCase {
         bytes callData;
-        uint256 permissionRquired;
+        uint192 permissionRequired;
     }
 
     /// @dev U:[FA-21]: multicall reverts if called without particaular permission
@@ -792,82 +1046,113 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
 
-        creditManagerMock.setManageDebt(2, 0, 0);
+        creditManagerMock.setManageDebt(2);
 
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
-        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
+        address priceFeed = address(new UpdatablePriceFeedMock());
 
-        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
+        priceOracleMock.addPriceFeed(token, priceFeed);
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[9] memory cases = [
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token)),
-                permissionRquired: ENABLE_TOKEN_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token)),
-                permissionRquired: DISABLE_TOKEN_PERMISSION
-            }),
+        MultiCallPermissionTestCase[7] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0)),
-                permissionRquired: ADD_COLLATERAL_PERMISSION
+                permissionRequired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateralWithPermit, (token, 0, 0, 0, bytes32(0), bytes32(0))
-                    ),
-                permissionRquired: ADD_COLLATERAL_PERMISSION
+                ),
+                permissionRequired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1)),
-                permissionRquired: INCREASE_DEBT_PERMISSION
+                permissionRequired: INCREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (0)),
-                permissionRquired: DECREASE_DEBT_PERMISSION
+                permissionRequired: DECREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (token, 0, 0)),
-                permissionRquired: UPDATE_QUOTA_PERMISSION
+                permissionRequired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (token, 0, USER)),
-                permissionRquired: WITHDRAW_COLLATERAL_PERMISSION
+                permissionRequired: WITHDRAW_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
-                permissionRquired: REVOKE_ALLOWANCES_PERMISSION
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (address(0), 0)),
+                permissionRequired: SET_BOT_PERMISSIONS_PERMISSION
             })
         ];
 
         uint256 len = cases.length;
         for (uint256 i = 0; i < len; ++i) {
-            vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
+            vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRequired));
 
             creditFacade.multicallInt({
                 creditAccount: creditAccount,
                 calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[i].callData})),
                 enabledTokensMask: 0,
-                flags: type(uint256).max.disable(cases[i].permissionRquired)
+                flags: ALL_PERMISSIONS & ~cases[i].permissionRequired
             });
         }
 
-        uint256 flags = type(uint256).max.disable(EXTERNAL_CALLS_PERMISSION);
-
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, EXTERNAL_CALLS_PERMISSION));
         creditFacade.multicallInt(
-            creditAccount, MultiCallBuilder.build(MultiCall({target: DUMB_ADDRESS4, callData: bytes("")})), 0, flags
+            creditAccount,
+            MultiCallBuilder.build(MultiCall({target: DUMB_ADDRESS4, callData: bytes("")})),
+            0,
+            ALL_PERMISSIONS & ~EXTERNAL_CALLS_PERMISSION
         );
     }
 
-    /// @dev U:[FA-22]: multicall reverts if called without particaular permission
-    function test_U_FA_22_multicall_reverts_if_called_without_particaular_permission() public notExpirableCase {
+    /// @dev U:[FA-22]: multicall reverts if unexpected method is called
+    function test_U_FA_22_multicall_reverts_if_unexpected_method_is_called() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        vm.expectRevert(UnknownMethodException.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                UnknownMethodException.selector, (ICreditFacadeV3Multicall.setFullCheckParams.selector)
+            )
+        );
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), 0))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: SKIP_COLLATERAL_CHECK_FLAG
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                UnknownMethodException.selector, (ICreditFacadeV3Multicall.onDemandPriceUpdates.selector)
+            )
+        );
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR))
+                ),
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdates, (new PriceUpdate[](0)))
+                )
+            ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(UnknownMethodException.selector, (bytes4(bytes("123")))));
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: bytes("123")})),
@@ -911,7 +1196,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             if (testCase == 1) {
-                vm.expectRevert(BalanceLessThanExpectedException.selector);
+                vm.expectRevert(abi.encodeWithSelector(BalanceLessThanExpectedException.selector, (link)));
             }
 
             if (testCase == 2) {
@@ -924,7 +1209,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -967,7 +1252,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -978,7 +1263,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     })
                 );
-                vm.expectRevert(BalanceLessThanExpectedException.selector);
+                vm.expectRevert(abi.encodeWithSelector(BalanceLessThanExpectedException.selector, (link)));
             }
 
             creditFacade.multicallInt({
@@ -990,7 +1275,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
     }
 
-    /// @dev U:[FA-24]: multicall setFullCheckParams works properly
+    /// @dev U:[FA-24]: multicall `setFullCheckParams` works properly
     function test_U_FA_24_multicall_setFullCheckParams_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
@@ -1004,32 +1289,30 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(
-                        ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR - 1)
-                        )
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
 
         minHealthFactor = PERCENTAGE_FACTOR;
         collateralHints = new uint256[](1);
-        vm.expectRevert(InvalidCollateralHintException.selector);
+        vm.expectRevert(abi.encodeWithSelector(InvalidCollateralHintException.selector, (0)));
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
 
         collateralHints[0] = 3;
-        vm.expectRevert(InvalidCollateralHintException.selector);
+        vm.expectRevert(abi.encodeWithSelector(InvalidCollateralHintException.selector, (3)));
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
@@ -1037,7 +1320,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1047,102 +1330,84 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         collateralHints[1] = 32;
         minHealthFactor = 12_320;
 
-        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, collateralHints, minHealthFactor, false)
+            )
+        );
+        creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
-
-        assertEq(fullCheckParams.minHealthFactor, minHealthFactor, "Incorrect minHealthFactor");
-        assertEq(fullCheckParams.collateralHints, collateralHints, "Incorrect collateralHints");
     }
 
-    /// @dev U:[FA-25]: multicall onDemandPriceUpdate works properly
-    function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
-        bytes memory cd = bytes("Hellew");
-
-        address token = tokenTestSuite.addressOf(Tokens.LINK);
-
+    /// @dev U:[FA-25]: multicall `onDemandPriceUpdates` works properly
+    function test_U_FA_25_multicall_onDemandPriceUpdates_works_properly() public notExpirableCase {
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
-        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
+        PriceUpdate[] memory updates = new PriceUpdate[](2);
+        updates[0] = PriceUpdate(makeAddr("token0"), "data0");
+        updates[1] = PriceUpdate(makeAddr("token1"), "data1");
 
-        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, false, cd))
-            })
-        );
-
-        // vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
-        vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
-        creditFacade.applyPriceOnDemandInt({calls: calls});
-
-        /// @notice it reverts for zero value
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (DUMB_ADDRESS, false, cd))
-            })
-        );
-
-        vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        creditFacade.applyPriceOnDemandInt({calls: calls});
+        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleV3.updatePrices, (updates)));
+        creditFacade.multicallInt({
+            creditAccount: DUMB_ADDRESS,
+            calls: MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdates, (updates)))
+            ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
     }
 
-    /// @dev U:[FA-26]: multicall addCollateral works properly
-    function test_U_FA_26_multicall_addCollateral_works_properly() public notExpirableCase {
+    /// @dev U:[FA-26A]: multicall addCollateral works properly
+    function test_U_FA_26A_multicall_addCollateral_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address token = tokenTestSuite.addressOf(Tokens.LINK);
         uint256 amount = 12333345;
-        uint256 mask = 1 << 5;
 
-        creditManagerMock.setAddCollateral(mask);
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0))
+                })
+            ),
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: ADD_COLLATERAL_PERMISSION
+        });
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, amount))
-            })
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.addCollateral, (address(this), creditAccount, token, amount))
         );
 
-        string memory caseNameBak = caseName;
+        vm.expectEmit(true, true, true, true);
+        emit AddCollateral(creditAccount, token, amount);
 
-        for (uint256 testCase = 0; testCase < 2; ++testCase) {
-            caseName = string.concat(caseNameBak, testCase == 0 ? "not in quoted mask" : "in quoted mask");
-
-            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
-
-            vm.expectCall(
-                address(creditManagerMock),
-                abi.encodeCall(ICreditManagerV3.addCollateral, (address(this), creditAccount, token, amount))
-            );
-
-            vm.expectEmit(true, true, true, true);
-            emit AddCollateral(creditAccount, token, amount);
-
-            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: calls,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: ADD_COLLATERAL_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
-                _testCaseErr("Incorrect enabledTokenMask")
-            );
-        }
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, amount))
+                })
+            ),
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: ADD_COLLATERAL_PERMISSION
+        });
     }
 
     /// @dev U:[FA-26B]: multicall addCollateralWithPermit works properly
@@ -1153,53 +1418,56 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         ERC20PermitMock token = new ERC20PermitMock("Test Token", "TEST", 18);
         uint256 amount = 12333345;
-        uint256 mask = 1 << 5;
         uint256 deadline = block.timestamp + 1;
 
-        creditManagerMock.setAddCollateral(mask);
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(key, token.getPermitHash(user, address(creditManagerMock), 0, deadline));
 
-        for (uint256 testCase = 0; testCase < 2; ++testCase) {
-            (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(key, token.getPermitHash(user, address(creditManagerMock), amount, deadline));
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        vm.prank(user);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.addCollateralWithPermit, (address(token), 0, deadline, v, r, s)
+                    )
+                })
+            ),
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: ADD_COLLATERAL_PERMISSION
+        });
 
-            MultiCall[] memory calls = MultiCallBuilder.build(
+        (v, r, s) = vm.sign(key, token.getPermitHash(user, address(creditManagerMock), amount, deadline));
+
+        vm.expectCall(
+            address(token),
+            abi.encodeCall(IERC20Permit.permit, (user, address(creditManagerMock), amount, deadline, v, r, s))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.addCollateral, (user, creditAccount, address(token), amount))
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit AddCollateral(creditAccount, address(token), amount);
+
+        vm.prank(user);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.addCollateralWithPermit, (address(token), amount, deadline, v, r, s)
-                        )
+                    )
                 })
-            );
-
-            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
-
-            vm.expectCall(
-                address(token),
-                abi.encodeCall(IERC20Permit.permit, (user, address(creditManagerMock), amount, deadline, v, r, s))
-            );
-
-            vm.expectCall(
-                address(creditManagerMock),
-                abi.encodeCall(ICreditManagerV3.addCollateral, (user, creditAccount, address(token), amount))
-            );
-
-            vm.expectEmit(true, true, true, true);
-            emit AddCollateral(creditAccount, address(token), amount);
-
-            vm.prank(user);
-            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: calls,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: ADD_COLLATERAL_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
-                _testCaseErr("Incorrect enabledTokenMask")
-            );
-        }
+            ),
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: ADD_COLLATERAL_PERMISSION
+        });
     }
 
     /// @dev U:[FA-27]: multicall increaseDebt works properly
@@ -1213,44 +1481,43 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
 
-        {
-            uint64 blockNow = 100;
-            creditFacade.setLastBlockBorrowed(blockNow);
-
-            vm.roll(blockNow);
-        }
+        creditFacade.setLastBlockBorrowed(uint64(block.number + 100));
+        creditFacade.setTotalBorrowedInBlock(40);
+        vm.roll(block.number + 100);
 
         uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
 
-        creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
+        creditManagerMock.setManageDebt(50);
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
-            })
-        );
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (0))
+                })
+            ),
+            enabledTokensMask: mask,
+            flags: INCREASE_DEBT_PERMISSION
+        });
 
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.manageDebt, (creditAccount, amount, mask, ManageDebtAction.INCREASE_DEBT))
         );
 
-        vm.expectEmit(true, true, false, false);
-        emit IncreaseDebt(creditAccount, amount);
-
-        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+        creditFacade.multicallInt({
             creditAccount: creditAccount,
-            calls: calls,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
+                })
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
-
-        assertEq(
-            fullCheckParams.enabledTokensMaskAfter,
-            mask | UNDERLYING_TOKEN_MASK,
-            _testCaseErr("Incorrect enabledTokenMask")
-        );
 
         assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + amount, "Debt in block was updated incorrectly");
     }
@@ -1265,8 +1532,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, maxDebt, 1);
+        vm.roll(block.number + 1);
 
-        creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
+        creditManagerMock.setManageDebt(50);
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
         creditFacade.multicallInt({
@@ -1276,16 +1544,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (maxDebt + 1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
 
-        creditManagerMock.setManageDebt({
-            newDebt: maxDebt + 1,
-            tokensToEnable: UNDERLYING_TOKEN_MASK,
-            tokensToDisable: 0
-        });
+        creditManagerMock.setManageDebt(maxDebt + 1);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         creditFacade.multicallInt({
@@ -1295,61 +1559,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
     }
-
-    /// @dev U:[FA-30]: multicall increaseDebt / withdrawCollateral set revertOnForbiddenTokens flag
-    function test_U_FA_30_multicall_increaseDebt_and_withdrawCollateral_set_revertOnForbiddenTokens()
-        public
-        notExpirableCase
-    {
-        address creditAccount = DUMB_ADDRESS;
-
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 linkMask = 1 << 8;
-        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
-
-        creditManagerMock.addToken(link, linkMask);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 1);
-
-        creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
-
-        FullCheckParams memory params = creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
-                })
-                ),
-            enabledTokensMask: linkMask,
-            flags: INCREASE_DEBT_PERMISSION
-        });
-        assertTrue(params.revertOnForbiddenTokens, "revertOnForbiddenTokens is false after increaseDebt");
-
-        params = creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1000, USER))
-                })
-                ),
-            enabledTokensMask: linkMask,
-            flags: WITHDRAW_COLLATERAL_PERMISSION
-        });
-        assertTrue(params.revertOnForbiddenTokens, "revertOnForbiddenTokens is false after withdrawCollateral");
-    }
-
-    ///
 
     /// @dev U:[FA-31]: multicall decreaseDebt works properly
     function test_U_FA_31_multicall_decreaseDebt_works_properly() public notExpirableCase {
@@ -1362,33 +1576,37 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
 
-        creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: 0, tokensToDisable: UNDERLYING_TOKEN_MASK});
+        creditManagerMock.setManageDebt(50);
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (0))
+                })
+            ),
+            enabledTokensMask: mask,
+            flags: DECREASE_DEBT_PERMISSION
+        });
 
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.manageDebt, (creditAccount, amount, mask, ManageDebtAction.DECREASE_DEBT))
         );
 
-        vm.expectEmit(true, true, false, false);
-        emit DecreaseDebt(creditAccount, amount);
-
-        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+        creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
-
-        assertEq(
-            fullCheckParams.enabledTokensMaskAfter,
-            mask & (~UNDERLYING_TOKEN_MASK),
-            _testCaseErr("Incorrect enabledTokenMask")
-        );
     }
 
     /// @dev U:[FA-32]: multicall decreaseDebt reverts if out of debt
@@ -1402,11 +1620,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(minDebt, minDebt + 100, 1);
 
-        creditManagerMock.setManageDebt({
-            newDebt: minDebt - 1,
-            tokensToEnable: 0,
-            tokensToDisable: UNDERLYING_TOKEN_MASK
-        });
+        creditManagerMock.setManageDebt(minDebt - 1);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         creditFacade.multicallInt({
@@ -1416,14 +1630,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
     }
 
-    /// @dev U:[FA-33A]: multicall decreaseDebt allows zero debt
-    function test_U_FA_33A_multicall_decreaseDebt_allows_zero_debt() public notExpirableCase {
+    /// @dev U:[FA-33]: multicall decreaseDebt allows zero debt
+    function test_U_FA_33_multicall_decreaseDebt_allows_zero_debt() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         uint128 minDebt = 100;
@@ -1433,7 +1647,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(minDebt, minDebt + 100, 1);
 
-        creditManagerMock.setManageDebt({newDebt: 0, tokensToEnable: 0, tokensToDisable: UNDERLYING_TOKEN_MASK});
+        creditManagerMock.setManageDebt(0);
 
         creditFacade.multicallInt({
             creditAccount: creditAccount,
@@ -1442,69 +1656,29 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
     }
 
-    /// @dev U:[FA-33]: multicall enableToken works properly
-    function test_U_FA_33_multicall_enableToken_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 mask = 1 << 5;
-
-        creditManagerMock.addToken(link, mask);
-
-        string memory caseNameBak = caseName;
-
-        for (uint256 testCase = 0; testCase < 2; ++testCase) {
-            caseName = string.concat(caseNameBak, testCase == 0 ? "not in quoted mask" : "in quoted mask");
-
-            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
-
-            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: MultiCallBuilder.build(
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
-                    })
-                    ),
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: ENABLE_TOKEN_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
-                _testCaseErr("Incorrect enabledTokenMask for enableToken")
-            );
-
-            fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: MultiCallBuilder.build(
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (link))
-                    })
-                    ),
-                enabledTokensMask: UNDERLYING_TOKEN_MASK | mask,
-                flags: DISABLE_TOKEN_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? UNDERLYING_TOKEN_MASK : (mask | UNDERLYING_TOKEN_MASK),
-                _testCaseErr("Incorrect enabledTokenMask for disableToken")
-            );
-        }
-    }
-
     /// @dev U:[FA-34]: multicall updateQuota works properly
     function test_U_FA_34_multicall_updateQuota_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
+
+        address underlying = tokenTestSuite.addressOf(Tokens.DAI);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (underlying, 0, 0))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: UPDATE_QUOTA_PERMISSION
+        });
 
         uint96 maxDebt = 443330;
 
@@ -1519,6 +1693,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setUpdateQuota({tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
 
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 0, 0))
+                })
+            ),
+            enabledTokensMask: maskToDisable,
+            flags: UPDATE_QUOTA_PERMISSION
+        });
+
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(
@@ -1527,80 +1714,59 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             )
         );
 
-        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, maskToEnable | UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, false)
+            )
+        );
+        creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
-                ),
-            enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
+            ),
+            enabledTokensMask: maskToDisable,
             flags: UPDATE_QUOTA_PERMISSION
         });
-
-        assertEq(
-            fullCheckParams.enabledTokensMaskAfter,
-            maskToEnable | UNDERLYING_TOKEN_MASK,
-            _testCaseErr("Incorrect enabledTokenMask")
-        );
     }
 
-    /// @dev U:[FA-34A]: multicall updateQuota reverts on trying to increase quota for forbidden token
-    function test_U_FA_34A_multicall_updateQuota_works_properly() public notExpirableCase {
+    /// @dev U:[FA-36]: multicall `withdrawCollateral` works properly
+    function test_U_FA_36_multicall_withdrawCollateral_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 linkMask = 1 << 8;
-        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
-
-        creditManagerMock.addToken(link, linkMask);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
-
-        uint96 maxDebt = 443330;
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);
-
-        int96 change = 990;
-
-        vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
-                })
-                ),
-            enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
-        });
-
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, -change, 0))
-                })
-                ),
-            enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
-        });
-    }
-
-    /// @dev U:[FA-35]: multicall `withdrawCollateral` works properly
-    function test_U_FA_35_multicall_withdrawCollateral_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 maskToDisable = 1 << 7;
 
         uint256 amount = 100;
-        creditManagerMock.setWithdrawCollateral({tokensToDisable: maskToDisable});
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 0, USER))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, type(uint256).max, USER))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
 
         vm.expectCall(
             address(creditManagerMock),
@@ -1610,33 +1776,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectEmit(true, true, false, true);
         emit WithdrawCollateral(creditAccount, link, amount, USER);
 
-        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
-                })
-                ),
-            enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
-            flags: WITHDRAW_COLLATERAL_PERMISSION
-        });
-
-        assertEq(
-            fullCheckParams.enabledTokensMaskAfter, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokenMask")
-        );
-    }
-
-    /// @dev U:[FA-36]: multicall revokeAdapterAllowances works properly
-    function test_U_FA_36_multicall_revokeAdapterAllowances_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        RevocationPair[] memory rp = new RevocationPair[](1);
-        rp[0].token = tokenTestSuite.addressOf(Tokens.LINK);
-        rp[0].spender = DUMB_ADDRESS;
-
         vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.revokeAdapterAllowances, (creditAccount, rp))
+            address(creditManagerMock),
+            abi.encodeCall(
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
+            )
         );
 
         creditFacade.multicallInt({
@@ -1644,99 +1789,203 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (rp))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
-            flags: REVOKE_ALLOWANCES_PERMISSION
+            flags: WITHDRAW_COLLATERAL_PERMISSION
         });
     }
 
-    struct ExternalCallTestCase {
-        string name;
-        uint256 quotedTokensMask;
-        uint256 tokenMaskBefore;
-        uint256 expectedTokensMaskAfter;
+    /// @dev U:[FA-36A]: multicall `withdrawCollateral` with phantom tokens works properly
+    function test_U_FA_36A_multicall_withdrawCollateral_with_phantom_token_works_correctly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        uint256 amount = 100;
+
+        GeneralMock targetContract = new GeneralMock();
+        ERC20Mock depositedToken = new ERC20Mock("Test Token", "TEST", 18);
+
+        PhantomTokenMock phantomToken =
+            new PhantomTokenMock(address(targetContract), address(depositedToken), "Phantom Token", "PHANTOM");
+        PhantomTokenWithdrawerMock adapter =
+            new PhantomTokenWithdrawerMock(address(creditManagerMock), address(phantomToken));
+
+        depositedToken.set_minter(address(adapter));
+        phantomToken.mint(creditAccount, amount);
+        phantomToken.setExchangeRate(0.5e18);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (address(phantomToken), amount, USER))
+            })
+        );
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+
+        creditManagerMock.addToken(address(depositedToken), 1 << 1);
+        creditManagerMock.addToken(address(phantomToken), 1 << 2);
+
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: address(targetContract)});
+
+        vm.expectCall(
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
+        );
+
+        vm.expectCall(
+            address(adapter),
+            abi.encodeCall(PhantomTokenWithdrawerMock.withdrawPhantomToken, (address(phantomToken), amount))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.withdrawCollateral, (creditAccount, address(depositedToken), amount / 2, USER)
+            )
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (INACTIVE_CREDIT_ACCOUNT_ADDRESS))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
+            )
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit Execute(creditAccount, address(targetContract));
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawPhantomToken(creditAccount, address(phantomToken), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawCollateral(creditAccount, address(depositedToken), amount / 2, USER);
+
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
     }
 
-    /// @dev U:[FA-38]: multicall external calls works properly
-    function test_U_FA_38_multicall_external_calls_properly() public notExpirableCase {
+    /// @dev U:[FA-37]: multicall `setBotPermissions` works properly
+    function test_U_FA_37_setBotPermissions_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        address bot = makeAddr("BOT");
+
+        creditManagerMock.setBorrower(USER);
+
+        // It reverts if passed unexpected permissions, e.g. `SET_BOT_PERMISSIONS_PEMISSION`
+        vm.expectRevert(
+            abi.encodeWithSelector(UnexpectedPermissionsException.selector, (SET_BOT_PERMISSIONS_PERMISSION))
+        );
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, SET_BOT_PERMISSIONS_PERMISSION))
+                )
+            )
+        );
+
+        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
+
+        botListMock.setBotPermissionsReturn(1);
+
+        // It sets `BOT_PERMISSIONS_SET_FLAG` flag in the credit manager to `true` if it was `false` before
+        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
+        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1)))
+            )
+        );
+
+        // It resets flag to `false` if there are no active bots left on the account
+        botListMock.setBotPermissionsReturn(0);
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
+        );
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1)))
+            )
+        );
+    }
+
+    /// @dev U:[FA-38]: multicall external call works properly
+    function test_U_FA_38_multicall_externalCall_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         creditManagerMock.setBorrower(USER);
 
-        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+        AdapterMock adapter = new AdapterMock(address(creditManagerMock), DUMB_ADDRESS);
+        adapter.setReturn_useSafePrices(true);
 
-        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: DUMB_ADDRESS});
 
-        uint256 tokensToEnable = 1 << 4;
-        uint256 tokensToDisable = 1 << 7;
+        vm.expectCall(address(adapter), abi.encodeCall(adapter.dumbCall, ()));
 
-        ExternalCallTestCase[3] memory cases = [
-            ExternalCallTestCase({
-                name: "not in quoted mask",
-                quotedTokensMask: 0,
-                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
-                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK | tokensToEnable
-            }),
-            ExternalCallTestCase({
-                name: "in quoted mask, mask is tokensToEnable",
-                quotedTokensMask: tokensToEnable,
-                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
-                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK
-            }),
-            ExternalCallTestCase({
-                name: "in quoted mask, mask is tokensToDisable",
-                quotedTokensMask: tokensToDisable,
-                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
-                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK | tokensToEnable | tokensToDisable
-            })
-        ];
+        vm.expectCall(
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
+        );
 
-        uint256 len = cases.length;
+        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
-        for (uint256 testCase = 0; testCase < len; ++testCase) {
-            uint256 snapshot = vm.snapshot();
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
+            )
+        );
 
-            ExternalCallTestCase memory _case = cases[testCase];
-
-            caseName = string.concat(caseName, _case.name);
-            creditManagerMock.setQuotedTokensMask(_case.quotedTokensMask);
-
-            vm.expectCall(adapter, abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable)));
-
-            vm.expectCall(
-                address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
-            );
-
-            vm.expectCall(
-                address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1)))
-            );
-
-            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: MultiCallBuilder.build(
-                    MultiCall({
-                        target: adapter,
-                        callData: abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable))
-                    })
-                    ),
-                enabledTokensMask: _case.tokenMaskBefore,
-                flags: EXTERNAL_CALLS_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                _case.expectedTokensMaskAfter,
-                _testCaseErr("Incorrect enabledTokenMask")
-            );
-
-            vm.revertTo(snapshot);
-        }
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({target: address(adapter), callData: abi.encodeCall(adapter.dumbCall, ())})
+            ),
+            enabledTokensMask: 0,
+            flags: EXTERNAL_CALLS_PERMISSION
+        });
     }
 
-    /// @dev U:[FA-39]: revertIfNoPermission calls works properly
-    function test_U_FA_39_revertIfNoPermission_calls_properly(uint256 mask) public notExpirableCase {
+    /// @dev U:[FA-39]: revertIfNoPermission works properly
+    function test_U_FA_39_revertIfNoPermission_works_properly(uint256 mask) public notExpirableCase {
         uint8 index = uint8(getHash(mask, 1));
         uint256 permission = 1 << index;
 
@@ -1747,58 +1996,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.revertIfNoPermission(mask & ~(permission), permission);
     }
 
-    /// @dev U:[FA-41]: setBotPermissions calls works properly
-    function test_U_FA_41_setBotPermissions_calls_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-        address bot = makeAddr("BOT");
-
-        creditManagerMock.setBorrower(USER);
-
-        /// It reverts if passed unexpected permissions
-        vm.expectRevert(UnexpectedPermissionsException.selector);
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: type(uint192).max});
-
-        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
-
-        botListMock.setBotPermissionsReturn(1);
-
-        /// It sets flag to true if it was false before
-        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
-        );
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
-        );
-
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
-
-        /// It removes flag if no bots left
-        botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
-        );
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
-        );
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
-    }
-
-    /// @dev U:[FA-43]: revertIfOutOfBorrowingLimit works properly
-    function test_U_FA_43_revertIfOutOfBorrowingLimit_works_properly() public notExpirableCase {
+    /// @dev U:[FA-43]: revertIfOutOfDebtPerBlockLimit works properly
+    function test_U_FA_43_revertIfOutOfDebtPerBlockLimit_works_properly() public notExpirableCase {
         //
         // Case: It does nothing is maxDebtPerBlockMultiplier == type(uint8).max
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(0, 0, type(uint8).max);
-        creditFacade.revertIfOutOfBorrowingLimit(type(uint256).max);
+        creditFacade.revertIfOutOfDebtPerBlockLimit(type(uint256).max);
 
         //
         // Case: it updates lastBlockBorrowed and rewrites totalBorrowedInBlock for new block
@@ -1811,14 +2015,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setLastBlockBorrowed(blockNow - 1);
 
         vm.roll(blockNow);
-        creditFacade.revertIfOutOfBorrowingLimit(200);
+        creditFacade.revertIfOutOfDebtPerBlockLimit(200);
 
         assertEq(creditFacade.lastBlockBorrowedInt(), blockNow, "Incorrect lastBlockBorrowed");
         assertEq(creditFacade.totalBorrowedInBlockInt(), 200, "Incorrect totalBorrowedInBlock");
 
         //
         // Case: it summarize if the called in the same block
-        creditFacade.revertIfOutOfBorrowingLimit(400);
+        creditFacade.revertIfOutOfDebtPerBlockLimit(400);
 
         assertEq(creditFacade.lastBlockBorrowedInt(), blockNow, "Incorrect lastBlockBorrowed");
         assertEq(creditFacade.totalBorrowedInBlockInt(), 200 + 400, "Incorrect totalBorrowedInBlock");
@@ -1826,10 +2030,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         //
         // Case it reverts if borrowed more than limit
         vm.expectRevert(BorrowedBlockLimitException.selector);
-        creditFacade.revertIfOutOfBorrowingLimit(800 * 2 - (200 + 400) + 1);
+        creditFacade.revertIfOutOfDebtPerBlockLimit(800 * 2 - (200 + 400) + 1);
     }
 
-    /// @dev U:[FA-44]: revertIfOutOfBorrowingLimit works properly
+    /// @dev U:[FA-44]: revertIfOutOfDebtLimits works properly
     function test_U_FA_44_revertIfOutOfDebtLimits_works_properly() public notExpirableCase {
         uint128 minDebt = 100;
         uint128 maxDebt = 200;
@@ -1838,73 +2042,123 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(minDebt, maxDebt, 1);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.revertIfOutOfDebtLimits(minDebt - 1);
+        creditFacade.revertIfOutOfDebtLimits(0, ManageDebtAction.INCREASE_DEBT);
+
+        creditFacade.revertIfOutOfDebtLimits(0, ManageDebtAction.DECREASE_DEBT);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1);
+        creditFacade.revertIfOutOfDebtLimits(minDebt - 1, ManageDebtAction.INCREASE_DEBT);
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.revertIfOutOfDebtLimits(minDebt - 1, ManageDebtAction.DECREASE_DEBT);
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1, ManageDebtAction.INCREASE_DEBT);
+
+        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1, ManageDebtAction.DECREASE_DEBT);
     }
 
-    /// @dev U:[FA-45]: fullCollateralCheck works properly
-    function test_U_FA_45_fullCollateralCheck_works_properly() public notExpirableCase {
+    /// @dev U:[FA-45]: multicall handles forbidden tokens properly
+    function test_U_FA_45_multicall_handles_forbidden_tokens_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
-        uint256 enabledTokensMaskBefore = UNDERLYING_TOKEN_MASK;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 linkMask = 2;
-        deal({token: link, to: creditAccount, give: 1000});
-
+        uint256 linkMask = 1 << 8;
         creditManagerMock.addToken(link, linkMask);
-        uint256 forbiddenTokensMask = linkMask;
 
-        uint256[] memory collateralHints = new uint256[](1);
-        collateralHints[0] = linkMask;
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
 
-        FullCheckParams memory params = FullCheckParams({
-            collateralHints: collateralHints,
-            minHealthFactor: 123,
-            enabledTokensMaskAfter: enabledTokensMaskBefore | linkMask,
-            useSafePrices: true,
-            revertOnForbiddenTokens: true
+        AdapterMock adapter = new AdapterMock(address(creditManagerMock), address(tokenTestSuite));
+        vm.prank(CONFIGURATOR);
+        creditManagerMock.setContractAllowance({adapter: address(adapter), targetContract: address(tokenTestSuite)});
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 2, 1);
+        vm.roll(block.number + 1);
+
+        creditManagerMock.setManageDebt(1);
+
+        // reverts if trying to increase debt if there are enabled foribdden tokens
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1)))
+            ),
+            enabledTokensMask: linkMask,
+            flags: INCREASE_DEBT_PERMISSION
         });
 
-        vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, new BalanceWithMask[](0), forbiddenTokensMask
-        );
+        // reverts if trying to withdraw collateral if there are enabled foribdden tokens
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1, USER))
+                )
+            ),
+            enabledTokensMask: linkMask,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
 
-        params.revertOnForbiddenTokens = false;
-        vm.expectRevert(ForbiddenTokenEnabledException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, new BalanceWithMask[](0), forbiddenTokensMask
-        );
+        // reverts if trying to perform unsafe adapter call if there are enabled foribdden tokens
+        adapter.setReturn_useSafePrices(true);
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(MultiCall(address(adapter), abi.encodeCall(adapter.dumbCall, ()))),
+            enabledTokensMask: linkMask,
+            flags: EXTERNAL_CALLS_PERMISSION
+        });
 
-        enabledTokensMaskBefore |= linkMask;
+        // reverts on trying to increase quota of forbidden token
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokenQuotaIncreasedException.selector, (link)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 1, 0)))
+            ),
+            enabledTokensMask: 0,
+            flags: UPDATE_QUOTA_PERMISSION
+        });
 
-        BalanceWithMask[] memory forbiddenBalances = new BalanceWithMask[](1);
-        forbiddenBalances[0] = BalanceWithMask(link, linkMask, 900);
-        vm.expectRevert(ForbiddenTokenBalanceIncreasedException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, forbiddenBalances, forbiddenTokensMask
-        );
+        // reverts on trying to increase balance of enabled forbidden token
+        adapter.setReturn_useSafePrices(false);
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokenBalanceIncreasedException.selector, (link)));
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall(
+                    address(adapter), abi.encodeWithSignature("mint(uint8,address,uint256)", Tokens.LINK, creditAccount, 10)
+                )
+            ),
+            enabledTokensMask: linkMask,
+            flags: EXTERNAL_CALLS_PERMISSION
+        });
 
-        forbiddenBalances[0] = BalanceWithMask(link, linkMask, 1100);
+        // enabled forbidden tokens activate collateral check with safe prices
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck,
-                (creditAccount, enabledTokensMaskBefore, collateralHints, 123, true)
+                creditManagerMock.fullCollateralCheck,
+                (creditAccount, linkMask | UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR, true)
             )
         );
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, forbiddenBalances, forbiddenTokensMask
-        );
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(),
+            enabledTokensMask: linkMask,
+            flags: 0
+        });
     }
 
     /// @dev U:[FA-46]: isExpired works properly
     function test_U_FA_46_isExpired_works_properly(uint40 timestamp) public allExpirableCases {
         vm.assume(timestamp > 1);
 
-        assertTrue(!creditFacade.isExpired(), "isExpired unexpectedly returns true (expiration date not set)");
+        assertTrue(!creditFacade.isExpiredInt(), "isExpired unexpectedly returns true (expiration date not set)");
 
         if (expirable) {
             vm.prank(CONFIGURATOR);
@@ -1912,10 +2166,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         vm.warp(timestamp - 1);
-        assertTrue(!creditFacade.isExpired(), "isExpired unexpectedly returns true (not expired)");
+        assertTrue(!creditFacade.isExpiredInt(), "isExpired unexpectedly returns true (not expired)");
 
         vm.warp(timestamp);
-        assertEq(creditFacade.isExpired(), expirable, "Incorrect isExpired");
+        assertEq(creditFacade.isExpiredInt(), expirable, "Incorrect isExpired");
     }
 
     /// @dev U:[FA-48]: rsetExpirationDate works properly
@@ -1937,15 +2191,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
-        assertEq(maxDebtPerBlockMultiplier, 0, "SETUP: incorrect maxDebtPerBlockMultiplier");
+        assertEq(
+            maxDebtPerBlockMultiplier, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "SETUP: incorrect maxDebtPerBlockMultiplier"
+        );
         assertEq(minDebt, 0, "SETUP: incorrect minDebt");
         assertEq(maxDebt, 0, "SETUP: incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), 0, "SETUP: incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), 0, "SETUP: incorrect totalBorrowedInBlock");
 
-        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt >= type(uint128).max
+        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt > type(uint128).max
         vm.expectRevert(IncorrectParameterException.selector);
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, type(uint128).max, 2);
+        creditFacade.setDebtLimits(1, type(uint128).max / 2 + 1, 2);
 
         // Case: it sets parameters properly
         vm.prank(CONFIGURATOR);
@@ -1957,45 +2215,23 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(maxDebtPerBlockMultiplier, 3, " incorrect maxDebtPerBlockMultiplier");
         assertEq(minDebt, 1, " incorrect minDebt");
         assertEq(maxDebt, 2, " incorrect maxDebt");
+        assertEq(creditFacade.lastBlockBorrowedInt(), block.number, "incorrect lastBlockBorrowed");
+        assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
     }
 
-    /// @dev U:[FA-50]: setBotList works properly
-    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
-        assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
+    /// @dev U:[FA-51]: `setLossLiquidator` works properly
+    function test_U_FA_51_setLossLiquidator_works_properly() public notExpirableCase {
+        assertEq(creditFacade.lossLiquidator(), address(0), "SETUP: incorrect loss liquidator");
 
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         vm.prank(CONFIGURATOR);
-        creditFacade.setBotList(DUMB_ADDRESS);
+        creditFacade.setLossLiquidator(DUMB_ADDRESS);
 
-        assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
-    }
-
-    /// @dev U:[FA-51]: setCumulativeLossParams works properly
-    function test_U_FA_51_setCumulativeLossParams_works_properly() public notExpirableCase {
-        (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 0, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
-
-        creditFacade.setCurrentCumulativeLoss(500);
-        (currentCumulativeLoss,) = creditFacade.lossParams();
-
-        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
-
+        address liquidator = address(new GeneralMock());
         vm.prank(CONFIGURATOR);
-        creditFacade.setCumulativeLossParams(200, false);
+        creditFacade.setLossLiquidator(liquidator);
 
-        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 200, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setCumulativeLossParams(400, true);
-
-        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 400, "SETUP: incorrect maxCumulativeLoss");
-        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
+        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
     }
 
     /// @dev U:[FA-52]: setTokenAllowance works properly
@@ -2025,27 +2261,27 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-53]: setEmergencyLiquidator works properly
     function test_U_FA_53_setEmergencyLiquidator_works_properly() public notExpirableCase {
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             false,
-            "SETUP: incorrect canLiquidateWhilePaused for LIQUIDATOR"
+            "SETUP: incorrect isEmergencyLiquidator for LIQUIDATOR"
         );
 
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
 
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             true,
-            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
         );
 
         vm.prank(CONFIGURATOR);
         creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
 
         assertEq(
-            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
             false,
-            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
         );
     }
 }

@@ -1,5 +1,3 @@
 node_modules
-artifacts
 cache
-types
-forge-out
+out
