@@ -13,7 +13,8 @@ import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3
 import {PoolV3} from "../../../pool/PoolV3.sol";
 
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-import {Tokens, TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 
 /// @title Pool equivalence test
 /// @notice U:[PET]: Tests that ensure that `PoolV3` without quotas behaves identically to `PoolService`
@@ -46,7 +47,7 @@ contract PoolEquivalenceTest is Test {
         liquidityProvider = makeAddr("LIQUIDITY_PROVIDER");
 
         tokens = new TokensTestSuite();
-        underlying = tokens.addressOf(Tokens.DAI);
+        underlying = tokens.addressOf(TOKEN_DAI);
 
         irm = new LinearInterestRateModelV3({
             U_1: 80_00,

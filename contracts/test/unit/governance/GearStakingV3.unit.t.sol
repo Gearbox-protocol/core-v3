@@ -20,7 +20,7 @@ import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -42,7 +42,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
         tokenTestSuite = new TokensTestSuite();
 
-        gearToken = tokenTestSuite.addressOf(Tokens.WETH);
+        gearToken = tokenTestSuite.addressOf(TOKEN_WETH);
 
         vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);

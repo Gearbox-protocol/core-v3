@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {BalanceEngine} from "./BalanceEngine.sol";
 import "forge-std/Vm.sol";
@@ -149,18 +149,18 @@ contract BalanceHelper is BalanceEngine {
         _;
     }
 
-    function expectBalance(Tokens t, address holder, uint256 expectedBalance) internal withTokenSuite {
+    function expectBalance(uint256 t, address holder, uint256 expectedBalance) internal withTokenSuite {
         expectBalance(t, holder, expectedBalance, "");
     }
 
-    function expectBalance(Tokens t, address holder, uint256 expectedBalance, string memory reason)
+    function expectBalance(uint256 t, address holder, uint256 expectedBalance, string memory reason)
         internal
         withTokenSuite
     {
         expectBalance(tokenTestSuite.addressOf(t), holder, expectedBalance, reason);
     }
 
-    function expectBalanceGe(Tokens t, address holder, uint256 minBalance, string memory reason)
+    function expectBalanceGe(uint256 t, address holder, uint256 minBalance, string memory reason)
         internal
         withTokenSuite
     {
@@ -169,21 +169,21 @@ contract BalanceHelper is BalanceEngine {
         expectBalanceGe(tokenTestSuite.addressOf(t), holder, minBalance, reason);
     }
 
-    function expectBalanceLe(Tokens t, address holder, uint256 maxBalance, string memory reason)
+    function expectBalanceLe(uint256 t, address holder, uint256 maxBalance, string memory reason)
         internal
         withTokenSuite
     {
         expectBalanceLe(tokenTestSuite.addressOf(t), holder, maxBalance, reason);
     }
 
-    function expectAllowance(Tokens t, address owner, address spender, uint256 expectedAllowance)
+    function expectAllowance(uint256 t, address owner, address spender, uint256 expectedAllowance)
         internal
         withTokenSuite
     {
         expectAllowance(t, owner, spender, expectedAllowance, "");
     }
 
-    function expectAllowance(Tokens t, address owner, address spender, uint256 expectedAllowance, string memory reason)
+    function expectAllowance(uint256 t, address owner, address spender, uint256 expectedAllowance, string memory reason)
         internal
         withTokenSuite
     {

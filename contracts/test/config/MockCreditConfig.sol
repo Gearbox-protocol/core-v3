@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 import "forge-std/console.sol";
@@ -34,7 +34,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
     uint128 public maxDebt;
     uint256 public chainId;
 
-    Tokens public underlying;
+    uint256 public underlying;
     bool public constant supportsQuotas = true;
 
     PoolV3DeployParams _poolParams;
@@ -53,7 +53,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
     PoolQuotaLimit[] _quotaLimits;
     CreditManagerV3DeployParams[] _creditManagers;
 
-    constructor(TokensTestSuite tokenTestSuite_, Tokens _underlying) {
+    constructor(TokensTestSuite tokenTestSuite_, uint256 _underlying) {
         NetworkDetector nd = new NetworkDetector();
         chainId = nd.chainId();
 
@@ -90,16 +90,16 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         pushCollateralToken(_underlying, cp.collateralTokens);
     }
 
-    function pushCollateralToken(Tokens _underlying, CollateralTokenHuman[] storage cth) private {
+    function pushCollateralToken(uint256 _underlying, CollateralTokenHuman[] storage cth) private {
         CollateralTokenHuman[8] memory collateralTokenOpts = [
-            CollateralTokenHuman({token: Tokens.USDC, lt: 90_00}),
-            CollateralTokenHuman({token: Tokens.USDT, lt: 88_00}),
-            CollateralTokenHuman({token: Tokens.DAI, lt: 83_00}),
-            CollateralTokenHuman({token: Tokens.WETH, lt: 83_00}),
-            CollateralTokenHuman({token: Tokens.LINK, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.CRV, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.CVX, lt: 73_00}),
-            CollateralTokenHuman({token: Tokens.STETH, lt: 73_00})
+            CollateralTokenHuman({token: TOKEN_USDC, lt: 90_00}),
+            CollateralTokenHuman({token: TOKEN_USDT, lt: 88_00}),
+            CollateralTokenHuman({token: TOKEN_DAI, lt: 83_00}),
+            CollateralTokenHuman({token: TOKEN_WETH, lt: 83_00}),
+            CollateralTokenHuman({token: TOKEN_LINK, lt: 73_00}),
+            CollateralTokenHuman({token: TOKEN_CRV, lt: 73_00}),
+            CollateralTokenHuman({token: TOKEN_CVX, lt: 73_00}),
+            CollateralTokenHuman({token: TOKEN_STETH, lt: 73_00})
         ];
 
         uint256 len = collateralTokenOpts.length;
@@ -111,9 +111,9 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
     }
 
     function getAccountAmount() public view override returns (uint256) {
-        return (underlying == Tokens.DAI)
+        return (underlying == TOKEN_DAI)
             ? DAI_ACCOUNT_AMOUNT
-            : (underlying == Tokens.USDC) ? USDC_ACCOUNT_AMOUNT : WETH_ACCOUNT_AMOUNT;
+            : (underlying == TOKEN_USDC) ? USDC_ACCOUNT_AMOUNT : WETH_ACCOUNT_AMOUNT;
     }
 
     // GETTERS

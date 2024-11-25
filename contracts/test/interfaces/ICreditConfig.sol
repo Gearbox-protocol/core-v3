@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
 import {CreditManagerOpts} from "../../interfaces/ICreditConfiguratorV3.sol";
@@ -38,34 +38,34 @@ struct BalancerPool {
 
 struct GenericSwapPair {
     Contracts router;
-    Tokens token0;
-    Tokens token1;
+    uint256 token0;
+    uint256 token1;
 }
 
 struct UniswapV3Pair {
     Contracts router;
-    Tokens token0;
-    Tokens token1;
+    uint256 token0;
+    uint256 token1;
     uint24 fee;
 }
 
 struct VelodromeV2Pool {
-    Tokens token0;
-    Tokens token1;
+    uint256 token0;
+    uint256 token1;
     bool stable;
     address factory;
 }
 
 struct PendlePair {
     address market;
-    Tokens inputToken;
-    Tokens pendleToken;
+    uint256 inputToken;
+    uint256 pendleToken;
     uint8 status;
 }
 
 struct MellowUnderlyingConfig {
     Contracts vault;
-    Tokens underlying;
+    uint256 underlying;
 }
 
 struct AdapterConfig {
@@ -113,19 +113,19 @@ struct CreditManagerV3DeployParams {
 }
 
 struct GaugeRate {
-    Tokens token;
+    uint256 token;
     uint16 minRate;
     uint16 maxRate;
 }
 
 struct PoolQuotaLimit {
-    Tokens token;
+    uint256 token;
     uint16 quotaIncreaseFee;
     uint96 limit;
 }
 
 struct CollateralTokenHuman {
-    Tokens token;
+    uint256 token;
     uint16 lt;
 }
 
@@ -135,7 +135,7 @@ interface IPoolV3DeployConfig {
     function name() external view returns (string memory);
 
     function chainId() external view returns (uint256);
-    function underlying() external view returns (Tokens);
+    function underlying() external view returns (uint256);
     function supportsQuotas() external view returns (bool);
 
     function poolParams() external view returns (PoolV3DeployParams memory);

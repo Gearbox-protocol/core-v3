@@ -15,7 +15,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 // TESTS
 import "../../lib/constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
@@ -72,7 +72,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.increaseDebt, (maxDebt * maxDebtPerBlockMultiplier + 1)
-                        )
+                    )
                 })
             )
         );
@@ -87,7 +87,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
         uint256 amount = maxDebt - DAI_ACCOUNT_AMOUNT + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
+        tokenTestSuite.mint(TOKEN_DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -130,7 +130,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -201,7 +201,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
         uint256 amount = DAI_ACCOUNT_AMOUNT - minDebt + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
+        tokenTestSuite.mint(TOKEN_DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -219,7 +219,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
     /// @dev I:[MD-8]: manageDebt correctly increases debt
     function test_I_MD_08_manageDebt_correctly_increases_debt(uint120 amount) public creditTest {
-        tokenTestSuite.mint(Tokens.DAI, INITIAL_LP, amount);
+        tokenTestSuite.mint(TOKEN_DAI, INITIAL_LP, amount);
 
         vm.assume(amount > 1);
 
@@ -254,7 +254,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         // (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
         // assertEq(debt, newBorrowedAmount, "Incorrect debt");
 
-        // expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
+        // expectBalance(TOKEN_DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
 
         // assertEq(pool.lendAmount(), amount, "Incorrect lend amount");
 
@@ -263,7 +263,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
     /// @dev I:[MD-9]: manageDebt correctly decreases debt
     function test_I_MD_09_manageDebt_correctly_decreases_debt(uint128 amount) public creditTest {
-        // tokenTestSuite.mint(Tokens.DAI, address(pool), (uint256(type(uint128).max) * 14) / 10);
+        // tokenTestSuite.mint(TOKEN_DAI, address(pool), (uint256(type(uint128).max) * 14) / 10);
 
         // (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cft.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
@@ -306,7 +306,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         //     assertEq(debt, newBorrowedAmount, "Incorrect debt");
         // }
 
-        // expectBalance(Tokens.DAI, creditAccount, debt - amount, "Incorrect balance on credit account");
+        // expectBalance(TOKEN_DAI, creditAccount, debt - amount, "Incorrect balance on credit account");
 
         // if (amount >= totalDebt - debt) {
         //     assertEq(cumulativeIndexLastUpdateAfter, cumulativeIndexNow, "Incorrect cumulativeIndexLastUpdate");

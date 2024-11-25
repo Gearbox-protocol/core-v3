@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {MockTokensData, MockToken} from "../../config/MockTokensData.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 
@@ -16,30 +16,30 @@ import "forge-std/console.sol";
 address constant PRICE_ORACLE = DUMB_ADDRESS4;
 
 struct B {
-    Tokens t;
+    uint256 t;
     uint256 balance;
 }
 
 struct Q {
-    Tokens t;
+    uint256 t;
     uint256 quota;
 }
 
 contract CollateralLogicHelper is TestHelper {
     uint256 session;
 
-    mapping(Tokens => uint256) tokenMask;
+    mapping(uint256 => uint256) tokenMask;
 
-    mapping(uint256 => Tokens) tokenByMask;
+    mapping(uint256 => uint256) tokenByMask;
 
-    mapping(Tokens => address) addressOf;
-    mapping(Tokens => string) symbolOf;
-    mapping(address => Tokens) tokenOf;
+    mapping(uint256 => address) addressOf;
+    mapping(uint256 => string) symbolOf;
+    mapping(address => uint256) tokenOf;
 
-    mapping(Tokens => uint16) lts;
+    mapping(uint256 => uint16) lts;
 
     mapping(address => uint256) _prices;
-    mapping(Tokens => uint256) prices;
+    mapping(uint256 => uint256) prices;
 
     mapping(address => bool) revertIsPriceOracleCalled;
 
@@ -69,8 +69,8 @@ contract CollateralLogicHelper is TestHelper {
     }
 
     function _collateralTokenByMask(uint256 _tokenMask, bool calcLT) internal view returns (address token, uint16 lt) {
-        Tokens t = tokenByMask[_tokenMask];
-        if (t == Tokens.NO_TOKEN) {
+        uint256 t = tokenByMask[_tokenMask];
+        if (t == TOKEN_NO_TOKEN) {
             console.log("Cant find token with mask");
             console.log(_tokenMask);
             revert("Token not found");
@@ -83,7 +83,7 @@ contract CollateralLogicHelper is TestHelper {
     /// HELPERS
 
     /// @dev Deployes order token and store info
-    function deploy(Tokens t, string memory symbol, uint8 index) internal {
+    function deploy(uint256 t, string memory symbol, uint8 index) internal {
         address token = address(new OrderToken());
         addressOf[t] = token;
         tokenOf[token] = t;
@@ -97,7 +97,7 @@ contract CollateralLogicHelper is TestHelper {
         vm.label(addressOf[t], symbol);
     }
 
-    function setTokenParams(Tokens t, uint16 lt, uint256 price) internal {
+    function setTokenParams(uint256 t, uint16 lt, uint256 price) internal {
         lts[t] = lt;
         prices[t] = price;
         _prices[addressOf[t]] = price;
@@ -108,8 +108,8 @@ contract CollateralLogicHelper is TestHelper {
     }
 
     function saveCallOrder() external view returns (uint256) {
-        Tokens currentToken = tokenOf[msg.sender];
-        if (currentToken == Tokens.NO_TOKEN) {
+        uint256 currentToken = tokenOf[msg.sender];
+        if (currentToken == TOKEN_NO_TOKEN) {
             revert("Incorrect tokens order");
         }
 
@@ -123,18 +123,18 @@ contract CollateralLogicHelper is TestHelper {
         }
     }
 
-    function expectTokensOrder(Tokens[] memory tokens, bool debug) internal {
+    function expectTokensOrder(uint256[] memory tokens, bool debug) internal {
         (bytes32[] memory reads,) = vm.accesses(address(this));
 
         uint256 len = reads.length;
 
-        Tokens[] memory callOrder = new Tokens[](len);
+        uint256[] memory callOrder = new uint256[](len);
         uint256 j;
 
         for (uint256 i; i < len; ++i) {
             uint256 slot = uint256(reads[i]);
-            if (slot > 100 && slot <= (100 + uint256(type(Tokens).max))) {
-                callOrder[j] = Tokens(slot - 100);
+            if (slot > 100 && slot <= (100 + NUM_TOKENS)) {
+                callOrder[j] = slot - 100;
                 ++j;
             }
         }
@@ -170,24 +170,24 @@ contract CollateralLogicHelper is TestHelper {
         }
     }
 
-    function printTokens(Tokens[] memory tokens) internal view {
+    function printTokens(uint256[] memory tokens) internal view {
         uint256 len = tokens.length;
 
         for (uint256 i; i < len; ++i) {
-            Tokens t = Tokens(tokens[i]);
-            if (t == Tokens.NO_TOKEN) break;
+            uint256 t = tokens[i];
+            if (t == TOKEN_NO_TOKEN) break;
             console.log(symbolOf[t]);
         }
     }
 
-    function getTokenMask(Tokens[] memory tokens) internal view returns (uint256 mask) {
+    function getTokenMask(uint256[] memory tokens) internal view returns (uint256 mask) {
         uint256 len = tokens.length;
         for (uint256 i; i < len; ++i) {
             mask |= tokenMask[tokens[i]];
         }
     }
 
-    function getHints(Tokens[] memory tokens) internal view returns (uint256[] memory collateralHints) {
+    function getHints(uint256[] memory tokens) internal view returns (uint256[] memory collateralHints) {
         uint256 len = tokens.length;
         collateralHints = new uint256[](len);
         for (uint256 i; i < len; ++i) {
@@ -220,38 +220,42 @@ contract CollateralLogicHelper is TestHelper {
 
     ///
 
-    function arrayOf(Tokens t1) internal pure returns (Tokens[] memory result) {
-        result = new Tokens[](1);
+    function arrayOfTokens(uint256 t1) internal pure returns (uint256[] memory result) {
+        result = new uint256[](1);
         result[0] = t1;
     }
 
-    function arrayOf(Tokens t1, Tokens t2) internal pure returns (Tokens[] memory result) {
-        result = new Tokens[](2);
+    function arrayOfTokens(uint256 t1, uint256 t2) internal pure returns (uint256[] memory result) {
+        result = new uint256[](2);
         result[0] = t1;
         result[1] = t2;
     }
 
-    function arrayOf(Tokens t1, Tokens t2, Tokens t3) internal pure returns (Tokens[] memory result) {
-        result = new Tokens[](3);
+    function arrayOfTokens(uint256 t1, uint256 t2, uint256 t3) internal pure returns (uint256[] memory result) {
+        result = new uint256[](3);
         result[0] = t1;
         result[1] = t2;
         result[2] = t3;
     }
 
-    function arrayOf(Tokens t1, Tokens t2, Tokens t3, Tokens t4) internal pure returns (Tokens[] memory result) {
-        result = new Tokens[](4);
+    function arrayOfTokens(uint256 t1, uint256 t2, uint256 t3, uint256 t4)
+        internal
+        pure
+        returns (uint256[] memory result)
+    {
+        result = new uint256[](4);
         result[0] = t1;
         result[1] = t2;
         result[2] = t3;
         result[3] = t4;
     }
 
-    function arrayOf(Tokens t1, Tokens t2, Tokens t3, Tokens t4, Tokens t5)
+    function arrayOfTokens(uint256 t1, uint256 t2, uint256 t3, uint256 t4, uint256 t5)
         internal
         pure
-        returns (Tokens[] memory result)
+        returns (uint256[] memory result)
     {
-        result = new Tokens[](5);
+        result = new uint256[](5);
         result[0] = t1;
         result[1] = t2;
         result[2] = t3;

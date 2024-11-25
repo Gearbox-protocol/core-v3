@@ -21,7 +21,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
 // EXCEPTIONS
@@ -46,7 +46,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        underlying = tokenTestSuite.addressOf(Tokens.DAI);
+        underlying = tokenTestSuite.addressOf(TOKEN_DAI);
 
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();

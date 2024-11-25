@@ -58,7 +58,7 @@ import "../../../interfaces/IExceptions.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 
@@ -127,7 +127,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         addressProvider = new AddressProviderV3ACLMock();
 
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(TOKEN_WETH), false);
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
@@ -135,7 +135,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
-        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(TOKEN_DAI));
 
         creditManagerMock =
             new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(poolMock)});
@@ -171,7 +171,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
         assertEq(address(creditFacade.creditManager()), address(creditManagerMock), "Incorrect creditManager");
 
-        assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
+        assertEq(creditFacade.weth(), tokenTestSuite.addressOf(TOKEN_WETH), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
     }
@@ -285,7 +285,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
 
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        address weth = tokenTestSuite.addressOf(TOKEN_WETH);
 
         vm.prank(USER);
         creditFacade.openCreditAccount{value: 1 ether}({
@@ -299,22 +299,22 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, 1 ether))
                 })
-                ),
+            ),
             referralCode: 0
         });
 
-        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 1 ether});
+        expectBalance({t: TOKEN_WETH, holder: USER, expectedBalance: 1 ether});
 
         creditManagerMock.setBorrower(USER);
 
         vm.prank(USER);
         creditFacade.closeCreditAccount{value: 1 ether}({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 2 ether});
+        expectBalance({t: TOKEN_WETH, holder: USER, expectedBalance: 2 ether});
 
         vm.prank(USER);
         creditFacade.multicall{value: 1 ether}({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
-        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 3 ether});
+        expectBalance({t: TOKEN_WETH, holder: USER, expectedBalance: 3 ether});
     }
 
     //
@@ -398,7 +398,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
                 })
-                ),
+            ),
             referralCode: REFERRAL_CODE
         });
 
@@ -515,8 +515,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         public
         notExpirableCase
     {
-        address dai = tokenTestSuite.addressOf(Tokens.DAI);
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address dai = tokenTestSuite.addressOf(TOKEN_DAI);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 linkMask = 4;
         creditManagerMock.addToken(link, linkMask);
 
@@ -554,7 +554,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                             (addNonUnderlying ? link : dai, abi.encodeCall(ERC20Mock.mint, (creditAccount, 10)))
                         )
                     )
-                    )
+                )
             });
         }
     }
@@ -603,9 +603,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
         creditManagerMock.setBorrower(USER);
 
-        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address usdc = tokenTestSuite.addressOf(TOKEN_USDC);
+        address weth = tokenTestSuite.addressOf(TOKEN_WETH);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         creditManagerMock.addToken(usdc, 2);
         creditManagerMock.addToken(weth, 4);
         creditManagerMock.addToken(link, 8);
@@ -646,7 +646,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 MultiCall(
                     address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (usdc, 2, FRIEND))
                 )
-                )
+            )
         });
     }
 
@@ -786,7 +786,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_21_multicall_reverts_if_called_without_particaular_permission() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address token = tokenTestSuite.addressOf(Tokens.LINK);
+        address token = tokenTestSuite.addressOf(TOKEN_LINK);
         creditManagerMock.addToken(token, 1 << 4);
 
         vm.prank(CONFIGURATOR);
@@ -818,7 +818,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateralWithPermit, (token, 0, 0, 0, bytes32(0), bytes32(0))
-                    ),
+                ),
                 permissionRquired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
@@ -880,7 +880,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_23_multicall_slippage_check_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         BalanceDelta[] memory expectedBalance = new BalanceDelta[](1);
 
         address acm = address(new AdapterCallMock());
@@ -924,7 +924,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -967,7 +967,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -1006,9 +1006,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR - 1)
-                        )
+                    )
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1023,7 +1023,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1037,7 +1037,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1054,7 +1054,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1067,7 +1067,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
         bytes memory cd = bytes("Hellew");
 
-        address token = tokenTestSuite.addressOf(Tokens.LINK);
+        address token = tokenTestSuite.addressOf(TOKEN_LINK);
 
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
@@ -1102,7 +1102,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_26_multicall_addCollateral_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address token = tokenTestSuite.addressOf(Tokens.LINK);
+        address token = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 amount = 12333345;
         uint256 mask = 1 << 5;
 
@@ -1167,7 +1167,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.addCollateralWithPermit, (address(token), amount, deadline, v, r, s)
-                        )
+                    )
                 })
             );
 
@@ -1276,7 +1276,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (maxDebt + 1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1295,7 +1295,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1308,7 +1308,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     {
         address creditAccount = DUMB_ADDRESS;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 linkMask = 1 << 8;
         tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
 
@@ -1329,7 +1329,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1342,7 +1342,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1000, USER))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
@@ -1379,7 +1379,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
@@ -1416,7 +1416,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
@@ -1442,7 +1442,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
@@ -1452,7 +1452,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_33_multicall_enableToken_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 mask = 1 << 5;
 
         creditManagerMock.addToken(link, mask);
@@ -1471,7 +1471,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: address(creditFacade),
                         callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
                     })
-                    ),
+                ),
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 flags: ENABLE_TOKEN_PERMISSION
             });
@@ -1489,7 +1489,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: address(creditFacade),
                         callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (link))
                     })
-                    ),
+                ),
                 enabledTokensMask: UNDERLYING_TOKEN_MASK | mask,
                 flags: DISABLE_TOKEN_PERMISSION
             });
@@ -1511,7 +1511,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 maskToEnable = 1 << 4;
         uint256 maskToDisable = 1 << 7;
 
@@ -1534,7 +1534,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
             flags: UPDATE_QUOTA_PERMISSION
         });
@@ -1550,7 +1550,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_34A_multicall_updateQuota_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 linkMask = 1 << 8;
         tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
 
@@ -1574,7 +1574,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
@@ -1586,7 +1586,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, -change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
@@ -1596,7 +1596,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_35_multicall_withdrawCollateral_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 maskToDisable = 1 << 7;
 
         uint256 amount = 100;
@@ -1617,7 +1617,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
                 })
-                ),
+            ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
@@ -1632,7 +1632,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
 
         RevocationPair[] memory rp = new RevocationPair[](1);
-        rp[0].token = tokenTestSuite.addressOf(Tokens.LINK);
+        rp[0].token = tokenTestSuite.addressOf(TOKEN_LINK);
         rp[0].spender = DUMB_ADDRESS;
 
         vm.expectCall(
@@ -1646,7 +1646,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (rp))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: REVOKE_ALLOWANCES_PERMISSION
         });
@@ -1720,7 +1720,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: adapter,
                         callData: abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable))
                     })
-                    ),
+                ),
                 enabledTokensMask: _case.tokenMaskBefore,
                 flags: EXTERNAL_CALLS_PERMISSION
             });
@@ -1849,7 +1849,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
         uint256 enabledTokensMaskBefore = UNDERLYING_TOKEN_MASK;
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 linkMask = 2;
         deal({token: link, to: creditAccount, give: 1000});
 
@@ -2007,7 +2007,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setTokenAllowance(DUMB_ADDRESS, AllowanceAction.ALLOW);
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 mask = 1 << 8;
         creditManagerMock.addToken(link, mask);
 
