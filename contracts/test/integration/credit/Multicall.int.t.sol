@@ -31,7 +31,7 @@ import "../../../interfaces/IExceptions.sol";
 import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
 
 // SUITES
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
@@ -108,12 +108,12 @@ contract MultiCallIntegrationTest is
     function test_I_MC_05_addCollateral_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, false);
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
 
-        tokenTestSuite.mint(Tokens.USDC, USER, 512);
-        tokenTestSuite.approve(Tokens.USDC, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_USDC, USER, 512);
+        tokenTestSuite.approve(TOKEN_USDC, USER, address(creditManager));
 
         vm.expectCall(
             address(creditManager),
@@ -135,8 +135,8 @@ contract MultiCallIntegrationTest is
         vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
-        expectBalance(Tokens.USDC, creditAccount, 512);
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        expectBalance(TOKEN_USDC, creditAccount, 512);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, true);
     }
 
     /// @dev I:[MC-6]: multicall addCollateral and oncreaseDebt works with creditFacade calls as expected
@@ -147,9 +147,9 @@ contract MultiCallIntegrationTest is
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
-        tokenTestSuite.approve(Tokens.USDC, USER, address(creditManager));
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
+        tokenTestSuite.mint(TOKEN_USDC, USER, USDC_EXCHANGE_AMOUNT);
+        tokenTestSuite.approve(TOKEN_USDC, USER, address(creditManager));
 
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
@@ -208,9 +208,9 @@ contract MultiCallIntegrationTest is
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
-        tokenTestSuite.approve(Tokens.USDC, USER, address(creditManager));
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
+        tokenTestSuite.mint(TOKEN_USDC, USER, USDC_EXCHANGE_AMOUNT);
+        tokenTestSuite.approve(TOKEN_USDC, USER, address(creditManager));
 
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
@@ -333,10 +333,10 @@ contract MultiCallIntegrationTest is
     function test_I_MC_10_enable_token_is_correct() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, false);
 
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, 100);
+        tokenTestSuite.mint(TOKEN_USDC, creditAccount, 100);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -349,7 +349,7 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, true);
     }
 
     /// @dev I:[MC-11]: slippage check works correctly
@@ -359,7 +359,7 @@ contract MultiCallIntegrationTest is
         uint256 expectedDAI = 1000;
         uint256 expectedLINK = 2000;
 
-        address tokenLINK = tokenTestSuite.addressOf(Tokens.LINK);
+        address tokenLINK = tokenTestSuite.addressOf(TOKEN_LINK);
 
         BalanceDelta[] memory expectedBalances = new BalanceDelta[](2);
         expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
@@ -367,11 +367,11 @@ contract MultiCallIntegrationTest is
         expectedBalances[1] = BalanceDelta({token: tokenLINK, amount: int256(expectedLINK)});
 
         // TOKEN PREPARATION
-        tokenTestSuite.mint(Tokens.DAI, USER, expectedDAI * 3);
-        tokenTestSuite.mint(Tokens.LINK, USER, expectedLINK * 3);
+        tokenTestSuite.mint(TOKEN_DAI, USER, expectedDAI * 3);
+        tokenTestSuite.mint(TOKEN_LINK, USER, expectedLINK * 3);
 
-        tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.approve(TOKEN_DAI, USER, address(creditManager));
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -407,13 +407,13 @@ contract MultiCallIntegrationTest is
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
-                            )
+                        )
                     })
                 )
             );
@@ -466,9 +466,9 @@ contract MultiCallIntegrationTest is
     function test_I_MC_13_enableToken_works_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
+        address token = tokenTestSuite.addressOf(TOKEN_USDC);
 
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, false);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -481,14 +481,14 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, true);
     }
 
     /// @dev I:[MC-14]: disableToken works as expected in a multicall
     function test_I_MC_14_disableToken_works_as_expected_multicall() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
+        address token = tokenTestSuite.addressOf(TOKEN_USDC);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -514,7 +514,7 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        expectTokenIsEnabled(creditAccount, TOKEN_USDC, false);
     }
 
     //
@@ -526,7 +526,7 @@ contract MultiCallIntegrationTest is
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256[] memory collateralHints = new uint256[](1);
-        collateralHints[0] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
+        collateralHints[0] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(TOKEN_USDC));
 
         uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
 

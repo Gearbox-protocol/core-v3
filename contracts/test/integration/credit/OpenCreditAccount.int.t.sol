@@ -29,7 +29,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../lib/constants.sol";
 
 // SUITES
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -51,8 +51,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         uint256 cumulativeAtOpen = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
-        tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_DAI, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_DAI, USER, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -62,8 +62,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT / 2)
+                )
             })
         );
 
@@ -80,7 +80,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
 
-        expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT + DAI_ACCOUNT_AMOUNT / 2);
+        expectBalance(TOKEN_DAI, creditAccount, DAI_ACCOUNT_AMOUNT + DAI_ACCOUNT_AMOUNT / 2);
         // assertEq(pool.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
         // assertEq(pool.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
         // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
@@ -197,8 +197,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         revocations[0] = RevocationPair({spender: address(this), token: underlying});
 
-        tokenTestSuite.mint(Tokens.DAI, USER, WAD);
-        tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_DAI, USER, WAD);
+        tokenTestSuite.approve(TOKEN_DAI, USER, address(creditManager));
 
         address expectedCreditAccountAddress = accountFactory.head();
 
@@ -265,7 +265,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         amount = bound(amount, 10000, DAI_ACCOUNT_AMOUNT);
         token1 = uint8(bound(token1, 1, creditManager.collateralTokensCount() - 1));
 
-        tokenTestSuite.mint(Tokens.DAI, address(creditManager.pool()), type(uint96).max);
+        tokenTestSuite.mint(TOKEN_DAI, address(creditManager.pool()), type(uint96).max);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(type(uint8).max);
@@ -381,7 +381,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
 
-        expectBalance(Tokens.DAI, creditAccount, 0);
+        expectBalance(TOKEN_DAI, creditAccount, 0);
 
         assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
     }
