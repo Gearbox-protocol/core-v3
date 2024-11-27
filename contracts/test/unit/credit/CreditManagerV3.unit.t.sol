@@ -46,7 +46,7 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -108,7 +108,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        underlying = tokenTestSuite.addressOf(Tokens.DAI);
+        underlying = tokenTestSuite.addressOf(TOKEN_DAI);
 
         addressProvider = new AddressProviderV3ACLMock();
 
@@ -165,10 +165,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     }
 
     function _setUnderlying(bool underlyingIsFeeToken) internal {
-        uint256 oneUSDT = 10 ** _decimals(tokenTestSuite.addressOf(Tokens.USDT));
+        uint256 oneUSDT = 10 ** _decimals(tokenTestSuite.addressOf(TOKEN_USDT));
 
         isFeeToken = underlyingIsFeeToken;
-        underlying = tokenTestSuite.addressOf(underlyingIsFeeToken ? Tokens.USDT : Tokens.DAI);
+        underlying = tokenTestSuite.addressOf(underlyingIsFeeToken ? TOKEN_USDT : TOKEN_DAI);
 
         uint256 _tokenFee = underlyingIsFeeToken ? 20 : 0;
         uint256 _maxTokenFee = underlyingIsFeeToken ? 50 * oneUSDT : 0;
@@ -199,7 +199,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         return IERC20Metadata(token).decimals();
     }
 
-    function _addToken(Tokens token, uint16 lt) internal {
+    function _addToken(uint256 token, uint16 lt) internal {
         _addToken(tokenTestSuite.addressOf(token), lt);
     }
 
@@ -226,7 +226,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    function _addQuotedToken(Tokens token, uint16 lt, uint96 quoted, uint128 outstandingInterest) internal {
+    function _addQuotedToken(uint256 token, uint16 lt, uint96 quoted, uint128 outstandingInterest) internal {
         _addQuotedToken({
             token: tokenTestSuite.addressOf(token),
             lt: lt,
@@ -252,7 +252,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
-    function _getTokenMaskOrRevert(Tokens token) internal view returns (uint256) {
+    function _getTokenMaskOrRevert(uint256 token) internal view returns (uint256) {
         return creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(token));
     }
 
@@ -337,14 +337,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
 
-        assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
+        assertEq(creditManager.underlying(), tokenTestSuite.addressOf(TOKEN_DAI), _testCaseErr("Incorrect underlying"));
 
         (address token,) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
 
-        assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
+        assertEq(token, tokenTestSuite.addressOf(TOKEN_DAI), _testCaseErr("Incorrect underlying"));
 
         assertEq(
-            creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI)),
+            creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(TOKEN_DAI)),
             1,
             _testCaseErr("Incorrect token mask for underlying token")
         );
@@ -660,23 +660,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         address[] memory hasQuotedTokens = new address[](2);
 
-        hasQuotedTokens[0] = tokenTestSuite.addressOf(Tokens.USDC);
-        hasQuotedTokens[1] = tokenTestSuite.addressOf(Tokens.LINK);
+        hasQuotedTokens[0] = tokenTestSuite.addressOf(TOKEN_USDC);
+        hasQuotedTokens[1] = tokenTestSuite.addressOf(TOKEN_LINK);
 
         priceOracleMock.setPrice(underlying, 10 ** 8);
 
         /// @notice sets price 2 USD for underlying
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.USDC), USDC_MULTIPLIER * 10 ** 8);
+        priceOracleMock.setPrice(tokenTestSuite.addressOf(TOKEN_USDC), USDC_MULTIPLIER * 10 ** 8);
 
         /// @notice sets price 4 USD for underlying
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.LINK), LINK_MULTIPLIER * 10 ** 8);
+        priceOracleMock.setPrice(tokenTestSuite.addressOf(TOKEN_LINK), LINK_MULTIPLIER * 10 ** 8);
 
         vm.startPrank(CONFIGURATOR);
-        creditManager.addToken(tokenTestSuite.addressOf(Tokens.USDC));
-        creditManager.addToken(tokenTestSuite.addressOf(Tokens.LINK));
+        creditManager.addToken(tokenTestSuite.addressOf(TOKEN_USDC));
+        creditManager.addToken(tokenTestSuite.addressOf(TOKEN_LINK));
         vm.stopPrank();
 
-        uint256 LINK_TOKEN_MASK = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
+        uint256 LINK_TOKEN_MASK = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(TOKEN_LINK));
 
         LiquidateAccountTestCase[7] memory cases = [
             LiquidateAccountTestCase({
@@ -845,11 +845,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 });
 
                 tokenTestSuite.mint(underlying, creditAccount, _case.underlyingBalance);
-                tokenTestSuite.mint(tokenTestSuite.addressOf(Tokens.USDC), creditAccount, _case.usdcBalance);
-                tokenTestSuite.mint(tokenTestSuite.addressOf(Tokens.LINK), creditAccount, _case.linkBalance);
+                tokenTestSuite.mint(tokenTestSuite.addressOf(TOKEN_USDC), creditAccount, _case.usdcBalance);
+                tokenTestSuite.mint(tokenTestSuite.addressOf(TOKEN_LINK), creditAccount, _case.linkBalance);
 
                 // vm.startPrank(CONFIGURATOR);
-                // for (uint256 j; j < _case.quotedTokens.length; ++j) {
+                // for (uint256 j; j < _case.quotedTOKEN_length; ++j) {
                 //     creditManager.setQuotedMask(
                 //         creditManager.quotedTokensMask() | creditManager.getTokenMaskOrRevert(_case.quotedTokens[j])
                 //     );
@@ -1167,13 +1167,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         tokenTestSuite.mint(underlying, creditAccount, _amountWithFee(DAI_ACCOUNT_AMOUNT));
 
         address[] memory quotedTokens = new address[](2);
-        quotedTokens[0] = tokenTestSuite.addressOf(Tokens.LINK);
-        quotedTokens[1] = tokenTestSuite.addressOf(Tokens.USDC);
+        quotedTokens[0] = tokenTestSuite.addressOf(TOKEN_LINK);
+        quotedTokens[1] = tokenTestSuite.addressOf(TOKEN_USDC);
 
-        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 10000, outstandingInterest: 0});
-        _addQuotedToken({token: Tokens.USDC, lt: 80_00, quoted: 10000, outstandingInterest: 0});
+        _addQuotedToken({token: TOKEN_LINK, lt: 80_00, quoted: 10000, outstandingInterest: 0});
+        _addQuotedToken({token: TOKEN_USDC, lt: 80_00, quoted: 10000, outstandingInterest: 0});
 
-        uint256 quotedTokensMask = _getTokenMaskOrRevert(Tokens.LINK) | _getTokenMaskOrRevert(Tokens.USDC);
+        uint256 quotedTokensMask = _getTokenMaskOrRevert(TOKEN_LINK) | _getTokenMaskOrRevert(TOKEN_USDC);
         //vm.prank(CONFIGURATOR);
         //creditManager.setQuotedMask(quotedTokensMask);
 
@@ -1238,7 +1238,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-13]: addCollateral works as expected
     function test_U_CM_13_addCollateral_works_as_expected() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
-        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+        address linkToken = tokenTestSuite.addressOf(TOKEN_LINK);
 
         uint256 amount = DAI_ACCOUNT_AMOUNT;
 
@@ -1272,7 +1272,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-14]: approveCreditAccount works as expected
     function test_U_CM_14_approveCreditAccount_works_as_expected() public creditManagerTest {
         address creditAccount = address(new CreditAccountMock());
-        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+        address linkToken = tokenTestSuite.addressOf(TOKEN_LINK);
 
         creditManager.setActiveCreditAccount(address(creditAccount));
 
@@ -1560,11 +1560,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint128 STETH_INTEREST = uint128(debt / 100);
         uint128 INITIAL_INTEREST = 500;
 
-        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: LINK_QUOTA, outstandingInterest: LINK_INTEREST});
-        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: STETH_QUOTA, outstandingInterest: STETH_INTEREST});
+        _addQuotedToken({token: TOKEN_LINK, lt: 80_00, quoted: LINK_QUOTA, outstandingInterest: LINK_INTEREST});
+        _addQuotedToken({token: TOKEN_STETH, lt: 30_00, quoted: STETH_QUOTA, outstandingInterest: STETH_INTEREST});
 
-        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
-        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_LINK});
+        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_STETH});
 
         vars.set("cumulativeIndexNow", RAY * 22 / 10);
         vars.set("cumulativeIndexLastUpdate", RAY * 21 / 10);
@@ -1599,7 +1599,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(collateralDebtData._poolQuotaKeeper, address(poolQuotaKeeperMock), "Incorrect _poolQuotaKeeper");
 
         assertEq(
-            collateralDebtData.quotedTokens, tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH), "Incorrect quotedTokens"
+            collateralDebtData.quotedTokens, tokenTestSuite.listOf(TOKEN_LINK, TOKEN_STETH), "Incorrect quotedTokens"
         );
 
         assertEq(
@@ -1654,7 +1654,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vars.set("LINK_LT", 80_00);
         _addQuotedToken({
-            token: Tokens.LINK,
+            token: TOKEN_LINK,
             lt: uint16(vars.get("LINK_LT")),
             quoted: uint96(vars.get("LINK_QUOTA")),
             outstandingInterest: uint128(vars.get("LINK_INTEREST"))
@@ -1671,7 +1671,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vars.set("LINK_PRICE", 4);
         priceOracleMock.setPrice({
-            token: tokenTestSuite.addressOf(Tokens.LINK),
+            token: tokenTestSuite.addressOf(TOKEN_LINK),
             price: vars.get("LINK_PRICE") * (10 ** 8)
         });
 
@@ -1684,7 +1684,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 debt = DAI_ACCOUNT_AMOUNT;
 
         _collateralTestSetup(debt);
-        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_LINK});
 
         CollateralCalcTestCase[3] memory cases = [
             CollateralCalcTestCase({
@@ -1737,7 +1737,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 });
 
                 tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _case.underlyingBalance});
-                tokenTestSuite.mint({t: Tokens.LINK, to: creditAccount, amount: _case.linkBalance});
+                tokenTestSuite.mint({t: TOKEN_LINK, to: creditAccount, amount: _case.linkBalance});
 
                 CollateralDebtData memory collateralDebtData =
                     creditManager.calcDebtAndCollateralFC({creditAccount: creditAccount, task: tasks[taskIndex]});
@@ -1786,14 +1786,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     function test_U_CM_24_getQuotedTokensData_works_correctly() public creditManagerTest {
         assertEq(creditManager.collateralTokensCount(), 1, "SETUP: incorrect tokens count");
 
-        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 10_000, outstandingInterest: 40_000});
-        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+        _addQuotedToken({token: TOKEN_LINK, lt: 80_00, quoted: 10_000, outstandingInterest: 40_000});
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_LINK});
 
-        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: 20_000, outstandingInterest: 10_000});
-        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
+        _addQuotedToken({token: TOKEN_STETH, lt: 30_00, quoted: 20_000, outstandingInterest: 10_000});
+        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_STETH});
 
-        _addQuotedToken({token: Tokens.CVX, lt: 20_00, quoted: 100_000, outstandingInterest: 30_000});
-        uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.CVX});
+        _addQuotedToken({token: TOKEN_CVX, lt: 20_00, quoted: 100_000, outstandingInterest: 30_000});
+        uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_CVX});
 
         GetQuotedTokenDataTestCase[4] memory cases = [
             GetQuotedTokenDataTestCase({
@@ -1807,7 +1807,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             GetQuotedTokenDataTestCase({
                 name: "1 quoted token",
                 enabledTokensMask: STETH_TOKEN_MASK,
-                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.STETH),
+                expectedQuotaTokens: tokenTestSuite.listOf(TOKEN_STETH),
                 expertedOutstandingQuotaInterest: 10_000,
                 expectedQuotas: arrayOf(20_000, 0, 0),
                 expectedLts: arrayOfU16(30_00, 0, 0)
@@ -1815,7 +1815,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             GetQuotedTokenDataTestCase({
                 name: "2 quoted tokens",
                 enabledTokensMask: STETH_TOKEN_MASK | LINK_TOKEN_MASK,
-                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH),
+                expectedQuotaTokens: tokenTestSuite.listOf(TOKEN_LINK, TOKEN_STETH),
                 expertedOutstandingQuotaInterest: 40_000 + 10_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 0),
                 expectedLts: arrayOfU16(80_00, 30_00, 0)
@@ -1823,7 +1823,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             GetQuotedTokenDataTestCase({
                 name: "3 quoted tokens",
                 enabledTokensMask: STETH_TOKEN_MASK | LINK_TOKEN_MASK | CVX_TOKEN_MASK,
-                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.CVX),
+                expectedQuotaTokens: tokenTestSuite.listOf(TOKEN_LINK, TOKEN_STETH, TOKEN_CVX),
                 expertedOutstandingQuotaInterest: 40_000 + 10_000 + 30_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 100_000),
                 expectedLts: arrayOfU16(80_00, 30_00, 20_00)
@@ -1861,8 +1861,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-25]: updateQuota works correctly
     function test_U_CM_25_updateQuota_works_correctly() public creditManagerTest {
-        _addToken(Tokens.LINK, 80_00);
-        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+        _addToken(TOKEN_LINK, 80_00);
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: TOKEN_LINK});
 
         uint128 INITIAL_INTEREST = 123123;
         uint128 caInterestChange = 10323212323;
@@ -1900,7 +1900,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
                 creditAccount: creditAccount,
-                token: tokenTestSuite.addressOf(Tokens.LINK),
+                token: tokenTestSuite.addressOf(TOKEN_LINK),
                 quotaChange: 122,
                 minQuota: 122,
                 maxQuota: type(uint96).max
@@ -1933,7 +1933,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-26]: withdrawCollateral reverts for unknown token
     function test_U_CM_26_withdrawCollateral_reverts_for_unknown_token() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
-        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+        address linkToken = tokenTestSuite.addressOf(TOKEN_LINK);
         /// @notice check that it reverts on unknown token
         vm.expectRevert(TokenNotAllowedException.selector);
         creditManager.withdrawCollateral({creditAccount: creditAccount, token: linkToken, amount: 20000, to: USER});
@@ -2207,7 +2207,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.revertTo(snapshot);
         /// @notice Non-underlying token case
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        address weth = tokenTestSuite.addressOf(TOKEN_WETH);
 
         creditManager.addToken(weth);
 

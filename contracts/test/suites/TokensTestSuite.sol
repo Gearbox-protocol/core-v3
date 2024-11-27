@@ -22,21 +22,21 @@ import "../lib/constants.sol";
 
 import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {MockTokensData, MockToken} from "../config/MockTokensData.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk-gov/contracts/TokensData.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
     using SafeERC20 for IERC20;
 
-    mapping(Tokens => address) public addressOf;
-    mapping(Tokens => string) public symbols;
-    mapping(Tokens => uint256) public prices;
-    mapping(Tokens => address) public priceFeedsMap;
+    mapping(uint256 => address) public addressOf;
+    mapping(uint256 => string) public symbols;
+    mapping(uint256 => uint256) public prices;
+    mapping(uint256 => address) public priceFeedsMap;
 
-    mapping(Tokens => TokenType) public tokenTypes;
+    mapping(uint256 => TokenType) public tokenTypes;
 
-    mapping(address => Tokens) public tokenIndexes;
+    mapping(address => uint256) public tokenIndexes;
 
     uint256 public tokenCount;
 
@@ -82,18 +82,18 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
                 }
             }
         }
-        wethToken = addressOf[Tokens.WETH];
+        wethToken = addressOf[TOKEN_WETH];
     }
 
     function addMockToken(MockToken memory token) internal {
         IERC20 t;
 
-        if (token.index == Tokens.WETH) {
+        if (token.index == TOKEN_WETH) {
             t = new WETHMock();
             wethToken = address(t);
-        } else if (token.index == Tokens.USDC) {
+        } else if (token.index == TOKEN_USDC) {
             t = new ERC20BlacklistableMock(token.symbol, token.symbol, token.decimals);
-        } else if (token.index == Tokens.USDT) {
+        } else if (token.index == TOKEN_USDT) {
             t = new ERC20FeeMock(token.symbol, token.symbol, token.decimals);
         } else {
             t = new ERC20Mock(token.symbol, token.symbol, token.decimals);
@@ -117,49 +117,53 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
         return priceFeeds;
     }
 
-    function mint(Tokens t, address to, uint256 amount) public {
+    function mint(uint256 t, address to, uint256 amount) public {
         mint(addressOf[t], to, amount);
     }
 
-    function balanceOf(Tokens t, address holder) public view returns (uint256) {
+    function balanceOf(uint256 t, address holder) public view returns (uint256) {
         return balanceOf(addressOf[t], holder);
     }
 
-    function approve(Tokens t, address from, address spender) public {
+    function approve(uint256 t, address from, address spender) public {
         approve(addressOf[t], from, spender);
     }
 
-    function approve(Tokens t, address from, address spender, uint256 amount) public {
+    function approve(uint256 t, address from, address spender, uint256 amount) public {
         approve(addressOf[t], from, spender, amount);
     }
 
-    function allowance(Tokens t, address from, address spender) external view returns (uint256) {
+    function allowance(uint256 t, address from, address spender) external view returns (uint256) {
         return IERC20(addressOf[t]).allowance(from, spender);
     }
 
-    function burn(Tokens t, address from, uint256 amount) external {
+    function burn(uint256 t, address from, uint256 amount) external {
         burn(addressOf[t], from, amount);
     }
 
-    function listOf(Tokens t1) external view returns (address[] memory tokensList) {
+    function listOf(uint256 t1) external view returns (address[] memory tokensList) {
         tokensList = new address[](1);
         tokensList[0] = addressOf[t1];
     }
 
-    function listOf(Tokens t1, Tokens t2) external view returns (address[] memory tokensList) {
+    function listOf(uint256 t1, uint256 t2) external view returns (address[] memory tokensList) {
         tokensList = new address[](2);
         tokensList[0] = addressOf[t1];
         tokensList[1] = addressOf[t2];
     }
 
-    function listOf(Tokens t1, Tokens t2, Tokens t3) external view returns (address[] memory tokensList) {
+    function listOf(uint256 t1, uint256 t2, uint256 t3) external view returns (address[] memory tokensList) {
         tokensList = new address[](3);
         tokensList[0] = addressOf[t1];
         tokensList[1] = addressOf[t2];
         tokensList[2] = addressOf[t3];
     }
 
-    function listOf(Tokens t1, Tokens t2, Tokens t3, Tokens t4) external view returns (address[] memory tokensList) {
+    function listOf(uint256 t1, uint256 t2, uint256 t3, uint256 t4)
+        external
+        view
+        returns (address[] memory tokensList)
+    {
         tokensList = new address[](4);
         tokensList[0] = addressOf[t1];
         tokensList[1] = addressOf[t2];

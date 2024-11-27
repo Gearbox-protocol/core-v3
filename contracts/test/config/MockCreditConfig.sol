@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 import "forge-std/console.sol";
@@ -30,7 +30,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
     string public name = "Diesel DAI v3";
 
     uint256 public chainId;
-    Tokens public underlying = Tokens.DAI;
+    uint256 public underlying = TOKEN_DAI;
     bool public constant supportsQuotas = true;
     uint256 public constant getAccountAmount = DAI_ACCOUNT_AMOUNT;
 
@@ -54,21 +54,21 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         NetworkDetector nd = new NetworkDetector();
         chainId = nd.chainId();
 
-        _gaugeRates.push(GaugeRate({token: Tokens.USDC, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.USDT, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.WETH, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.LINK, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.CRV, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.CVX, minRate: 1, maxRate: 10_000}));
-        _gaugeRates.push(GaugeRate({token: Tokens.STETH, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_USDC, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_USDT, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_WETH, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_LINK, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_CRV, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_CVX, minRate: 1, maxRate: 10_000}));
+        _gaugeRates.push(GaugeRate({token: TOKEN_STETH, minRate: 1, maxRate: 10_000}));
 
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDC, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.USDT, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.WETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.LINK, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CRV, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.CVX, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
-        _quotaLimits.push(PoolQuotaLimit({token: Tokens.STETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_USDC, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_USDT, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_WETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_LINK, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_CRV, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_CVX, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
+        _quotaLimits.push(PoolQuotaLimit({token: TOKEN_STETH, quotaIncreaseFee: 0, limit: uint96(type(int96).max)}));
 
         CreditManagerV3DeployParams storage cp = _creditManagers.push();
 
@@ -87,13 +87,13 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         cp.name = "Mock Credit Manager DAI";
 
         CollateralTokenHuman[] storage cts = cp.collateralTokens;
-        cts.push(CollateralTokenHuman({token: Tokens.USDC, lt: 90_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.USDT, lt: 88_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.WETH, lt: 83_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.LINK, lt: 73_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.CRV, lt: 73_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.CVX, lt: 73_00}));
-        cts.push(CollateralTokenHuman({token: Tokens.STETH, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_USDC, lt: 90_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_USDT, lt: 88_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_WETH, lt: 83_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_LINK, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_CRV, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_CVX, lt: 73_00}));
+        cts.push(CollateralTokenHuman({token: TOKEN_STETH, lt: 73_00}));
     }
 
     function poolParams() external view override returns (PoolV3DeployParams memory) {

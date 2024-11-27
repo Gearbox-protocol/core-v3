@@ -19,7 +19,7 @@ import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
@@ -51,10 +51,10 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
     CreditManagerMock creditManagerMock;
 
     function setUp() public {
-        _setUp(Tokens.DAI);
+        _setUp(TOKEN_DAI);
     }
 
-    function _setUp(Tokens t) public {
+    function _setUp(uint256 t) public {
         tokenTestSuite = new TokensTestSuite();
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
@@ -62,7 +62,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         underlying = tokenTestSuite.addressOf(t);
 
         addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(TOKEN_WETH), false);
 
         poolMock = new PoolMock(address(addressProvider), underlying);
 
@@ -184,8 +184,8 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
     /// @notice U:[PQK-7]: updateRates works as expected
     function test_U_PQK_07_updateRates_works_as_expected() public {
-        address DAI = tokenTestSuite.addressOf(Tokens.DAI);
-        address USDC = tokenTestSuite.addressOf(Tokens.USDC);
+        address DAI = tokenTestSuite.addressOf(TOKEN_DAI);
+        address USDC = tokenTestSuite.addressOf(TOKEN_USDC);
 
         uint16 DAI_QUOTA_RATE = 20_00;
         uint16 USDC_QUOTA_RATE = 45_00;
@@ -281,7 +281,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
     /// @notice U:[PQK-7B]: updateRates reverts on zero rate
     function test_U_PQK_07B_updateRates_reverts_on_zero_rate() public {
-        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address dai = tokenTestSuite.addressOf(TOKEN_DAI);
 
         gaugeMock.addQuotaToken(dai, 0);
 
@@ -409,7 +409,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
     function test_U_PQK_14_updateQuotas_reverts_for_unregistered_token() public {
         pqk.addCreditManager(address(creditManagerMock));
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
 
         vm.expectRevert(TokenIsNotQuotedException.selector);
         vm.prank(address(creditManagerMock));

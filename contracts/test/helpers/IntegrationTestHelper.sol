@@ -43,7 +43,7 @@ import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import {DegenNFTMock} from "../mocks/token/DegenNFTMock.sol";
 import "../lib/constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 import {BalanceHelper} from "./BalanceHelper.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
@@ -90,7 +90,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     address public weth;
 
     bool public anyUnderlying = true;
-    Tokens public underlyingT = Tokens.DAI;
+    uint256 public underlyingT = TOKEN_DAI;
 
     address public underlying;
 
@@ -154,7 +154,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         _;
     }
 
-    modifier withUnderlying(Tokens t) {
+    modifier withUnderlying(uint256 t) {
         anyUnderlying = false;
         underlyingT = t;
         _;
@@ -214,7 +214,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.deal(address(this), 100 * WAD);
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        weth = tokenTestSuite.addressOf(Tokens.WETH);
+        weth = tokenTestSuite.addressOf(TOKEN_WETH);
 
         vm.startPrank(CONFIGURATOR);
         GenesisFactory gp = new GenesisFactory();
@@ -379,7 +379,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _deployMockCreditAndPool() internal {
-        require(underlyingT == Tokens.DAI, "IntegrationTestHelper: Only DAI mock config is supported");
+        require(underlyingT == TOKEN_DAI, "IntegrationTestHelper: Only DAI mock config is supported");
         IPoolV3DeployConfig creditConfig = new MockCreditConfig();
         _deployCreditAndPool(creditConfig);
     }
@@ -614,15 +614,17 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
     }
 
-    function expectTokenIsEnabled(address creditAccount, Tokens t, bool expectedState) internal {
+    function expectTokenIsEnabled(address creditAccount, uint256 t, bool expectedState) internal {
         expectTokenIsEnabled(creditAccount, t, expectedState, "");
     }
 
-    function expectTokenIsEnabled(address creditAccount, Tokens t, bool expectedState, string memory reason) internal {
+    function expectTokenIsEnabled(address creditAccount, uint256 t, bool expectedState, string memory reason)
+        internal
+    {
         expectTokenIsEnabled(creditAccount, tokenTestSuite.addressOf(t), expectedState, reason);
     }
 
-    function addCollateral(Tokens t, uint256 amount) internal {
+    function addCollateral(uint256 t, uint256 amount) internal {
         tokenTestSuite.mint(t, USER, amount);
         tokenTestSuite.approve(t, USER, address(creditManager));
 
@@ -637,7 +639,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _checkForWETHTest(address tester) internal {
-        expectBalance(Tokens.WETH, tester, WETH_TEST_AMOUNT);
+        expectBalance(TOKEN_WETH, tester, WETH_TEST_AMOUNT);
 
         expectEthBalance(tester, 0);
     }
@@ -652,10 +654,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             IWETH(weth).deposit{value: tester.balance}();
         }
 
-        IERC20(weth).transfer(address(this), tokenTestSuite.balanceOf(Tokens.WETH, tester));
+        IERC20(weth).transfer(address(this), tokenTestSuite.balanceOf(TOKEN_WETH, tester));
 
         vm.stopPrank();
-        expectBalance(Tokens.WETH, tester, 0);
+        expectBalance(TOKEN_WETH, tester, 0);
 
         vm.deal(tester, WETH_TEST_AMOUNT);
     }

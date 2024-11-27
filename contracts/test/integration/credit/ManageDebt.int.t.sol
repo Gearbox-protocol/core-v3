@@ -11,7 +11,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 // TESTS
 import "../../lib/constants.sol";
 import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
@@ -83,7 +83,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
         uint256 amount = maxDebt - DAI_ACCOUNT_AMOUNT + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
+        tokenTestSuite.mint(TOKEN_DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -125,7 +125,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     function test_I_MD_05_increaseDebt_reverts_with_forbidden_tokens() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
         uint256 linkMask = creditManager.getTokenMaskOrRevert(link);
 
         vm.prank(USER);
@@ -199,7 +199,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
         uint256 amount = DAI_ACCOUNT_AMOUNT - minDebt + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
+        tokenTestSuite.mint(TOKEN_DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -217,7 +217,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
     /// @dev I:[MD-8]: manageDebt correctly increases debt
     function test_I_MD_08_manageDebt_correctly_increases_debt(uint120 amount) public creditTest {
-        tokenTestSuite.mint(Tokens.DAI, INITIAL_LP, amount);
+        tokenTestSuite.mint(TOKEN_DAI, INITIAL_LP, amount);
 
         vm.assume(amount > 1);
 

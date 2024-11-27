@@ -37,7 +37,7 @@ import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // SUITES
 
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
@@ -92,7 +92,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT / 2)
                 )
             })
         );
@@ -196,7 +196,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
     /// @dev I:[CCA-5]: closeCreditAccount returns account to the factory and removes owner
     function test_I_CCA_05_closeCreditAccount_returns_account_to_the_factory_and_removes_owner() public creditTest {
-        address daiToken = tokenTestSuite.addressOf(Tokens.DAI);
+        address daiToken = tokenTestSuite.addressOf(TOKEN_DAI);
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),

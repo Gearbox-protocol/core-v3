@@ -10,7 +10,7 @@ import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
@@ -31,13 +31,13 @@ contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
     /// @notice U:[CAH-1]: approveCreditAccount approves with desired allowance
     function test_U_CAH_01_safeApprove_approves_with_desired_allowance() public {
         // Case, when current allowance > Allowance_THRESHOLD
-        tokenTestSuite.approve(Tokens.DAI, creditAccount, DUMB_ADDRESS, 200);
+        tokenTestSuite.approve(TOKEN_DAI, creditAccount, DUMB_ADDRESS, 200);
 
-        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+        address dai = tokenTestSuite.addressOf(TOKEN_DAI);
 
         CreditAccountHelper.safeApprove(creditAccount, dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
-        expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        expectAllowance(TOKEN_DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
 
     /// @dev U:[CAH-2]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve

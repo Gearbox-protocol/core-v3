@@ -10,19 +10,6 @@ interface ITokenTestSuite {
 
     function approve(address token, address holder, address targetContract, uint256 amount) external;
 
-    // function approve(
-    //     Tokens t,
-    //     address holder,
-    //     address targetContract
-    // ) external;
-
-    // function approve(
-    //     Tokens t,
-    //     address holder,
-    //     address targetContract,
-    //     uint256 amount
-    // ) external;
-
     function topUpWETH() external payable;
 
     function topUpWETH(address onBehalfOf, uint256 value) external;
@@ -32,10 +19,4 @@ interface ITokenTestSuite {
     function mint(address token, address to, uint256 amount) external;
 
     function burn(address token, address from, uint256 amount) external;
-
-    // function mint(
-    //     Tokens t,
-    //     address to,
-    //     uint256 amount
-    // ) external;
 }

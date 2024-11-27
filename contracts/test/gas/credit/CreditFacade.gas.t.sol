@@ -14,7 +14,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 
 // SUITES
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 contract CreditFacadeGasTest is IntegrationTestHelper {
     function _zeroAllLTs() internal {
@@ -46,7 +46,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -74,7 +74,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
@@ -105,7 +105,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
@@ -131,8 +131,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
 
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -142,28 +142,28 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             })
         );
@@ -185,8 +185,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
 
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -196,14 +196,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
@@ -234,7 +234,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -274,7 +274,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -308,8 +308,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
 
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -319,14 +319,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             })
         );
@@ -342,7 +342,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
             MultiCall({
@@ -374,7 +374,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -409,7 +409,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -449,7 +449,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -457,8 +457,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        tokenTestSuite.burn(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
-        tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
+        tokenTestSuite.burn(TOKEN_DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
+        tokenTestSuite.mint(TOKEN_LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
 
         calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
@@ -466,7 +466,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
                 )
             })
         );
@@ -496,7 +496,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -539,7 +539,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -577,8 +577,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
     /// @dev G:[FA-16]: closeCreditAccount with debt and two tokens
     function test_G_FA_16_closeCreditAccount_gas_estimate_3() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -588,13 +588,13 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -604,7 +604,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
         vm.roll(block.number + 1);
 
-        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+        address linkToken = tokenTestSuite.addressOf(TOKEN_LINK);
 
         uint256 gasBefore = gasleft();
 
@@ -649,7 +649,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -694,7 +694,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -720,11 +720,11 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
     /// @dev G:[FA-19]: liquidateCreditAccount with two tokens
     function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
-        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
+        tokenTestSuite.mint(TOKEN_DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(TOKEN_DAI, FRIEND, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -734,13 +734,13 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             })
         );
@@ -769,11 +769,11 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
 
-        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
 
-        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
+        tokenTestSuite.mint(TOKEN_DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(TOKEN_DAI, FRIEND, address(creditManager));
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -783,14 +783,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             })
         );

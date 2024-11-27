@@ -11,7 +11,7 @@ import {TestHelper} from "../../lib/helper.sol";
 import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 import "../../lib/constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {CollateralLogicHelper, PRICE_ORACLE, B, Q} from "./CollateralLogicHelper.sol";
 
 /// @title CollateralLogic unit test
@@ -21,9 +21,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
     ///
 
     modifier withTokenSetup() {
-        setTokenParams({t: Tokens.DAI, lt: 95_00, price: 1});
-        setTokenParams({t: Tokens.USDT, lt: 90_00, price: 1});
-        setTokenParams({t: Tokens.LINK, lt: 75_00, price: 15});
+        setTokenParams({t: TOKEN_DAI, lt: 95_00, price: 1});
+        setTokenParams({t: TOKEN_USDT, lt: 90_00, price: 1});
+        setTokenParams({t: TOKEN_LINK, lt: 75_00, price: 15});
         _;
     }
 
@@ -115,7 +115,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
         // expected behavior
         uint256 expectedTotalValueUSD;
         uint256 expectedTwvUSD;
-        Tokens[] expectedOrder;
+        uint256[] expectedOrder;
     }
 
     /// @dev U:[CLL-2]: calcCollateral works correctly
@@ -123,41 +123,41 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
         CalcCollateralTestCase[4] memory cases = [
             CalcCollateralTestCase({
                 name: "No target, one quoted token and underlying",
-                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 5_000})),
-                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
+                balances: arrayOf(B({t: TOKEN_USDT, balance: 10_000}), B({t: TOKEN_DAI, balance: 5_000})),
+                quotas: arrayOf(Q({t: TOKEN_USDT, quota: 10_000})),
                 target: type(uint256).max,
-                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT] + 5_000 * prices[Tokens.DAI],
-                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
-                    + 5_000 * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
-                expectedOrder: arrayOf(Tokens.USDT, Tokens.DAI)
+                expectedTotalValueUSD: 10_000 * prices[TOKEN_USDT] + 5_000 * prices[TOKEN_DAI],
+                expectedTwvUSD: 10_000 * prices[TOKEN_USDT] * lts[TOKEN_USDT] / PERCENTAGE_FACTOR
+                    + 5_000 * prices[TOKEN_DAI] * lts[TOKEN_DAI] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOfTokens(TOKEN_USDT, TOKEN_DAI)
             }),
             CalcCollateralTestCase({
                 name: "No target, two quoted tokens",
-                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
-                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000}), Q({t: Tokens.LINK, quota: 20_000})),
+                balances: arrayOf(B({t: TOKEN_USDT, balance: 10_000}), B({t: TOKEN_LINK, balance: 1_000})),
+                quotas: arrayOf(Q({t: TOKEN_USDT, quota: 10_000}), Q({t: TOKEN_LINK, quota: 20_000})),
                 target: type(uint256).max,
-                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT] + 1_000 * prices[Tokens.LINK],
-                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
-                    + 1_000 * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
-                expectedOrder: arrayOf(Tokens.USDT, Tokens.LINK, Tokens.DAI)
+                expectedTotalValueUSD: 10_000 * prices[TOKEN_USDT] + 1_000 * prices[TOKEN_LINK],
+                expectedTwvUSD: 10_000 * prices[TOKEN_USDT] * lts[TOKEN_USDT] / PERCENTAGE_FACTOR
+                    + 1_000 * prices[TOKEN_LINK] * lts[TOKEN_LINK] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOfTokens(TOKEN_USDT, TOKEN_LINK, TOKEN_DAI)
             }),
             CalcCollateralTestCase({
                 name: "Finite target, one quoted token and underlying",
-                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 5_000})),
-                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
-                target: 8_000 * prices[Tokens.DAI],
-                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT],
-                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
-                expectedOrder: arrayOf(Tokens.USDT)
+                balances: arrayOf(B({t: TOKEN_USDT, balance: 10_000}), B({t: TOKEN_DAI, balance: 5_000})),
+                quotas: arrayOf(Q({t: TOKEN_USDT, quota: 10_000})),
+                target: 8_000 * prices[TOKEN_DAI],
+                expectedTotalValueUSD: 10_000 * prices[TOKEN_USDT],
+                expectedTwvUSD: 10_000 * prices[TOKEN_USDT] * lts[TOKEN_USDT] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOfTokens(TOKEN_USDT)
             }),
             CalcCollateralTestCase({
                 name: "Finite target, two quoted tokens",
-                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
-                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000}), Q({t: Tokens.LINK, quota: 20_000})),
-                target: 8_000 * prices[Tokens.DAI],
-                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT],
-                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
-                expectedOrder: arrayOf(Tokens.USDT)
+                balances: arrayOf(B({t: TOKEN_USDT, balance: 10_000}), B({t: TOKEN_LINK, balance: 1_000})),
+                quotas: arrayOf(Q({t: TOKEN_USDT, quota: 10_000}), Q({t: TOKEN_LINK, quota: 20_000})),
+                target: 8_000 * prices[TOKEN_DAI],
+                expectedTotalValueUSD: 10_000 * prices[TOKEN_USDT],
+                expectedTwvUSD: 10_000 * prices[TOKEN_USDT] * lts[TOKEN_USDT] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOfTokens(TOKEN_USDT)
             })
         ];
 
@@ -178,8 +178,8 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 quotedTokens: quotedTokens,
                 quotasPacked: quotasPacked,
                 creditAccount: creditAccount,
-                underlying: addressOf[Tokens.DAI],
-                ltUnderlying: lts[Tokens.DAI],
+                underlying: addressOf[TOKEN_DAI],
+                ltUnderlying: lts[TOKEN_DAI],
                 twvUSDTarget: _case.target,
                 convertToUSDFn: _convertToUSD,
                 priceOracle: PRICE_ORACLE

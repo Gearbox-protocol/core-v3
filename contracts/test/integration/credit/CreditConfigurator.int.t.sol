@@ -35,7 +35,7 @@ import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {CollateralTokenHuman} from "../../interfaces/ICreditConfig.sol";
 
@@ -150,14 +150,14 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         );
 
         CollateralTokenHuman[8] memory collateralTokenOpts = [
-            CollateralTokenHuman({token: Tokens.DAI, lt: DEFAULT_UNDERLYING_LT}),
-            CollateralTokenHuman({token: Tokens.USDC, lt: 9000}),
-            CollateralTokenHuman({token: Tokens.USDT, lt: 8800}),
-            CollateralTokenHuman({token: Tokens.WETH, lt: 8300}),
-            CollateralTokenHuman({token: Tokens.LINK, lt: 7300}),
-            CollateralTokenHuman({token: Tokens.CRV, lt: 7300}),
-            CollateralTokenHuman({token: Tokens.CVX, lt: 7300}),
-            CollateralTokenHuman({token: Tokens.STETH, lt: 7300})
+            CollateralTokenHuman({token: TOKEN_DAI, lt: DEFAULT_UNDERLYING_LT}),
+            CollateralTokenHuman({token: TOKEN_USDC, lt: 9000}),
+            CollateralTokenHuman({token: TOKEN_USDT, lt: 8800}),
+            CollateralTokenHuman({token: TOKEN_WETH, lt: 8300}),
+            CollateralTokenHuman({token: TOKEN_LINK, lt: 7300}),
+            CollateralTokenHuman({token: TOKEN_CRV, lt: 7300}),
+            CollateralTokenHuman({token: TOKEN_CVX, lt: 7300}),
+            CollateralTokenHuman({token: TOKEN_STETH, lt: 7300})
         ];
 
         uint256 len = collateralTokenOpts.length;
@@ -286,7 +286,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
         creditConfigurator.addCollateralToken(unknownPricefeedToken, 9300);
 
-        address nonQuotedToken = tokenTestSuite.addressOf(Tokens.wstETH);
+        address nonQuotedToken = tokenTestSuite.addressOf(TOKEN_wstETH);
         vm.expectRevert(TokenIsNotQuotedException.selector);
         creditConfigurator.addCollateralToken(nonQuotedToken, 9300);
 
@@ -302,7 +302,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function test_I_CC_04_addCollateralToken_adds_new_token_to_creditManager_and_set_lt() public creditTest {
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
-        address newToken = tokenTestSuite.addressOf(Tokens.wstETH);
+        address newToken = tokenTestSuite.addressOf(TOKEN_wstETH);
         makeTokenQuoted(newToken, 1, uint96(type(int96).max));
 
         vm.expectEmit(true, false, false, false);
@@ -332,7 +332,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.setLiquidationThreshold(underlying, 1);
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
 
         uint16 maxAllowedLT = creditManager.liquidationThresholds(underlying);
         vm.expectRevert(IncorrectLiquidationThresholdException.selector);
@@ -343,7 +343,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-6]: setLiquidationThreshold sets liquidation threshold in creditManager
     function test_I_CC_06_setLiquidationThreshold_sets_liquidation_threshold_in_creditManager() public creditTest {
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
         uint16 newLT = 24;
 
         vm.expectEmit(true, false, false, true);
@@ -376,7 +376,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-8]: allowToken works correctly
     function test_I_CC_08_allowToken_works_correctly() public creditTest {
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
         uint256 forbiddenMask = creditFacade.forbiddenTokenMask();
 
         vm.prank(CONFIGURATOR);
@@ -398,7 +398,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-9]: forbidToken works correctly
     function test_I_CC_09_forbidToken_works_correctly() public creditTest {
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, false, false, false);
@@ -657,7 +657,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-18]: setFees updates LT for underlying or reverts
     function test_I_CC_18_setFees_updates_LT_for_underlying_or_reverts() public creditTest {
-        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+        address usdc = tokenTestSuite.addressOf(TOKEN_USDC);
 
         uint16 expectedLT = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - 2 * DEFAULT_FEE_LIQUIDATION;
 
@@ -904,9 +904,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
             creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
 
-            address crvToken = tokenTestSuite.addressOf(Tokens.CRV);
+            address crvToken = tokenTestSuite.addressOf(TOKEN_CRV);
             uint256 crvMask = creditManager.getTokenMaskOrRevert(crvToken);
-            address cvxToken = tokenTestSuite.addressOf(Tokens.CVX);
+            address cvxToken = tokenTestSuite.addressOf(TOKEN_CVX);
             uint256 cvxMask = creditManager.getTokenMaskOrRevert(cvxToken);
 
             creditConfigurator.forbidToken(crvToken);
@@ -1100,8 +1100,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-30] rampLiquidationThreshold works correctly
     function test_I_CC_30_rampLiquidationThreshold_works_correctly() public creditTest {
-        address dai = tokenTestSuite.addressOf(Tokens.DAI);
-        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+        address dai = tokenTestSuite.addressOf(TOKEN_DAI);
+        address usdc = tokenTestSuite.addressOf(TOKEN_USDC);
 
         vm.expectRevert(TokenNotAllowedException.selector);
         vm.prank(CONFIGURATOR);
