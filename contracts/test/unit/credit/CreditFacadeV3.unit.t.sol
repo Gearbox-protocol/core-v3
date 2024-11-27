@@ -2131,7 +2131,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall(
-                    address(adapter), abi.encodeWithSignature("mint(uint8,address,uint256)", TOKEN_LINK, creditAccount, 10)
+                    address(adapter),
+                    abi.encodeWithSignature("mint(uint256,address,uint256)", TOKEN_LINK, creditAccount, 10)
                 )
             ),
             enabledTokensMask: linkMask,
