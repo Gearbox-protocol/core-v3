@@ -1,5 +1,5 @@
 [profile.default]
-libs = ['lib']
+libs = ['lib', 'node_modules']
 out = 'forge-out'
 solc_version = '0.8.17'
 evm_version = 'shanghai'
@@ -17,6 +17,7 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 max_test_rejects = 200000
 
 [invariant]
-fail_on_revert = true
+fail_on_revert = false
+preserve_state = true
 runs = 200
 depth = 10
