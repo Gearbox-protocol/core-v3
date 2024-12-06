@@ -369,7 +369,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             _prepareAssets(caller, cases[i].assets);
 
-            // receives udnerlying
+            // receives underlying
             vm.expectCall(
                 address(underlying), abi.encodeCall(IERC20.transferFrom, (caller, address(pool), cases[i].assets))
             );
