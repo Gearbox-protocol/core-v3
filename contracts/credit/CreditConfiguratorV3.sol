@@ -25,7 +25,7 @@ import {IAdapter} from "../interfaces/base/IAdapter.sol";
 import {IPhantomToken} from "../interfaces/base/IPhantomToken.sol";
 
 // TRAITS
-import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // EXCEPTIONS
@@ -33,8 +33,8 @@ import "../interfaces/IExceptions.sol";
 
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
-/// @dev Most of the functions can only be accessed by configurator or timelock controller
-contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityCheckTrait {
+/// @dev Most of the functions can only be accessed by configurator
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;
@@ -63,9 +63,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     /// @notice Constructor
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _creditManager)
-        ControlledTrait(ControlledTrait(CreditManagerV3(_creditManager).pool()).acl())
-    {
+    constructor(address _creditManager) ACLTrait(ACLTrait(CreditManagerV3(_creditManager).pool()).acl()) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
@@ -149,7 +147,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
@@ -191,7 +189,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         (, uint16 ltUnderlying) =
             CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: UNDERLYING_TOKEN_MASK});
@@ -257,7 +255,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         override
         nonZeroAddress(token)
         nonUnderlyingTokenOnly(token)
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
@@ -320,7 +318,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
         external
         override
         nonZeroAddress(adapter)
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         address targetContract = _getTargetContractOrRevert({adapter: adapter});
         if (CreditManagerV3(creditManager).adapterToContract(adapter) == address(0)) {
@@ -590,7 +588,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt)
         external
         override
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         _setLimits(newMinDebt, newMaxDebt);
     }
@@ -621,7 +619,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier)
         external
         override
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         _setMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
@@ -717,7 +715,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, SanityC
     function removeEmergencyLiquidator(address liquidator)
         external
         override
-        controllerOrConfiguratorOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 

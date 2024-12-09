@@ -96,7 +96,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         assertEq(underlying, pqk.underlying(), "Incorrect poolMock address");
     }
 
-    /// @notice U:[PQK-2]: configuration functions revert if called nonConfigurator(nonController)
+    /// @notice U:[PQK-2]: configuration functions revert if called nonConfigurator
     function test_U_PQK_02_configuration_functions_reverts_if_call_nonConfigurator() public {
         vm.startPrank(USER);
 
@@ -106,10 +106,10 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pqk.addCreditManager(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pqk.setTokenLimit(DUMB_ADDRESS, 1);
 
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, 1);
 
         vm.stopPrank();

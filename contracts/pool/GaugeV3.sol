@@ -11,7 +11,7 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 // TRAITS
-import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // EXCEPTIONS
@@ -30,7 +30,7 @@ import {
 ///         determined by the Gearbox DAO. GEAR holders then vote either for CA side, which moves the rate towards min,
 ///         or for LP side, which moves it towards max.
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
-contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
+contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
@@ -66,7 +66,7 @@ contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
-        ControlledTrait(ControlledTrait(_pool).acl())
+        ACLTrait(ACLTrait(_pool).acl())
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {
         pool = _pool; // U:[GA-1]
@@ -257,7 +257,7 @@ contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOrConfiguratorOnly // U:[GA-3]
+        configuratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
     }
@@ -268,7 +268,7 @@ contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOrConfiguratorOnly // U:[GA-3]
+        configuratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }

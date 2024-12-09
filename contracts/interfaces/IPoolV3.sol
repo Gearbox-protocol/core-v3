@@ -6,9 +6,9 @@ pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IVersion} from "./base/IVersion.sol";
-import {IControlledTrait} from "./base/IControlledTrait.sol";
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IContractsRegisterTrait} from "./base/IContractsRegisterTrait.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code
@@ -43,7 +43,7 @@ interface IPoolV3Events {
 }
 
 /// @title Pool V3 interface
-interface IPoolV3 is IVersion, IControlledTrait, IContractsRegisterTrait, IPoolV3Events, IERC4626, IERC20Permit {
+interface IPoolV3 is IVersion, IACLTrait, IContractsRegisterTrait, IPoolV3Events, IERC4626, IERC20Permit {
     function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);

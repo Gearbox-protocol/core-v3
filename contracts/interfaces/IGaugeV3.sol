@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IControlledTrait} from "./base/IControlledTrait.sol";
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
 
@@ -40,7 +40,7 @@ interface IGaugeV3Events {
 }
 
 /// @title Gauge V3 interface
-interface IGaugeV3 is IVotingContract, IRateKeeper, IControlledTrait, IGaugeV3Events {
+interface IGaugeV3 is IVotingContract, IRateKeeper, IACLTrait, IGaugeV3Events {
     function updateEpoch() external;
 
     function epochLastUpdate() external view returns (uint16);

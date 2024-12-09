@@ -305,10 +305,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
 
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
 
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.setCreditManagerDebtLimit({creditManager: address(0), newLimit: 0});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);

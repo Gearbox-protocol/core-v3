@@ -14,13 +14,13 @@ import {
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
-import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
-///         instead of voting, allows controller to set rates directly with custom epoch length
-contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
+///         instead of voting, allows configurator to set rates directly with custom epoch length
+contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -55,7 +55,7 @@ contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
     constructor(address poolQuotaKeeper_, uint256 epochLength_)
-        ControlledTrait(ControlledTrait(IPoolQuotaKeeperV3(poolQuotaKeeper_).pool()).acl())
+        ACLTrait(ACLTrait(IPoolQuotaKeeperV3(poolQuotaKeeper_).pool()).acl())
     {
         pool = IPoolQuotaKeeperV3(poolQuotaKeeper_).pool();
         underlying = IPoolQuotaKeeperV3(poolQuotaKeeper_).underlying();
@@ -105,14 +105,14 @@ contract TumblerV3 is ITumblerV3, ControlledTrait, SanityCheckTrait {
     /// @dev Sets `token`'s rate to `rate`
     /// @dev Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
-    function setRate(address token, uint16 rate) external override controllerOrConfiguratorOnly {
+    function setRate(address token, uint16 rate) external override configuratorOnly {
         if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
         _setRate(token, rate);
     }
 
     /// @notice Updates rates in the quota keeper if time passed since the last update is greater than epoch length
     /// @custom:tests U:[TU-4], I:[QR-1]
-    function updateRates() external override controllerOrConfiguratorOnly {
+    function updateRates() external override configuratorOnly {
         if (block.timestamp < IPoolQuotaKeeperV3(poolQuotaKeeper).lastQuotaRateUpdate() + epochLength) return;
         IPoolQuotaKeeperV3(poolQuotaKeeper).updateRates();
     }

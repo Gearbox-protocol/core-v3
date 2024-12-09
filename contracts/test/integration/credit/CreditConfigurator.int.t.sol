@@ -202,7 +202,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.addCollateralToken(DUMB_ADDRESS, 1);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.allowToken(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.allowAdapter(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setFees(0, 0, 0, 0);
@@ -217,10 +229,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setDebtLimits(0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setMaxDebtPerBlockMultiplier(0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setLossLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addEmergencyLiquidator(address(0));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.removeEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setExpirationDate(0);
@@ -235,30 +256,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotPausableAdminException.selector);
         creditConfigurator.forbidToken(DUMB_ADDRESS);
-    }
-
-    /// @dev I:[CC-2B]: controllerOrConfiguratorOnly functions revert on non-pausable admin
-    function test_I_CC_02B_controllerOrConfiguratorOnly_functions_revert_on_non_controller() public creditTest {
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.allowToken(DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.setDebtLimits(0, 0);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.setMaxDebtPerBlockMultiplier(0);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.removeEmergencyLiquidator(address(0));
     }
 
     //

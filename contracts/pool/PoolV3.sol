@@ -26,7 +26,7 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
-import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
@@ -58,7 +58,7 @@ contract PoolV3 is
     Pausable,
     ReentrancyGuardTrait,
     SanityCheckTrait,
-    ControlledTrait,
+    ACLTrait,
     ContractsRegisterTrait,
     IPoolV3
 {
@@ -131,7 +131,7 @@ contract PoolV3 is
         string memory name_,
         string memory symbol_
     )
-        ControlledTrait(acl_) // U:[LP-1A]
+        ACLTrait(acl_) // U:[LP-1A]
         ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
@@ -709,24 +709,24 @@ contract PoolV3 is
         emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
     }
 
-    /// @notice Sets new total debt limit, can only be called by controller
+    /// @notice Sets new total debt limit, can only be called by configurator
     /// @param newLimit New debt limit, `type(uint256).max` for no limit
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOrConfiguratorOnly // U:[LP-2C]
+        configuratorOnly // U:[LP-2C]
     {
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
 
-    /// @notice Sets new debt limit for a given credit manager, can only be called by controller
+    /// @notice Sets new debt limit for a given credit manager, can only be called by configurator
     ///         Adds credit manager to the list of connected managers when called for the first time
     /// @param creditManager Credit manager to set the limit for
     /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOrConfiguratorOnly // U:[LP-2C]
+        configuratorOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
         registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
