@@ -75,7 +75,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         vm.startPrank(configurator);
         addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.addPausableAdmin(configurator);
+        addressProvider.grantRole("PAUSABLE_ADMIN", configurator);
         addressProvider.addCreditManager(creditManager);
         treasury = addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
         vm.stopPrank();

@@ -84,12 +84,6 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when a new expiration timestamp is set in the credit facade
     event SetExpirationDate(uint40 expirationDate);
-
-    /// @notice Emitted when an address is added to the list of emergency liquidators
-    event AddEmergencyLiquidator(address indexed liquidator);
-
-    /// @notice Emitted when an address is removed from the list of emergency liquidators
-    event RemoveEmergencyLiquidator(address indexed liquidator);
 }
 
 /// @title Credit configurator V3 interface
@@ -163,8 +157,4 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
     function setLossLiquidator(address newLossLiquidator) external;
 
     function setExpirationDate(uint40 newExpirationDate) external;
-
-    function addEmergencyLiquidator(address liquidator) external;
-
-    function removeEmergencyLiquidator(address liquidator) external;
 }

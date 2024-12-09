@@ -23,8 +23,7 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
     mapping(address => bool) public isPool;
     mapping(address => bool) public isCreditManager;
 
-    mapping(address => bool) public isPausableAdmin;
-    mapping(address => bool) public isUnpausableAdmin;
+    mapping(bytes32 => mapping(address => bool)) public hasRole;
 
     constructor() {
         _setAddress(AP_ACL, address(this), NO_VERSION_CONTROL);
@@ -82,11 +81,11 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         isCreditManager[creditManager] = true;
     }
 
-    function addPausableAdmin(address newAdmin) external {
-        isPausableAdmin[newAdmin] = true;
+    function grantRole(bytes32 role, address account) external {
+        hasRole[role][account] = true;
     }
 
-    function addUnpausableAdmin(address newAdmin) external {
-        isUnpausableAdmin[newAdmin] = true;
+    function revokeRole(bytes32 role, address account) external {
+        hasRole[role][account] = false;
     }
 }

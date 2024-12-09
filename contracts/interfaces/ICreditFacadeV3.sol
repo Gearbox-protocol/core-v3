@@ -105,10 +105,6 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
 
     function forbiddenTokenMask() external view returns (uint256);
 
-    function emergencyLiquidators() external view returns (address[] memory);
-
-    function isEmergencyLiquidator(address) external view returns (bool);
-
     // ------------------ //
     // ACCOUNT MANAGEMENT //
     // ------------------ //
@@ -148,8 +144,6 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     function setLossLiquidator(address newLossLiquidator) external;
 
     function setTokenAllowance(address token, AllowanceAction allowance) external;
-
-    function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
 
     function pause() external;
 

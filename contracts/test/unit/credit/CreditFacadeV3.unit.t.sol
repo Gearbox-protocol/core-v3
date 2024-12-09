@@ -137,7 +137,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
-        AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
+        AddressProviderV3ACLMock(address(addressProvider)).grantRole("PAUSABLE_ADMIN", CONFIGURATOR);
 
         PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(TOKEN_DAI));
         treasury = makeAddr("TREASURY");
@@ -168,6 +168,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
+            address(addressProvider),
             address(creditManagerMock),
             address(botListMock),
             tokenTestSuite.addressOf(TOKEN_WETH),
@@ -189,7 +190,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
 
         vm.expectRevert(ZeroAddressException.selector);
-        new CreditFacadeV3Harness(address(creditManagerMock), address(0), address(0), address(degenNFTMock), expirable);
+        new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(0),
+            address(0),
+            address(degenNFTMock),
+            expirable
+        );
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause
@@ -300,9 +308,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setEmergencyLiquidator(address(0), AllowanceAction.ALLOW);
     }
 
     /// @dev U:[FA-7]: payable functions wraps eth to msg.sender
@@ -480,8 +485,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.pause();
 
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
+        AddressProviderV3ACLMock(address(addressProvider)).grantRole("EMERGENCY_LIQUIDATOR", LIQUIDATOR);
 
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
         vm.prank(LIQUIDATOR);
@@ -498,8 +502,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             priceUpdates: new PriceUpdate[](0)
         });
 
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
+        AddressProviderV3ACLMock(address(addressProvider)).revokeRole("EMERGENCY_LIQUIDATOR", LIQUIDATOR);
 
         vm.expectRevert("Pausable: paused");
         vm.prank(LIQUIDATOR);
@@ -2257,32 +2260,5 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setTokenAllowance(link, AllowanceAction.ALLOW);
 
         assertEq(creditFacade.forbiddenTokenMask(), 0, "incorrect forbiddenTokenMask");
-    }
-
-    /// @dev U:[FA-53]: setEmergencyLiquidator works properly
-    function test_U_FA_53_setEmergencyLiquidator_works_properly() public notExpirableCase {
-        assertEq(
-            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
-            false,
-            "SETUP: incorrect isEmergencyLiquidator for LIQUIDATOR"
-        );
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
-
-        assertEq(
-            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
-            true,
-            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
-        );
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
-
-        assertEq(
-            creditFacade.isEmergencyLiquidator(LIQUIDATOR),
-            false,
-            "incorrect isEmergencyLiquidator for LIQUIDATOR after ALLOW"
-        );
     }
 }

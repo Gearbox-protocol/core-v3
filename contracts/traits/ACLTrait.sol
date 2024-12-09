@@ -59,12 +59,18 @@ abstract contract ACLTrait is IACLTrait {
     /// @dev Reverts if the caller is not pausable admin
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsPausableAdmin() internal view {
-        if (!IACL(acl).isPausableAdmin(msg.sender)) revert CallerNotPausableAdminException();
+        if (!_hasRole("PAUSABLE_ADMIN", msg.sender)) revert CallerNotPausableAdminException();
     }
 
     /// @dev Reverts if the caller is not unpausable admin
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsUnpausableAdmin() internal view {
-        if (!IACL(acl).isUnpausableAdmin(msg.sender)) revert CallerNotUnpausableAdminException();
+        if (!_hasRole("UNPAUSABLE_ADMIN", msg.sender)) revert CallerNotUnpausableAdminException();
+    }
+
+    /// @dev Whether account `account` has role `role`
+    /// @dev Used to cut contract size on external calls
+    function _hasRole(bytes32 role, address account) internal view returns (bool) {
+        return IACL(acl).hasRole(role, account);
     }
 }

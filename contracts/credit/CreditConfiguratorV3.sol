@@ -515,8 +515,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             address lossLiquidator = prevCreditFacade.lossLiquidator();
             if (lossLiquidator != address(0)) _setLossLiquidator(lossLiquidator); // I:[CC-22]
 
-            _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
-
             _migrateForbiddenTokens(prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
             if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
@@ -525,17 +523,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]
-    }
-
-    /// @dev Migrate emergency liquidators to the new credit facade
-    function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
-        address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
-        uint256 len = emergencyLiquidators.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _addEmergencyLiquidator(emergencyLiquidators[i]);
-            }
-        }
     }
 
     /// @dev Migrates forbidden tokens to the new credit facade
@@ -688,41 +675,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
 
         cf.setExpirationDate(newExpirationDate); // I:[CC-25]
         emit SetExpirationDate(newExpirationDate); // I:[CC-25]
-    }
-
-    /// @notice Adds an address to the list of emergency liquidators
-    /// @param liquidator Address to add to the list
-    function addEmergencyLiquidator(address liquidator)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        _addEmergencyLiquidator(liquidator); // I:[CC-27]
-    }
-
-    /// @dev `addEmergencyLiquidator` implementation
-    function _addEmergencyLiquidator(address liquidator) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-
-        if (cf.isEmergencyLiquidator(liquidator)) return;
-
-        cf.setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // I:[CC-27]
-        emit AddEmergencyLiquidator(liquidator); // I:[CC-27]
-    }
-
-    /// @notice Removes an address from the list of emergency liquidators
-    /// @param liquidator Address to remove from the list
-    function removeEmergencyLiquidator(address liquidator)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-
-        if (cf.isEmergencyLiquidator(liquidator)) {
-            cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
-            emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
-        }
     }
 
     // --------- //

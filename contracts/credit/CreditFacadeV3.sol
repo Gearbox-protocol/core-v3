@@ -119,9 +119,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @notice Contract that enforces a policy on how liquidations with loss are performed
     address public override lossLiquidator;
 
-    /// @dev Set of emergency liquidators
-    EnumerableSet.AddressSet internal _emergencyLiquidatorsSet;
-
     /// @dev Ensures that function caller is credit configurator
     modifier creditConfiguratorOnly() {
         _checkCreditConfigurator();
@@ -138,7 +135,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     ///      caller is an approved emergency liquidator or the loss liquidator
     modifier whenNotPausedOrEmergency() {
         require(
-            !paused() || _emergencyLiquidatorsSet.contains(msg.sender) || msg.sender == lossLiquidator,
+            !paused() || _hasRole("EMERGENCY_LIQUIDATOR", msg.sender) || msg.sender == lossLiquidator,
             "Pausable: paused"
         );
         _;
@@ -157,16 +154,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
+    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
-    constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
-        ACLTrait(ACLTrait(ICreditManagerV3(_creditManager).pool()).acl())
-        nonZeroAddress(_botList)
-    {
+    constructor(
+        address _acl,
+        address _creditManager,
+        address _botList,
+        address _weth,
+        address _degenNFT,
+        bool _expirable
+    ) ACLTrait(_acl) nonZeroAddress(_botList) {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]
@@ -175,16 +177,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
         treasury = IPoolV3(ICreditManagerV3(_creditManager).pool()).treasury(); // U:[FA-1]
-    }
-
-    /// @notice Whether `addr` is an approved emergency liquidator
-    function isEmergencyLiquidator(address addr) public view override returns (bool) {
-        return _emergencyLiquidatorsSet.contains(addr);
-    }
-
-    /// @notice Returns emergency liquidators
-    function emergencyLiquidators() external view override returns (address[] memory) {
-        return _emergencyLiquidatorsSet.values();
     }
 
     // ------------------ //
@@ -884,22 +876,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         forbiddenTokenMask = (allowance == AllowanceAction.ALLOW)
             ? forbiddenTokenMask.disable(tokenMask)
             : forbiddenTokenMask.enable(tokenMask); // U:[FA-52]
-    }
-
-    /// @notice Changes account's status as emergency liquidator
-    /// @param liquidator Account to change the status for
-    /// @param allowance Status to set
-    /// @dev Reverts if caller is not credit configurator
-    function setEmergencyLiquidator(address liquidator, AllowanceAction allowance)
-        external
-        override
-        creditConfiguratorOnly // U:[FA-6]
-    {
-        if (allowance == AllowanceAction.ALLOW) {
-            _emergencyLiquidatorsSet.add(liquidator);
-        } else {
-            _emergencyLiquidatorsSet.remove(liquidator);
-        } // U:[FA-53]
     }
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role

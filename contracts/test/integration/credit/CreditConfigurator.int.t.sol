@@ -238,12 +238,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setLossLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.addEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.removeEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setExpirationDate(0);
 
         vm.stopPrank();
@@ -805,8 +799,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             if (expirable) {
-                CreditFacadeV3 initialCf =
-                    new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), true);
+                CreditFacadeV3 initialCf = new CreditFacadeV3(
+                    address(acl), address(creditManager), address(botList), address(0), address(0), true
+                );
 
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
@@ -825,8 +820,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.prank(CONFIGURATOR);
             creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
-            CreditFacadeV3 cf =
-                new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), expirable);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl), address(creditManager), address(botList), address(0), address(0), expirable
+            );
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -870,7 +866,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function test_I_CC_22B_setCreditFacade_reverts_if_new_facade_is_adapter() public creditTest {
         vm.startPrank(CONFIGURATOR);
 
-        CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), false);
+        CreditFacadeV3 cf =
+            new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), false);
         AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
         TargetContractMock target = new TargetContractMock();
 
@@ -897,10 +894,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             vm.startPrank(CONFIGURATOR);
-
-            creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-            creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
-
             address crvToken = tokenTestSuite.addressOf(TOKEN_CRV);
             uint256 crvMask = creditManager.getTokenMaskOrRevert(crvToken);
             address cvxToken = tokenTestSuite.addressOf(TOKEN_CVX);
@@ -911,8 +904,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             vm.stopPrank();
 
-            CreditFacadeV3 cf =
-                new CreditFacadeV3(address(creditManager), address(botList), address(0), address(0), false);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl), address(creditManager), address(botList), address(0), address(0), false
+            );
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
@@ -921,23 +915,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
                 cf.forbiddenTokenMask(), migrateSettings ? crvMask | cvxMask : 0, "Incorrect forbidden mask migration"
             );
 
-            assertEq(
-                cf.isEmergencyLiquidator(DUMB_ADDRESS),
-                migrateSettings,
-                "Emergency liquidator 1 was not migrated correctly"
-            );
-
-            assertEq(
-                cf.isEmergencyLiquidator(DUMB_ADDRESS2),
-                migrateSettings,
-                "Emergency liquidator 2 was not migrated correctly"
-            );
-
             if (!migrateSettings) {
-                address[] memory el = cf.emergencyLiquidators();
-
-                assertEq(el.length, 0, "Emergency liquidator array was not deleted");
-
                 assertEq(cf.forbiddenTokenMask(), 0, "Incorrect forbidden token mask");
             }
 
@@ -1041,45 +1019,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setLossLiquidator(liquidator);
 
         assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
-    }
-
-    /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
-    function test_I_CC_27_addEmergencyLiquidator_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit AddEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(
-            creditFacade.isEmergencyLiquidator(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
-        );
-
-        address[] memory el = creditFacade.emergencyLiquidators();
-
-        assertEq(el.length, 1, "Emergency liquidator was not added to array");
-
-        assertEq(el[0], DUMB_ADDRESS, "Emergency liquidator address is incorrect");
-    }
-
-    /// @dev I:[CC-28]: removeEmergencyLiquidator works correctly and emits event
-    function test_I_CC_28_removeEmergencyLiquidator_works_correctly() public creditTest {
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.expectEmit(false, false, false, true);
-        emit RemoveEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(
-            !creditFacade.isEmergencyLiquidator(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
-        );
-
-        address[] memory el = creditFacade.emergencyLiquidators();
-
-        assertEq(el.length, 0, "Emergency liquidator was not removed from array");
     }
 
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC

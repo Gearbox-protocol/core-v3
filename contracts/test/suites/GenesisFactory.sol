@@ -38,8 +38,8 @@ contract GenesisFactory is Ownable {
 
         gearStaking = new GearStakingV3(msg.sender, address(gearToken), 1);
 
-        acl.addPausableAdmin(msg.sender);
-        acl.addUnpausableAdmin(msg.sender);
+        acl.grantRole("PAUSABLE_ADMIN", msg.sender);
+        acl.grantRole("UNPAUSABLE_ADMIN", msg.sender);
         acl.transferOwnership(msg.sender);
     }
 }

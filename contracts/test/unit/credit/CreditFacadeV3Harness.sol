@@ -9,9 +9,14 @@ import {ManageDebtAction, CollateralDebtData} from "../../../interfaces/ICreditM
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
-    constructor(address _creditManager, address _botList, address _weth, address _degenNFT, bool _expirable)
-        CreditFacadeV3(_creditManager, _botList, _weth, _degenNFT, _expirable)
-    {}
+    constructor(
+        address _acl,
+        address _creditManager,
+        address _botList,
+        address _weth,
+        address _degenNFT,
+        bool _expirable
+    ) CreditFacadeV3(_acl, _creditManager, _botList, _weth, _degenNFT, _expirable) {}
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;

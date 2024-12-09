@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/utils/Create2.sol";
 
 import "../interfaces/IAddressProviderV3.sol";
+import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
@@ -35,7 +36,8 @@ contract CreditManagerFactory {
     ) {
         creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
 
-        creditFacade = new CreditFacadeV3(address(creditManager), botList, weth, degenNFT, expirable);
+        creditFacade =
+            new CreditFacadeV3(IPoolV3(pool).acl(), address(creditManager), botList, weth, degenNFT, expirable);
         creditManager.setCreditFacade(address(creditFacade));
 
         creditConfigurator = new CreditConfiguratorV3(address(creditManager));
