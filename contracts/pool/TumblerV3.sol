@@ -51,15 +51,13 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param poolQuotaKeeper_ Quota keeper of the pool whose rates to set by this contract
+    /// @param pool_ Pool whose rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address poolQuotaKeeper_, uint256 epochLength_)
-        ACLTrait(ACLTrait(IPoolQuotaKeeperV3(poolQuotaKeeper_).pool()).acl())
-    {
-        pool = IPoolQuotaKeeperV3(poolQuotaKeeper_).pool();
-        underlying = IPoolQuotaKeeperV3(poolQuotaKeeper_).underlying();
-        poolQuotaKeeper = poolQuotaKeeper_;
+    constructor(address pool_, uint256 epochLength_) ACLTrait(ACLTrait(pool_).acl()) {
+        pool = pool_;
+        poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();
+        underlying = IPoolQuotaKeeperV3(poolQuotaKeeper).underlying();
         epochLength = epochLength_;
     }
 
@@ -88,18 +86,17 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
         }
     }
 
-    /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
-    ///         sets its rate to `rate`
-    /// @dev Reverts if `token` is zero address, pool's underlying or is already added, or if `rate` is zero
+    /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there
+    /// @dev Reverts if `token` is zero address, pool's underlying or is already added
     /// @custom:tests U:[TU-2]
-    function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
+    function addToken(address token) external override configuratorOnly nonZeroAddress(token) {
         if (token == underlying || !_tokensSet.add(token)) revert TokenNotAllowedException();
         if (!IPoolQuotaKeeperV3(poolQuotaKeeper).isQuotedToken(token)) {
             IPoolQuotaKeeperV3(poolQuotaKeeper).addQuotaToken(token);
         }
         emit AddToken(token);
 
-        _setRate(token, rate);
+        _setRate(token, 1);
     }
 
     /// @dev Sets `token`'s rate to `rate`
@@ -107,6 +104,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     /// @custom:tests U:[TU-3]
     function setRate(address token, uint16 rate) external override configuratorOnly {
         if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
+        if (rate == 0) revert IncorrectParameterException();
         _setRate(token, rate);
     }
 
@@ -119,7 +117,6 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
 
     /// @dev `setRate` implementation
     function _setRate(address token, uint16 rate) internal {
-        if (rate == 0) revert IncorrectParameterException();
         if (_rates[token] == rate) return;
         _rates[token] = rate;
         emit SetRate(token, rate);

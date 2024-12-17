@@ -34,14 +34,17 @@ contract QuotaRatesIntegrationTest is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(pool));
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        tumbler = new TumblerV3(address(quotaKeeper), 1 days);
+        tumbler = new TumblerV3(address(pool), 1 days);
         quotaKeeper.setGauge(address(tumbler));
     }
 
     /// @notice I:[QR-1]: `TumblerV3` allows to change rates in `PoolQuotaKeeperV3`
     function test_I_QR_01_tumbler_allows_to_change_rates_in_poolQuotaKeeper() public {
-        tumbler.addToken(address(token1), 4200);
-        tumbler.addToken(address(token2), 12000);
+        tumbler.addToken(address(token1));
+        tumbler.addToken(address(token2));
+
+        tumbler.setRate(address(token1), 4200);
+        tumbler.setRate(address(token2), 12000);
 
         address[] memory tokens = new address[](2);
         tokens[0] = address(token1);

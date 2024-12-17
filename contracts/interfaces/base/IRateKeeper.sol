@@ -11,6 +11,10 @@ interface IRateKeeper is IVersion {
     /// @notice Pool rates are provided for
     function pool() external view returns (address);
 
+    /// @notice Adds token to the rate keeper
+    /// @dev Must add token to the quota keeper in case it's not already there
+    function addToken(address token) external;
+
     /// @notice Whether token is added to the rate keeper
     function isTokenAdded(address token) external view returns (bool);
 

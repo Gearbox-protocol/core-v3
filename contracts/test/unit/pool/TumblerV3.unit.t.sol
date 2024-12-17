@@ -40,7 +40,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        tumbler = new TumblerV3(address(poolQuotaKeeper), 1 days);
+        tumbler = new TumblerV3(address(pool), 1 days);
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
@@ -62,15 +62,11 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         // addToken reverts if token is zero address
         vm.expectRevert(ZeroAddressException.selector);
-        tumbler.addToken(address(0), 0);
+        tumbler.addToken(address(0));
 
         // addToken reverts if token is underlying
         vm.expectRevert(TokenNotAllowedException.selector);
-        tumbler.addToken(underlying, 0);
-
-        // addToken reverts on zero rate
-        vm.expectRevert(IncorrectParameterException.selector);
-        tumbler.addToken(token1, 0);
+        tumbler.addToken(underlying);
 
         // addToken properly adds token to both rate and quota keeper and sets rate
         poolQuotaKeeper.set_isQuotedToken(false);
@@ -81,9 +77,9 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         emit AddToken(token1);
 
         vm.expectEmit(true, true, true, true);
-        emit SetRate(token1, 4200);
+        emit SetRate(token1, 1);
 
-        tumbler.addToken(token1, 4200);
+        tumbler.addToken(token1);
 
         assertTrue(tumbler.isTokenAdded(token1), "token1 is not added");
 
@@ -93,7 +89,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         // addToken reverts if token is already added
         vm.expectRevert(TokenNotAllowedException.selector);
-        tumbler.addToken(token1, 4200);
+        tumbler.addToken(token1);
 
         // addToken adds token to tumbler but skips quota keeper if token is already there
         poolQuotaKeeper.set_isQuotedToken(true);
@@ -106,7 +102,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.expectEmit(true, true, true, true);
         emit SetRate(token2, 1);
 
-        tumbler.addToken(token2, 1);
+        tumbler.addToken(token2);
 
         assertTrue(tumbler.isTokenAdded(token2), "token2 is not added");
 
@@ -125,7 +121,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.expectRevert(TokenIsNotQuotedException.selector);
         tumbler.setRate(token1, 0);
 
-        tumbler.addToken(token1, 1);
+        tumbler.addToken(token1);
 
         // setRate reverts on zero rate
         vm.expectRevert(IncorrectParameterException.selector);
@@ -159,8 +155,8 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.clearMockedCalls();
         vm.warp(block.timestamp + 1 days);
 
-        tumbler.addToken(token1, 4200);
-        tumbler.addToken(token2, 12000);
+        tumbler.addToken(token1);
+        tumbler.addToken(token2);
 
         // updates rates in quota keeper
         vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.updateRates, ()));

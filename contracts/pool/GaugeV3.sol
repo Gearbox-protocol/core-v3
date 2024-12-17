@@ -229,12 +229,29 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
     /// @param token Address of the token to add
     /// @param minRate The minimal interest rate paid on token's quotas
     /// @param maxRate The maximal interest rate paid on token's quotas
+    /// @dev Exists for backward compatibility with older gauges
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate)
         external
         override
         nonZeroAddress(token) // U:[GA-4]
         configuratorOnly // U:[GA-3]
     {
+        _addToken(token, minRate, maxRate);
+    }
+
+    /// @notice Adds a new quoted token to the gauge with default initial rate params
+    ///         If token is not added to the quota keeper, adds it there as well
+    /// @param token Address of the token to add
+    function addToken(address token)
+        external
+        override
+        nonZeroAddress(token) // U:[GA-4]
+        configuratorOnly // U:[GA-3]
+    {
+        _addToken(token, 1, 1);
+    }
+
+    function _addToken(address token, uint16 minRate, uint16 maxRate) internal {
         if (isTokenAdded(token) || token == IPoolV3(pool).underlyingToken()) {
             revert TokenNotAllowedException(); // U:[GA-4]
         }

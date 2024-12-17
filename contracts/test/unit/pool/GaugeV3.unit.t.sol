@@ -89,6 +89,9 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     /// @dev U:[GA-3]: configuratorOnly functions reverts if called by non-configurator
     function test_U_GA_03_configuratorOnly_functions_reverts_if_called_by_non_configurator() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        gauge.addToken(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -102,6 +105,12 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     function test_U_GA_04_addQuotaToken_reverts_for_incorrect_params() public {
         address token = DUMB_ADDRESS;
         vm.startPrank(CONFIGURATOR);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        gauge.addToken(address(0));
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        gauge.addToken(underlying);
 
         vm.expectRevert(ZeroAddressException.selector);
         gauge.addQuotaToken(address(0), 0, 0);
