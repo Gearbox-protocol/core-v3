@@ -58,8 +58,6 @@ import {TestHelper, Vars, VarU256} from "../../lib/helper.sol";
 
 import "forge-std/console.sol";
 
-uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
-
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
     using CreditLogic for CollateralTokenData;
@@ -140,26 +138,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(priceOracleMock),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
             name,
             isFeeToken
         );
         creditManager.setCreditFacade(address(this));
-
-        creditManager.setFees(
-            0,
-            DEFAULT_FEE_LIQUIDATION,
-            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
-
-        creditManager.setCollateralTokenData({
-            token: underlying,
-            ltInitial: LT_UNDERLYING,
-            ltFinal: LT_UNDERLYING,
-            timestampRampStart: type(uint40).max,
-            rampDuration: 0
-        });
 
         creditManager.setCreditConfigurator(CONFIGURATOR);
     }
@@ -308,6 +294,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(priceOracleMock),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
             "",
             isFeeToken
         );
@@ -319,7 +309,91 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(priceOracleMock),
             0,
             DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
             name,
+            isFeeToken
+        );
+
+        // fee > premium
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            "",
+            isFeeToken
+        );
+
+        // fee (expired) > premium (expired)
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            "",
+            isFeeToken
+        );
+
+        // premium (expired) > premium
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            "",
+            isFeeToken
+        );
+
+        // fee (expired) > fee
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            DEFAULT_LIQUIDATION_PREMIUM + 1,
+            "",
+            isFeeToken
+        );
+
+        // fee + premium >= 100%
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            DEFAULT_MAX_ENABLED_TOKENS,
+            DEFAULT_FEE_INTEREST,
+            PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
+            "",
             isFeeToken
         );
 
@@ -331,6 +405,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(priceOracleMock2),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
             name,
             isFeeToken
         );
@@ -1693,7 +1771,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 underlyingBalance: debt,
                 linkBalance: 0,
                 expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * DEFAULT_UNDERLYING_LT / PERCENTAGE_FACTOR
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
@@ -2190,22 +2268,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.assume(uint256(timestampRampStart) + uint256(rampDuration) < type(uint40).max);
 
-        uint256 snapshot = vm.snapshot();
-
         /// @notice Underlying token case
+        vm.expectRevert(TokenNotAllowedException.selector);
         creditManager.setCollateralTokenData(underlying, ltInitial, 90_00, type(uint40).max, 230);
 
-        CollateralTokenData memory ctd = creditManager.getCollateralTokensData(UNDERLYING_TOKEN_MASK);
-
-        assertEq(ctd.token, underlying, "Incorrect token field");
-        assertEq(ctd.ltInitial, 0, "Incorrect ltInitial");
-        assertEq(ctd.ltFinal, 0, "Incorrect ltFinal");
-        assertEq(ctd.timestampRampStart, type(uint40).max, "Incorrect timestampRampStart");
-        assertEq(ctd.rampDuration, 0, "Incorrect rampDuration");
-
-        assertEq(creditManager.liquidationThresholds(underlying), ltInitial, "Incorrect LT for underlying token");
-
-        vm.revertTo(snapshot);
         /// @notice Non-underlying token case
         address weth = tokenTestSuite.addressOf(TOKEN_WETH);
 
@@ -2213,7 +2279,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         creditManager.setCollateralTokenData(weth, ltInitial, ltFinal, timestampRampStart, rampDuration);
 
-        ctd = creditManager.getCollateralTokensData(creditManager.getTokenMaskOrRevert(weth));
+        CollateralTokenData memory ctd = creditManager.getCollateralTokensData(creditManager.getTokenMaskOrRevert(weth));
 
         assertEq(ctd.token, weth, "Incorrect token field");
         assertEq(ctd.ltInitial, ltInitial, "Incorrect ltInitial");

@@ -156,6 +156,15 @@ error AdapterIsNotRegisteredException();
 /// @notice Thrown if new credit configurator's set of allowed adapters differs from the current one
 error IncorrectAdaptersSetException();
 
+/// @notice Thrown if attempting to schedule a token's LT ramping that is too short in duration
+error RampDurationTooShortException();
+
+/// @notice Thrown if attempting to set liquidation fees such that the sum of premium and fee changes
+error InconsistentLiquidationFeesException();
+
+/// @notice Thrown if attempting to set expired liquidation fees such that the sum of premium and fee changes
+error InconsistentExpiredLiquidationFeesException();
+
 // ------------- //
 // CREDIT FACADE //
 // ------------- //

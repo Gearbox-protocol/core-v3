@@ -225,6 +225,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 gp.priceOracle().setPriceFeed(
                     priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod
                 );
+                gp.priceOracle().setReservePriceFeed(
+                    priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod
+                );
             }
         }
 
@@ -408,18 +411,24 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 whitelisted = cmParams.whitelisted;
             }
 
-            CreditManagerFactory cmf = new CreditManagerFactory({
-                weth: weth,
+            CreditManagerFactory.ManagerParams memory managerParams = CreditManagerFactory.ManagerParams({
                 accountFactory: address(accountFactory),
                 priceOracle: address(priceOracle),
-                botList: address(botList),
-                pool: address(pool),
-                degenNFT: (whitelisted) ? address(degenNFT) : address(0),
-                expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 maxEnabledTokens: cmParams.maxEnabledTokens,
                 feeInterest: cmParams.feeInterest,
+                feeLiquidation: cmParams.feeLiquidation,
+                liquidationPremium: cmParams.liquidationPremium,
+                feeLiquidationExpired: cmParams.feeLiquidationExpired,
+                liquidationPremiumExpired: cmParams.liquidationPremiumExpired,
                 name: cmParams.name
             });
+            CreditManagerFactory.FacadeParams memory facadeParams = CreditManagerFactory.FacadeParams({
+                weth: weth,
+                botList: address(botList),
+                degenNFT: (whitelisted) ? address(degenNFT) : address(0),
+                expirable: (anyExpirable) ? cmParams.expirable : expirable
+            });
+            CreditManagerFactory cmf = new CreditManagerFactory(address(pool), managerParams, facadeParams);
 
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
@@ -427,12 +436,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.startPrank(CONFIGURATOR);
             creditConfigurator.setDebtLimits(cmParams.minDebt, cmParams.maxDebt);
-            creditConfigurator.setFees(
-                cmParams.feeLiquidation,
-                cmParams.liquidationPremium,
-                cmParams.feeLiquidationExpired,
-                cmParams.liquidationPremiumExpired
-            );
 
             vm.etch(LIQUIDATOR, "DUMMY_CODE");
             creditConfigurator.setLossLiquidator(LIQUIDATOR);
@@ -446,7 +449,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);
-                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+                creditConfigurator.setExpirationDate(uint40(block.timestamp + 3 weeks));
             }
 
             vm.prank(CONFIGURATOR);
@@ -593,13 +596,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _makeAccountsLiquidatable() internal {
         vm.startPrank(CONFIGURATOR);
-        uint256 idx = creditManager.collateralTokensCount() - 1;
-        while (idx != 0) {
-            address token = creditManager.getTokenByMask(1 << (idx--));
+        uint256 numTokens = creditManager.collateralTokensCount();
+        for (uint256 i = 1; i < numTokens; ++i) {
+            address token = creditManager.getTokenByMask(1 << i);
             creditConfigurator.setLiquidationThreshold(token, 0);
         }
-        // FIXME: setting liquidation premium to 90% is not the cleanest way to make account liquidatable
-        creditConfigurator.setFees(200, 9000, 100, 9500);
         vm.stopPrank();
 
         // switch to new block to be able to close account

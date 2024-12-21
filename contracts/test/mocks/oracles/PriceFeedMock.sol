@@ -17,7 +17,7 @@ contract PriceFeedMock is IPriceFeed {
     uint256 public constant override version = 3_10;
     bytes32 public constant override contractType = "PRICE_FEED_MOCK";
 
-    int256 private price;
+    int256 public price;
     uint8 public immutable override decimals;
 
     uint80 internal roundId;

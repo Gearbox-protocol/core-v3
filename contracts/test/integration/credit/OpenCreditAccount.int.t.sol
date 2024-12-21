@@ -293,7 +293,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-11]: openCreditAccount no longer works if the CreditFacadeV3 is expired
     function test_I_OCA_11_openCreditAccount_reverts_on_expired_CreditFacade() public expirableCase creditTest {
-        vm.warp(block.timestamp + 1);
+        vm.warp(creditFacade.expirationDate());
 
         vm.expectRevert(NotAllowedAfterExpirationException.selector);
 

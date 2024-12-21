@@ -19,9 +19,24 @@ contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
         address _priceOracle,
         uint8 _maxEnabledTokens,
         uint16 _feeInterest,
+        uint16 _feeLiquidation,
+        uint16 _liquidationPremium,
+        uint16 _feeLiquidationExpired,
+        uint16 _liquidationPremiumExpired,
         string memory _name
     )
-        CreditManagerV3(_pool, _accountFactory, _priceOracle, _maxEnabledTokens, _feeInterest, _name)
+        CreditManagerV3(
+            _pool,
+            _accountFactory,
+            _priceOracle,
+            _maxEnabledTokens,
+            _feeInterest,
+            _feeLiquidation,
+            _liquidationPremium,
+            _feeLiquidationExpired,
+            _liquidationPremiumExpired,
+            _name
+        )
         USDT_Transfer(IPoolV3(_pool).asset())
     {}
 

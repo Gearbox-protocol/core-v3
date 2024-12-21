@@ -22,22 +22,47 @@ contract CreditManagerFactory {
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
 
-    constructor(
-        address weth,
-        address accountFactory,
-        address priceOracle,
-        address botList,
-        address pool,
-        address degenNFT,
-        bool expirable,
-        uint8 maxEnabledTokens,
-        uint16 feeInterest,
-        string memory name
-    ) {
-        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
+    struct ManagerParams {
+        address accountFactory;
+        address priceOracle;
+        uint8 maxEnabledTokens;
+        uint16 feeInterest;
+        uint16 feeLiquidation;
+        uint16 liquidationPremium;
+        uint16 feeLiquidationExpired;
+        uint16 liquidationPremiumExpired;
+        string name;
+    }
 
-        creditFacade =
-            new CreditFacadeV3(IPoolV3(pool).acl(), address(creditManager), botList, weth, degenNFT, expirable);
+    struct FacadeParams {
+        address botList;
+        address weth;
+        address degenNFT;
+        bool expirable;
+    }
+
+    constructor(address pool, ManagerParams memory cmParams, FacadeParams memory cfParams) {
+        creditManager = new CreditManagerV3(
+            pool,
+            cmParams.accountFactory,
+            cmParams.priceOracle,
+            cmParams.maxEnabledTokens,
+            cmParams.feeInterest,
+            cmParams.feeLiquidation,
+            cmParams.liquidationPremium,
+            cmParams.feeLiquidationExpired,
+            cmParams.liquidationPremiumExpired,
+            cmParams.name
+        );
+
+        creditFacade = new CreditFacadeV3(
+            IPoolV3(pool).acl(),
+            address(creditManager),
+            cfParams.botList,
+            cfParams.weth,
+            cfParams.degenNFT,
+            cfParams.expirable
+        );
         creditManager.setCreditFacade(address(creditFacade));
 
         creditConfigurator = new CreditConfiguratorV3(address(creditManager));

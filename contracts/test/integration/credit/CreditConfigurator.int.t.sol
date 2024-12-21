@@ -627,66 +627,63 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-17]: setFees reverts for incorrect fees
-    function test_I_CC_17_setFees_reverts_for_incorrect_fees() public creditTest {
-        (, uint16 feeLiquidation,, uint16 feeLiquidationExpired,) = creditManager.fees();
+    function test_I_CC_17_setFees_reverts_for_incorrect_fees() public allExpirableCases creditTest {
+        (
+            ,
+            uint16 feeLiquidation,
+            uint16 liquidationDiscount,
+            uint16 feeLiquidationExpired,
+            uint16 liquidationDiscountExpired
+        ) = creditManager.fees();
 
+        uint16 liquidationPremium = PERCENTAGE_FACTOR - liquidationDiscount;
+        uint16 liquidationPremiumExpired = PERCENTAGE_FACTOR - liquidationDiscountExpired;
+
+        // fee > premium
         vm.expectRevert(IncorrectParameterException.selector);
-
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, 0, 0);
+        creditConfigurator.setFees(liquidationPremium, feeLiquidation, feeLiquidationExpired, liquidationPremiumExpired);
 
+        // fee (expired) > premium (expired)
         vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, liquidationPremiumExpired, feeLiquidationExpired);
 
+        // premium (expired) > premium
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, feeLiquidationExpired, liquidationPremium + 1);
+
+        // fee (expired) > fee
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, feeLiquidation + 1, liquidationPremiumExpired);
+
+        // fee + premium >= 100%
+        vm.expectRevert(IncorrectParameterException.selector);
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            feeLiquidation,
-            PERCENTAGE_FACTOR - feeLiquidation - 1,
-            feeLiquidationExpired,
-            PERCENTAGE_FACTOR - feeLiquidationExpired
+            feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, feeLiquidation, liquidationPremiumExpired
         );
-    }
 
-    /// @dev I:[CC-18]: setFees updates LT for underlying or reverts
-    function test_I_CC_18_setFees_updates_LT_for_underlying_or_reverts() public creditTest {
-        address usdc = tokenTestSuite.addressOf(TOKEN_USDC);
-
-        uint16 expectedLT = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - 2 * DEFAULT_FEE_LIQUIDATION;
-
-        vm.startPrank(CONFIGURATOR);
-
-        creditConfigurator.setLiquidationThreshold(usdc, expectedLT + 1);
-        vm.expectRevert(IncorrectLiquidationThresholdException.selector);
+        // fee + premium changes
+        vm.expectRevert(InconsistentLiquidationFeesException.selector);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            2 * DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+            feeLiquidation, liquidationPremium + 1, feeLiquidationExpired, liquidationPremiumExpired
         );
-        creditConfigurator.setLiquidationThreshold(usdc, expectedLT - 1);
 
-        creditConfigurator.rampLiquidationThreshold(usdc, expectedLT + 1, uint40(block.timestamp + 1), 1);
-        vm.expectRevert(IncorrectLiquidationThresholdException.selector);
+        if (!expirable) return;
+
+        assertEq(creditFacade.expirationDate(), block.timestamp + 3 weeks, "Incorrect setup");
+        vm.warp(block.timestamp + 2 weeks);
+
+        // fee (expired) + premium (expired) changes less than 2 weeks before expiration
+        vm.expectRevert(InconsistentExpiredLiquidationFeesException.selector);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            2 * DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+            feeLiquidation, liquidationPremium, feeLiquidationExpired, liquidationPremiumExpired + 1
         );
-        creditConfigurator.setLiquidationThreshold(usdc, expectedLT - 1);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
-
-        creditConfigurator.setFees(
-            2 * DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
-
-        assertEq(creditManager.liquidationThresholds(underlying), expectedLT, "Incorrect LT for underlying token");
-
-        vm.stopPrank();
     }
 
     /// @dev I:[CC-19]: setFees sets fees and doesn't change others
@@ -699,10 +696,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             uint16 liquidationDiscountExpired
         ) = creditManager.fees();
 
-        uint16 newFeeLiquidation = feeLiquidation * 3 / 2;
-        uint16 newLiquidationPremium = (PERCENTAGE_FACTOR - liquidationDiscount) * 3 / 2;
-        uint16 newFeeLiquidationExpired = feeLiquidationExpired * 3 / 2;
-        uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 3 / 2;
+        uint16 newFeeLiquidation = feeLiquidation - 50;
+        uint16 newLiquidationPremium = PERCENTAGE_FACTOR - liquidationDiscount + 50;
+        uint16 newFeeLiquidationExpired = feeLiquidationExpired - 50;
+        uint16 newLiquidationPremiumExpired = PERCENTAGE_FACTOR - liquidationDiscountExpired + 50;
 
         vm.expectEmit(false, false, false, true);
         emit UpdateFees(
@@ -807,7 +804,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
 
                 vm.prank(CONFIGURATOR);
-                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1 + ms));
+                creditConfigurator.setExpirationDate(uint40(block.timestamp + 4 weeks + ms));
 
                 creditFacade = initialCf;
             }
@@ -975,32 +972,37 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-25]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
     function test_I_CC_25_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets()
         public
-        expirableCase
+        allExpirableCases
         creditTest
     {
+        if (!expirable) {
+            vm.expectRevert(NotAllowedWhenNotExpirableException.selector);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setExpirationDate(uint40(block.timestamp + 2 weeks));
+            return;
+        }
+
+        vm.expectRevert(IncorrectExpirationDateException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setExpirationDate(uint40(block.timestamp - 1));
+
         uint40 expirationDate = creditFacade.expirationDate();
-
-        vm.prank(CONFIGURATOR);
         vm.expectRevert(IncorrectExpirationDateException.selector);
-        creditConfigurator.setExpirationDate(expirationDate);
-
-        vm.warp(block.timestamp + 10);
-
         vm.prank(CONFIGURATOR);
-        vm.expectRevert(IncorrectExpirationDateException.selector);
-        creditConfigurator.setExpirationDate(expirationDate + 1);
+        creditConfigurator.setExpirationDate(expirationDate - 1);
+
+        vm.warp(block.timestamp + 2 weeks);
 
         uint40 newExpirationDate = uint40(block.timestamp + 1);
+        uint40 expectedExpirationDate = uint40(block.timestamp + 2 weeks);
 
         vm.expectEmit(false, false, false, true);
-        emit SetExpirationDate(newExpirationDate);
+        emit SetExpirationDate(expectedExpirationDate);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setExpirationDate(newExpirationDate);
 
-        expirationDate = creditFacade.expirationDate();
-
-        assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
+        assertEq(creditFacade.expirationDate(), expectedExpirationDate, "Incorrect new expirationDate");
     }
 
     /// @dev I:[CC-26]: setLossLiquidator works correctly
@@ -1041,11 +1043,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(TokenNotAllowedException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 2 days);
 
         vm.expectRevert(IncorrectLiquidationThresholdException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 2 days);
+
+        vm.expectRevert(RampDurationTooShortException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp), 1 days);
 
         vm.expectRevert(IncorrectParameterException.selector);
         vm.prank(CONFIGURATOR);
@@ -1056,26 +1062,26 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp + 1), 1000)
+                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp + 1), 2 days)
             )
         );
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(
-            usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1001)
+            usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1 + 2 days)
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 1), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 1), 2 days);
 
-        vm.warp(block.timestamp + 1006);
+        vm.warp(block.timestamp + 2 days + 6);
 
         vm.expectCall(
             address(creditManager),
-            abi.encodeCall(CreditManagerV3.setCollateralTokenData, (usdc, 8900, 9000, uint40(block.timestamp), 1000))
+            abi.encodeCall(CreditManagerV3.setCollateralTokenData, (usdc, 8900, 9000, uint40(block.timestamp), 2 days))
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 2 days);
     }
 }

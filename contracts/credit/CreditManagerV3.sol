@@ -34,15 +34,7 @@ import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // LIBRARIES
-import {
-    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
-    PERCENTAGE_FACTOR,
-    UNDERLYING_TOKEN_MASK,
-    DEFAULT_FEE_LIQUIDATION,
-    DEFAULT_LIQUIDATION_PREMIUM,
-    DEFAULT_FEE_LIQUIDATION_EXPIRED,
-    DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-} from "../libraries/Constants.sol";
+import {INACTIVE_CREDIT_ACCOUNT_ADDRESS, PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -87,22 +79,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint8 public override collateralTokensCount;
 
     /// @dev Liquidation threshold for the underlying token in bps
-    uint16 internal ltUnderlying = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION_EXPIRED;
+    uint16 internal immutable ltUnderlying;
 
     /// @dev Percentage of accrued interest in bps taken by the protocol as profit
     uint16 internal immutable feeInterest;
 
     /// @dev Percentage of liquidated account value in bps taken by the protocol as profit
-    uint16 internal feeLiquidation = DEFAULT_FEE_LIQUIDATION;
+    uint16 internal feeLiquidation;
 
     /// @dev Percentage of liquidated account value in bps that is used to repay debt
-    uint16 internal liquidationDiscount = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM;
+    uint16 internal liquidationDiscount;
 
     /// @dev Percentage of liquidated expired account value in bps taken by the protocol as profit
-    uint16 internal feeLiquidationExpired = DEFAULT_FEE_LIQUIDATION_EXPIRED;
+    uint16 internal feeLiquidationExpired;
 
     /// @dev Percentage of liquidated expired account value in bps that is used to repay debt
-    uint16 internal liquidationDiscountExpired = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED;
+    uint16 internal liquidationDiscountExpired;
 
     /// @dev Active credit account which is an account adapters can interfact with
     address internal _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;
@@ -149,6 +141,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _priceOracle Price oracle address
     /// @param _maxEnabledTokens Maximum number of tokens that a credit account can have enabled as collateral
     /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
+    /// @param _feeLiquidation Percentage of liquidated account value taken by the protocol as profit
+    /// @param _liquidationPremium Percentage of liquidated account value that can be taken by liquidator
+    /// @param _feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
+    /// @param _liquidationPremiumExpired Percentage of liquidated expired account value that can be taken by liquidator
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Checks that `_priceOracle` has a price for underlying
@@ -161,15 +157,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle,
         uint8 _maxEnabledTokens,
         uint16 _feeInterest,
+        uint16 _feeLiquidation,
+        uint16 _liquidationPremium,
+        uint16 _feeLiquidationExpired,
+        uint16 _liquidationPremiumExpired,
         string memory _name
     ) {
         if (bytes(_name).length == 0 || _maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
+        if (
+            _feeLiquidation > _liquidationPremium || _feeLiquidationExpired > _liquidationPremiumExpired
+                || _feeLiquidationExpired > _feeLiquidation || _liquidationPremiumExpired > _liquidationPremium
+                || _liquidationPremium + _feeLiquidation >= PERCENTAGE_FACTOR
+        ) revert IncorrectParameterException(); // U:[CM-1]
 
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]
         priceOracle = _priceOracle; // U:[CM-1]
         maxEnabledTokens = _maxEnabledTokens; // U:[CM-1]
+        ltUnderlying = PERCENTAGE_FACTOR - _liquidationPremium - _feeLiquidation; // U:[CM-1]
         feeInterest = _feeInterest; // U:[CM-1]
+        feeLiquidation = _feeLiquidation; // U:[CM-1]
+        liquidationDiscount = PERCENTAGE_FACTOR - _liquidationPremium; // U:[CM-1]
+        feeLiquidationExpired = _feeLiquidationExpired; // U:[CM-1]
+        liquidationDiscountExpired = PERCENTAGE_FACTOR - _liquidationPremiumExpired; // U:[CM-1]
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
@@ -1206,8 +1216,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param ltFinal LT at the end of the ramp in bps
     /// @param timestampRampStart Timestamp of the beginning of the ramp
     /// @param rampDuration Ramp duration in seconds
-    /// @dev If `token` is `underlying`, sets LT to `ltInitial` and ignores other parameters
-    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
+    /// @dev Reverts if `token` is `underlying` or is not recognized as collateral in the credit manager
     function setCollateralTokenData(
         address token,
         uint16 ltInitial,
@@ -1219,17 +1228,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
-        if (token == underlying) {
-            ltUnderlying = ltInitial; // U:[CM-42]
-        } else {
-            uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-41]
-            CollateralTokenData storage tokenData = collateralTokensData[tokenMask];
+        if (token == underlying) revert TokenNotAllowedException(); // U:[CM-42]
 
-            tokenData.ltInitial = ltInitial; // U:[CM-42]
-            tokenData.ltFinal = ltFinal; // U:[CM-42]
-            tokenData.timestampRampStart = timestampRampStart; // U:[CM-42]
-            tokenData.rampDuration = rampDuration; // U:[CM-42]
-        }
+        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-41]
+        CollateralTokenData storage tokenData = collateralTokensData[tokenMask];
+
+        tokenData.ltInitial = ltInitial; // U:[CM-42]
+        tokenData.ltFinal = ltFinal; // U:[CM-42]
+        tokenData.timestampRampStart = timestampRampStart; // U:[CM-42]
+        tokenData.rampDuration = rampDuration; // U:[CM-42]
     }
 
     /// @notice Sets the link between the adapter and the target contract

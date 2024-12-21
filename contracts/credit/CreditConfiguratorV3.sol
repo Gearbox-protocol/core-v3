@@ -10,7 +10,6 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBRARIES & CONSTANTS
 import {BitMask} from "../libraries/BitMask.sol";
-import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
@@ -180,6 +179,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     /// @dev Reverts if `token` is underlying
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     /// @dev Reverts if `liquidationThresholdFinal` is greater than underlying's LT
+    /// @dev Reverts if `rampDuration` is less than 2 days
     function rampLiquidationThreshold(
         address token,
         uint16 liquidationThresholdFinal,
@@ -198,6 +198,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             revert IncorrectLiquidationThresholdException(); // I:[CC-30]
         }
 
+        if (rampDuration < 2 days) revert RampDurationTooShortException(); // I:[CC-30]
         rampStart = block.timestamp > rampStart ? uint40(block.timestamp) : rampStart; // I:[CC-30]
         if (uint256(rampStart) + rampDuration > type(uint40).max) {
             revert IncorrectParameterException(); // I:[CC-30]
@@ -351,14 +352,15 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     // -------------- //
 
     /// @notice Sets new fees params in the credit manager (all fields in bps)
-    /// @notice Sets underlying token's liquidation threshold to 1 - liquidation fee - liquidation premium
     /// @param feeLiquidation Percentage of liquidated account value taken by the protocol as profit
     /// @param liquidationPremium Percentage of liquidated account value that can be taken by liquidator
     /// @param feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
     /// @param liquidationPremiumExpired Percentage of liquidated expired account value that can be taken by liquidator
-    /// @dev Reverts if `liquidationPremium + feeLiquidation` is above 100%
-    /// @dev Reverts if `liquidationPremiumExpired + feeLiquidationExpired` is above 100%
-    /// @dev Reverts if new underlying's LT is below some collateral token's LT, accounting for ramps
+    /// @dev Performs parameters validation:
+    ///      - liquidation fee must not be greater than premium (same for expired liquidations)
+    ///      - expired liquidation premium or fee must not be greater than that of non-expired
+    ///      - the sum of liquidation premium and fee must not change compared to its previous value
+    ///        (for expired liquidations, it must not change less than 2 weeks before the expiration)
     function setFees(
         uint16 feeLiquidation,
         uint16 liquidationPremium,
@@ -370,33 +372,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         configuratorOnly // I:[CC-2]
     {
         if (
-            (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
-                || (liquidationPremiumExpired + feeLiquidationExpired) >= PERCENTAGE_FACTOR
+            feeLiquidation > liquidationPremium || feeLiquidationExpired > liquidationPremiumExpired
+                || feeLiquidationExpired > feeLiquidation || liquidationPremiumExpired > liquidationPremium
+                || liquidationPremium + feeLiquidation >= PERCENTAGE_FACTOR
         ) revert IncorrectParameterException(); // I:[CC-17]
-
-        _setFees({
-            feeLiquidation: feeLiquidation,
-            liquidationDiscount: PERCENTAGE_FACTOR - liquidationPremium,
-            feeLiquidationExpired: feeLiquidationExpired,
-            liquidationDiscountExpired: PERCENTAGE_FACTOR - liquidationPremiumExpired
-        });
-    }
-
-    /// @dev `setFees` implementation
-    function _setFees(
-        uint16 feeLiquidation,
-        uint16 liquidationDiscount,
-        uint16 feeLiquidationExpired,
-        uint16 liquidationDiscountExpired
-    ) internal {
-        uint16 newLTUnderlying = liquidationDiscount - feeLiquidation; // I:[CC-18]
-        (, uint16 ltUnderlying) =
-            CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: UNDERLYING_TOKEN_MASK});
-
-        if (newLTUnderlying != ltUnderlying) {
-            _updateUnderlyingLT(newLTUnderlying); // I:[CC-18]
-            emit SetTokenLiquidationThreshold({token: underlying, liquidationThreshold: newLTUnderlying}); // I:[CC-1A,18]
-        }
 
         (
             uint16 _feeInterestCurrent,
@@ -406,11 +385,28 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             uint16 _liquidationDiscountExpiredCurrent
         ) = CreditManagerV3(creditManager).fees();
 
+        uint16 liquidationDiscount = PERCENTAGE_FACTOR - liquidationPremium;
+        uint16 liquidationDiscountExpired = PERCENTAGE_FACTOR - liquidationPremiumExpired;
+
         if (
             (feeLiquidation == _feeLiquidationCurrent) && (liquidationDiscount == _liquidationDiscountCurrent)
                 && (feeLiquidationExpired == _feeLiquidationExpiredCurrent)
                 && (liquidationDiscountExpired == _liquidationDiscountExpiredCurrent)
         ) return;
+
+        if (liquidationDiscount - feeLiquidation != _liquidationDiscountCurrent - _feeLiquidationCurrent) {
+            revert InconsistentLiquidationFeesException(); // I:[CC-17]
+        }
+
+        if (
+            liquidationDiscountExpired - feeLiquidationExpired
+                != _liquidationDiscountExpiredCurrent - _feeLiquidationExpiredCurrent
+        ) {
+            uint256 expirationDate = CreditFacadeV3(creditFacade()).expirationDate();
+            if (expirationDate != 0 && block.timestamp + 2 weeks > expirationDate) {
+                revert InconsistentExpiredLiquidationFeesException(); // I:[CC-17]
+            }
+        }
 
         CreditManagerV3(creditManager).setFees(
             _feeInterestCurrent, feeLiquidation, liquidationDiscount, feeLiquidationExpired, liquidationDiscountExpired
@@ -418,37 +414,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
 
         emit UpdateFees({
             feeLiquidation: feeLiquidation,
-            liquidationPremium: PERCENTAGE_FACTOR - liquidationDiscount,
+            liquidationPremium: liquidationPremium,
             feeLiquidationExpired: feeLiquidationExpired,
-            liquidationPremiumExpired: PERCENTAGE_FACTOR - liquidationDiscountExpired
-        }); // I:[CC-1A,19]
-    }
-
-    /// @dev Updates underlying token's liquidation threshold
-    function _updateUnderlyingLT(uint16 ltUnderlying) internal {
-        CreditManagerV3(creditManager).setCollateralTokenData({
-            token: underlying,
-            ltInitial: ltUnderlying,
-            ltFinal: ltUnderlying,
-            timestampRampStart: type(uint40).max,
-            rampDuration: 0
-        }); // I:[CC-18]
-
-        uint256 len = CreditManagerV3(creditManager).collateralTokensCount();
-        unchecked {
-            for (uint256 i = 1; i < len; ++i) {
-                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
-                (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
-                    CreditManagerV3(creditManager).ltParams(token);
-                uint16 lt = CreditLogic.getLiquidationThreshold({
-                    ltInitial: ltInitial,
-                    ltFinal: ltFinal,
-                    timestampRampStart: timestampRampStart,
-                    rampDuration: rampDuration
-                });
-                if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
-            }
-        }
+            liquidationPremiumExpired: liquidationPremiumExpired
+        }); // I:[CC-19]
     }
 
     // -------- //
@@ -598,7 +567,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         if (currentMinDebt == minDebt && currentMaxDebt == maxDebt) return;
 
         cf.setDebtLimits(minDebt, maxDebt, cf.maxDebtPerBlockMultiplier()); // I:[CC-16]
-        emit SetBorrowingLimits(minDebt, maxDebt); // I:[CC-1A,19]
+        emit SetBorrowingLimits(minDebt, maxDebt); // I:[CC-19]
     }
 
     /// @notice Sets the new max debt per block multiplier in the credit facade
@@ -628,7 +597,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
 
         (uint128 minDebt, uint128 maxDebt) = cf.debtLimits();
         cf.setDebtLimits(minDebt, maxDebt, newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
-        emit SetMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-1A,24]
+        emit SetMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
 
     /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
@@ -652,16 +621,19 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         emit SetLossLiquidator(newLossLiquidator); // I:[CC-26]
     }
 
-    /// @notice Sets a new credit facade expiration timestamp
-    /// @param newExpirationDate New expiration timestamp
-    /// @dev Reverts if `newExpirationDate` is in the past
-    /// @dev Reverts if `newExpirationDate` is older than the current expiration date
+    /// @notice Sets a new credit facade expiration date
+    /// @param newExpirationDate New expiration date
+    /// @dev Reverts if `newExpirationDate` is in the past and updates it to be at least 2 weeks
+    ///      from the current timestamp otherwise
+    /// @dev Reverts if updated `newExpirationDate` is before the current expiration date
     /// @dev Reverts if credit facade is not expirable
     function setExpirationDate(uint40 newExpirationDate)
         external
         override
         configuratorOnly // I:[CC-2]
     {
+        if (newExpirationDate < block.timestamp) revert IncorrectExpirationDateException(); // I:[CC-25]
+        if (newExpirationDate < block.timestamp + 2 weeks) newExpirationDate = uint40(block.timestamp + 2 weeks); // I:[CC-25]
         _setExpirationDate(newExpirationDate); // I:[CC-25]
     }
 
@@ -669,9 +641,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     function _setExpirationDate(uint40 newExpirationDate) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        if (block.timestamp > newExpirationDate || cf.expirationDate() >= newExpirationDate) {
-            revert IncorrectExpirationDateException(); // I:[CC-25]
-        }
+        uint256 expirationDate = cf.expirationDate();
+        if (newExpirationDate == expirationDate) return;
+        else if (newExpirationDate < expirationDate) revert IncorrectExpirationDateException(); // I:[CC-25]
 
         cf.setExpirationDate(newExpirationDate); // I:[CC-25]
         emit SetExpirationDate(newExpirationDate); // I:[CC-25]
