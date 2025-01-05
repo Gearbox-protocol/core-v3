@@ -21,6 +21,7 @@ import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
+import {LossPolicyMock} from "../../mocks/core/LossPolicyMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
@@ -75,6 +76,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
     PriceOracleMock priceOracleMock;
+    LossPolicyMock lossPolicyMock;
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
@@ -145,6 +147,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock =
             new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(poolMock)});
+
+        lossPolicyMock = new LossPolicyMock();
     }
 
     function _withoutDegenNFT() internal {
@@ -170,6 +174,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade = new CreditFacadeV3Harness(
             address(addressProvider),
             address(creditManagerMock),
+            address(lossPolicyMock),
             address(botListMock),
             tokenTestSuite.addressOf(TOKEN_WETH),
             address(degenNFTMock),
@@ -185,6 +190,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(TOKEN_DAI), "Incorrect underlying");
         assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
+        assertEq(creditFacade.lossPolicy(), address(lossPolicyMock), "Incorrect lossPolicy");
+        assertEq(creditFacade.botList(), address(botListMock), "Incorrect botList");
+
         assertEq(creditFacade.weth(), tokenTestSuite.addressOf(TOKEN_WETH), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
@@ -193,6 +201,18 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         new CreditFacadeV3Harness(
             address(addressProvider),
             address(creditManagerMock),
+            address(0),
+            address(botListMock),
+            address(0),
+            address(degenNFTMock),
+            expirable
+        );
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(lossPolicyMock),
             address(0),
             address(0),
             address(degenNFTMock),
@@ -304,7 +324,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setLossLiquidator(address(0));
+        creditFacade.setLossPolicy(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
@@ -614,7 +634,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
 
         vm.prank(LIQUIDATOR);
-        uint256 loss = creditFacade.liquidateCreditAccount({
+        creditFacade.liquidateCreditAccount({
             creditAccount: creditAccount,
             to: FRIEND,
             calls: MultiCallBuilder.build(
@@ -624,7 +644,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 )
             )
         });
-        assertEq(loss, 0, "Non-zero loss");
     }
 
     /// @dev U:[FA-14A]: liquidateCreditAccount reverts if non-underlying balance increases in multicall
@@ -650,6 +669,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         CollateralDebtData memory collateralDebtData;
         collateralDebtData.debt = 101;
+        collateralDebtData.totalValue = 110;
         collateralDebtData.totalDebtUSD = 101;
         collateralDebtData.twvUSD = 100;
         collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK | linkMask;
@@ -941,22 +961,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         collateralDebtData.twvUSD = 100;
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
-        creditManagerMock.setLiquidateCreditAccountReturns(0, 100);
-
-        // only the loss liquidator can call
-        vm.expectRevert(CallerNotLossLiquidatorException.selector);
+        // reverts if loss policy is violated
+        lossPolicyMock.disable();
+        vm.expectRevert(CreditAccountNotLiquidatableWithLossException.selector);
         vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
-        vm.etch(LIQUIDATOR, "CODE");
-        vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(LIQUIDATOR);
-
-        // loss forbids borrowing
+        // if loss policy is not violated, further borrowing is forbidden
+        lossPolicyMock.enable();
         vm.prank(LIQUIDATOR);
-        uint256 loss =
-            creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-        assertEq(loss, 100, "Incorrect loss");
+        creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
         assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");
     }
 
@@ -2223,19 +2237,15 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.totalBorrowedInBlockInt(), type(uint128).max, "incorrect totalBorrowedInBlock");
     }
 
-    /// @dev U:[FA-51]: `setLossLiquidator` works properly
-    function test_U_FA_51_setLossLiquidator_works_properly() public notExpirableCase {
-        assertEq(creditFacade.lossLiquidator(), address(0), "SETUP: incorrect loss liquidator");
+    /// @dev U:[FA-51]: `setLossPolicy` works properly
+    function test_U_FA_51_setLossPolicy_works_properly() public notExpirableCase {
+        assertEq(creditFacade.lossPolicy(), address(lossPolicyMock), "SETUP: incorrect loss policy");
 
-        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
+        address lossPolicy = address(new LossPolicyMock());
         vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(DUMB_ADDRESS);
+        creditFacade.setLossPolicy(lossPolicy);
 
-        address liquidator = address(new GeneralMock());
-        vm.prank(CONFIGURATOR);
-        creditFacade.setLossLiquidator(liquidator);
-
-        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
+        assertEq(creditFacade.lossPolicy(), lossPolicy, "Loss policy not set");
     }
 
     /// @dev U:[FA-52]: setTokenAllowance works properly

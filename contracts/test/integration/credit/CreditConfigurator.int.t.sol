@@ -26,7 +26,8 @@ import "../../../interfaces/IExceptions.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {LossPolicyMock} from "../../mocks/core/LossPolicyMock.sol";
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
@@ -235,7 +236,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setLossLiquidator(address(0));
+        creditConfigurator.setLossPolicy(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setExpirationDate(0);
@@ -797,7 +798,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             if (expirable) {
                 CreditFacadeV3 initialCf = new CreditFacadeV3(
-                    address(acl), address(creditManager), address(botList), address(0), address(0), true
+                    address(acl),
+                    address(creditManager),
+                    address(lossPolicy),
+                    address(botList),
+                    address(0),
+                    address(0),
+                    true
                 );
 
                 vm.prank(CONFIGURATOR);
@@ -809,16 +816,17 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
                 creditFacade = initialCf;
             }
 
-            address lossLiquidator = makeAddr("LOSS_LIQUIDATOR");
-            vm.etch(lossLiquidator, "DUMMY_CODE");
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setLossLiquidator(lossLiquidator);
-
             vm.prank(CONFIGURATOR);
             creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
             CreditFacadeV3 cf = new CreditFacadeV3(
-                address(acl), address(creditManager), address(botList), address(0), address(0), expirable
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                expirable
             );
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -841,8 +849,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             (uint128 minDebt2, uint128 maxDebt2) = cf.debtLimits();
 
-            address lossLiquidator2 = cf.lossLiquidator();
-
             assertEq(
                 maxDebtPerBlockMultiplier2,
                 migrateSettings ? maxDebtPerBlockMultiplier : DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
@@ -853,8 +859,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(expirationDate2, migrateSettings ? expirationDate : 0, "Incorrect expirationDate");
 
-            assertEq(lossLiquidator2, migrateSettings ? lossLiquidator : address(0), "Incorrect lossLiquidator");
-
             vm.revertTo(snapshot);
         }
     }
@@ -863,8 +867,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function test_I_CC_22B_setCreditFacade_reverts_if_new_facade_is_adapter() public creditTest {
         vm.startPrank(CONFIGURATOR);
 
-        CreditFacadeV3 cf =
-            new CreditFacadeV3(address(acl), address(creditManager), address(botList), address(0), address(0), false);
+        CreditFacadeV3 cf = new CreditFacadeV3(
+            address(acl), address(creditManager), address(lossPolicy), address(botList), address(0), address(0), false
+        );
         AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
         TargetContractMock target = new TargetContractMock();
 
@@ -902,7 +907,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.stopPrank();
 
             CreditFacadeV3 cf = new CreditFacadeV3(
-                address(acl), address(creditManager), address(botList), address(0), address(0), false
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                false
             );
 
             vm.prank(CONFIGURATOR);
@@ -930,12 +941,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter1));
 
-        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(creditManager));
+        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(acl), address(creditManager));
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter2));
 
-        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(creditManager));
+        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(acl), address(creditManager));
 
         vm.expectRevert(IncorrectAdaptersSetException.selector);
         vm.prank(CONFIGURATOR);
@@ -1005,22 +1016,25 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(creditFacade.expirationDate(), expectedExpirationDate, "Incorrect new expirationDate");
     }
 
-    /// @dev I:[CC-26]: setLossLiquidator works correctly
-    function test_I_CC_26_setLossLiquidator_works_correctly() public creditTest {
+    /// @dev I:[CC-26]: setLossPolicy works correctly
+    function test_I_CC_26_setLossPolicy_works_correctly() public creditTest {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLossLiquidator(address(0));
+        creditConfigurator.setLossPolicy(address(0));
 
-        address liquidator = makeAddr("LOSS_LIQUIDATOR");
-        vm.etch(liquidator, "DUMMY_CODE");
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, address(0xdead)));
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setLossPolicy(address(0xdead));
+
+        address lossPolicy = address(new LossPolicyMock());
 
         vm.expectEmit(true, true, true, true);
-        emit SetLossLiquidator(liquidator);
+        emit SetLossPolicy(lossPolicy);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLossLiquidator(liquidator);
+        creditConfigurator.setLossPolicy(lossPolicy);
 
-        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
+        assertEq(creditFacade.lossPolicy(), lossPolicy, "Loss policy not set");
     }
 
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC
@@ -1028,7 +1042,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
 
-        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(creditManager));
+        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager));
 
         address[] memory newAllowedAdapters = newConfigurator.allowedAdapters();
 

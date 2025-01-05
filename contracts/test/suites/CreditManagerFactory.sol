@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/utils/Create2.sol";
 
 import "../interfaces/IAddressProviderV3.sol";
-import {IPoolV3} from "../../interfaces/IPoolV3.sol";
+import {IACLTrait} from "../../interfaces/base/IACLTrait.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
@@ -35,6 +35,7 @@ contract CreditManagerFactory {
     }
 
     struct FacadeParams {
+        address lossPolicy;
         address botList;
         address weth;
         address degenNFT;
@@ -55,9 +56,11 @@ contract CreditManagerFactory {
             cmParams.name
         );
 
+        address acl = IACLTrait(pool).acl();
         creditFacade = new CreditFacadeV3(
-            IPoolV3(pool).acl(),
+            acl,
             address(creditManager),
+            cfParams.lossPolicy,
             cfParams.botList,
             cfParams.weth,
             cfParams.degenNFT,
@@ -65,7 +68,7 @@ contract CreditManagerFactory {
         );
         creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = new CreditConfiguratorV3(address(creditManager));
+        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
     }
 }

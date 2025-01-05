@@ -7,6 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
+import {LossPolicyMock} from "../mocks/core/LossPolicyMock.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
@@ -21,6 +22,7 @@ import {PriceOracleV3} from "../../core/PriceOracleV3.sol";
 contract GenesisFactory is Ownable {
     AddressProviderV3ACLMock public acl;
     PriceOracleV3 public priceOracle;
+    LossPolicyMock public lossPolicy;
     BotListV3 public botList;
     AccountFactoryV3 public accountFactory;
     IContractsRegister public contractsRegister;
@@ -31,6 +33,7 @@ contract GenesisFactory is Ownable {
         contractsRegister = IContractsRegister(address(acl));
 
         priceOracle = new PriceOracleV3(address(acl));
+        lossPolicy = new LossPolicyMock();
         accountFactory = new AccountFactoryV3(msg.sender);
         botList = new BotListV3(msg.sender);
 

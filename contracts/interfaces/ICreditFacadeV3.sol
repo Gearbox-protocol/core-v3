@@ -101,7 +101,7 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
 
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    function lossLiquidator() external view returns (address);
+    function lossPolicy() external view returns (address);
 
     function forbiddenTokenMask() external view returns (uint256);
 
@@ -116,9 +116,14 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
 
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
-        external
-        returns (uint256 reportedLoss);
+    function liquidateCreditAccount(
+        address creditAccount,
+        address to,
+        MultiCall[] calldata calls,
+        bytes memory lossPolicyData
+    ) external;
+
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
 
     function partiallyLiquidateCreditAccount(
         address creditAccount,
@@ -141,7 +146,7 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    function setLossLiquidator(address newLossLiquidator) external;
+    function setLossPolicy(address newLossPolicy) external;
 
     function setTokenAllowance(address token, AllowanceAction allowance) external;
 

@@ -27,6 +27,7 @@ import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
 import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
+import {ILossPolicy} from "../interfaces/base/ILossPolicy.sol";
 import {IPhantomToken, IPhantomTokenWithdrawer} from "../interfaces/base/IPhantomToken.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
@@ -117,7 +118,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     uint256 public override forbiddenTokenMask;
 
     /// @notice Contract that enforces a policy on how liquidations with loss are performed
-    address public override lossLiquidator;
+    address public override lossPolicy;
 
     /// @dev Ensures that function caller is credit configurator
     modifier creditConfiguratorOnly() {
@@ -132,12 +133,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @dev Ensures that function can't be called when the contract is paused, unless
-    ///      caller is an approved emergency liquidator or the loss liquidator
+    ///      caller is an approved emergency liquidator
     modifier whenNotPausedOrEmergency() {
-        require(
-            !paused() || _hasRole("EMERGENCY_LIQUIDATOR", msg.sender) || msg.sender == lossLiquidator,
-            "Pausable: paused"
-        );
+        require(!paused() || _hasRole("EMERGENCY_LIQUIDATOR", msg.sender), "Pausable: paused");
         _;
     }
 
@@ -156,6 +154,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @notice Constructor
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
+    /// @param _lossPolicy Loss policy address
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
@@ -164,12 +163,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     constructor(
         address _acl,
         address _creditManager,
+        address _lossPolicy,
         address _botList,
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) ACLTrait(_acl) nonZeroAddress(_botList) {
+    ) ACLTrait(_acl) nonZeroAddress(_lossPolicy) nonZeroAddress(_botList) {
         creditManager = _creditManager; // U:[FA-1]
+        lossPolicy = _lossPolicy; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]
         degenNFT = _degenNFT; // U:[FA-1]
@@ -266,10 +267,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @notice Liquidates a credit account
     ///         - Updates price feeds before running all computations if such call is present in the multicall
     ///         - Evaluates account's collateral and debt to determine whether liquidated account is unhealthy or expired
+    ///         - If account has bad debt, liquidation is only allowed when it doesn't violate the loss policy,
+    ///           further borrowing through the facade is forbidden in this case
     ///         - Performs a multicall (only `addCollateral`, `withdrawCollateral` and adapter calls are allowed)
     ///         - Liquidates a credit account in the credit manager, which repays debt to the pool, removes quotas, and
     ///           transfers underlying to the liquidator
-    ///         - If pool incurs a loss on liquidation, further borrowing through the facade is forbidden
     /// @notice The function computes account’s total value (oracle value of enabled tokens), discounts it by liquidator’s
     ///         premium, and uses this value to compute funds due to the pool and owner.
     ///         Debt to the pool must be repaid in underlying, while funds due to owner might be covered by underlying
@@ -282,21 +284,24 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param creditAccount Account to liquidate
     /// @param to Address to transfer underlying left after liquidation
     /// @param calls List of calls to perform before liquidating the account
-    /// @return reportedLoss Loss incurred on liquidation, if any
-    /// @dev If liquidation incurs loss, reverts if caller is not the loss liquidator
-    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator or the loss liquidator
+    /// @param lossPolicyData Additional data to pass to the loss policy contract
+    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if remaining token balances increase during the multicall
     /// @dev Liquidator can fully seize non-enabled tokens so it's highly recommended to avoid holding them.
     ///      Since adapter calls are allowed, unclaimed rewards from integrated protocols are also at risk;
     ///      bots can be used to claim and withdraw them.
-    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
-        external
+    function liquidateCreditAccount(
+        address creditAccount,
+        address to,
+        MultiCall[] calldata calls,
+        bytes memory lossPolicyData
+    )
+        public
         override
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
-        returns (uint256 reportedLoss)
     {
         uint256 flags = LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS | SKIP_COLLATERAL_CHECK_FLAG;
         if (
@@ -308,6 +313,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         }
 
         (CollateralDebtData memory collateralDebtData, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,14]
+        if (isUnhealthy && _hasBadDebt(collateralDebtData)) {
+            if (!ILossPolicy(lossPolicy).isLiquidatable(creditAccount, msg.sender, lossPolicyData)) {
+                revert CreditAccountNotLiquidatableWithLossException(); // U:[FA-17]
+            }
+            maxDebtPerBlockMultiplier = 0; // U:[FA-17]
+        }
 
         BalanceWithMask[] memory initialBalances = BalancesLogic.storeBalances({
             creditAccount: creditAccount,
@@ -327,8 +338,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-14]
 
-        uint256 remainingFunds;
-        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
+        (uint256 remainingFunds,) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
             to: to,
@@ -336,14 +346,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         }); // U:[FA-14]
 
         emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-14]
+    }
 
-        if (reportedLoss != 0) {
-            maxDebtPerBlockMultiplier = 0; // U:[FA-17]
-
-            if (msg.sender != lossLiquidator) {
-                revert CallerNotLossLiquidatorException(); // U:[FA-17]
-            }
-        }
+    /// @dev Deprecated method that preserves liquidation signature from v3.0.x by using empty loss policy data
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external override {
+        liquidateCreditAccount(creditAccount, to, calls, "");
     }
 
     /// @notice Partially liquidates credit account's debt in exchange for discounted collateral
@@ -361,7 +368,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param to Account to withdraw seized `token` to
     /// @param priceUpdates On-demand price feed updates to apply before calculations, see `PriceUpdate` for details
     /// @return seizedAmount Amount of `token` seized
-    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator or the loss liquidator
+    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if `token` is underlying or if `token` is a phantom token and its `depositedToken` is underlying
@@ -847,19 +854,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         totalBorrowedInBlock = type(uint128).max; // U:[FA-49]
     }
 
-    /// @notice Sets the new loss liquidator
-    /// @param newLossLiquidator New loss liquidator
+    /// @notice Sets the new loss policy
+    /// @param newLossPolicy New loss policy
     /// @dev Reverts if caller is not credit configurator
-    /// @dev Reverts if `newLossLiquidator` is not a contract
-    function setLossLiquidator(address newLossLiquidator)
+    function setLossPolicy(address newLossPolicy)
         external
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        if (newLossLiquidator.code.length == 0) {
-            revert AddressIsNotContractException(newLossLiquidator); // U:[FA-51]
-        }
-        lossLiquidator = newLossLiquidator; // U:[FA-51]
+        lossPolicy = newLossPolicy; // U:[FA-51]
     }
 
     /// @notice Changes token's forbidden status
@@ -880,7 +883,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
     /// @dev Pause blocks all user entrypoints to the contract.
-    ///      Liquidations remain open only to emergency and loss liquidators.
+    ///      Liquidations remain open only to emergency liquidators.
     /// @dev Reverts if contract is already paused
     function pause() external override pausableAdminsOnly {
         _pause();
@@ -955,6 +958,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         cdd = ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
         isUnhealthy = cdd.twvUSD < cdd.totalDebtUSD; // U:[FA-13]
         if (cdd.debt == 0 || !isUnhealthy && !_isExpired()) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
+    }
+
+    /// @dev Whether account's total value (minus liquidator's premium) is below its outstanding debt
+    function _hasBadDebt(CollateralDebtData memory cdd) internal view returns (bool) {
+        (,, uint16 liquidationDiscount,,) = ICreditManagerV3(creditManager).fees();
+        // NOTE: this formula does not account for transfer fees for simplicity, so there might be edge
+        // cases when liquidation bypasses the loss policy, however loss size is bounded by the fee
+        return cdd.totalValue * liquidationDiscount < (cdd.debt + cdd.accruedInterest) * PERCENTAGE_FACTOR;
     }
 
     /// @dev Calculates and returns partial liquidation payment amounts:

@@ -23,6 +23,7 @@ import {GaugeV3} from "../../pool/GaugeV3.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
 import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
+import {ILossPolicy} from "../../interfaces/base/ILossPolicy.sol";
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
@@ -66,6 +67,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     IContractsRegister cr;
     AccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
+    ILossPolicy lossPolicy;
     BotListV3 botList;
     GearStakingV3 gearStaking;
 
@@ -233,6 +235,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         acl = IACL(address(gp.acl()));
         priceOracle = gp.priceOracle();
+        lossPolicy = gp.lossPolicy();
         accountFactory = gp.accountFactory();
         botList = gp.botList();
         cr = gp.contractsRegister();
@@ -273,6 +276,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         priceOracle = IPriceOracleV3(CreditManagerV3(cm).priceOracle());
 
         address cf = CreditManagerV3(cm).creditFacade();
+        lossPolicy = ILossPolicy(CreditFacadeV3(cf).lossPolicy());
 
         botList = BotListV3(payable(CreditFacadeV3(cf).botList()));
 
@@ -424,6 +428,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             });
             CreditManagerFactory.FacadeParams memory facadeParams = CreditManagerFactory.FacadeParams({
                 weth: weth,
+                lossPolicy: address(lossPolicy),
                 botList: address(botList),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable
@@ -436,9 +441,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.startPrank(CONFIGURATOR);
             creditConfigurator.setDebtLimits(cmParams.minDebt, cmParams.maxDebt);
-
-            vm.etch(LIQUIDATOR, "DUMMY_CODE");
-            creditConfigurator.setLossLiquidator(LIQUIDATOR);
 
             vm.stopPrank();
             vm.roll(block.number + 1);
