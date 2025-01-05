@@ -181,6 +181,9 @@ error UnknownMethodException(bytes4 selector);
 /// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
+/// @notice Thrown if a liquidator tries to liquidate an account with loss but violates the loss policy
+error CreditAccountNotLiquidatableWithLossException();
+
 /// @notice Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();
 
@@ -277,9 +280,6 @@ error CallerNotExecutorException();
 
 /// @notice Thrown on attempting to call an access restricted function not as veto admin
 error CallerNotVetoAdminException();
-
-/// @notice Thrown on attempting to perform liquidation with loss not through the loss liquidator contract
-error CallerNotLossLiquidatorException();
 
 // -------- //
 // BOT LIST //

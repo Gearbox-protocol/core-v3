@@ -60,9 +60,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     }
 
     /// @notice Constructor
+    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _creditManager) ACLTrait(ACLTrait(CreditManagerV3(_creditManager).pool()).acl()) {
+    constructor(address _acl, address _creditManager) ACLTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
@@ -481,9 +482,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
-            address lossLiquidator = prevCreditFacade.lossLiquidator();
-            if (lossLiquidator != address(0)) _setLossLiquidator(lossLiquidator); // I:[CC-22]
-
             _migrateForbiddenTokens(prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
             if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
@@ -600,25 +598,22 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         emit SetMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
 
-    /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
-    /// @param newLossLiquidator New loss liquidator, must be a contract
-    function setLossLiquidator(address newLossLiquidator)
+    /// @notice Sets the new loss policy which control which lossy liquidations should be allowed
+    /// @param newLossPolicy New loss policy, must be a contract
+    function setLossPolicy(address newLossPolicy)
         external
         override
         configuratorOnly // I:[CC-2]
-        nonZeroAddress(newLossLiquidator) // I:[CC-26]
+        nonZeroAddress(newLossPolicy) // I:[CC-26]
     {
-        _setLossLiquidator(newLossLiquidator); // I:[CC-26]
-    }
+        if (newLossPolicy.code.length == 0) revert AddressIsNotContractException(newLossPolicy); // I:[CC-26]
 
-    /// @dev `setLossLiquidator` implementation
-    function _setLossLiquidator(address newLossLiquidator) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        if (cf.lossLiquidator() == newLossLiquidator) return;
+        if (cf.lossPolicy() == newLossPolicy) return;
 
-        cf.setLossLiquidator(newLossLiquidator); // I:[CC-26]
-        emit SetLossLiquidator(newLossLiquidator); // I:[CC-26]
+        cf.setLossPolicy(newLossPolicy); // I:[CC-26]
+        emit SetLossPolicy(newLossPolicy); // I:[CC-26]
     }
 
     /// @notice Sets a new credit facade expiration date

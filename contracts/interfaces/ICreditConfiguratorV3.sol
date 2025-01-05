@@ -79,8 +79,8 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a new max debt per block multiplier is set
     event SetMaxDebtPerBlockMultiplier(uint8 maxDebtPerBlockMultiplier);
 
-    /// @notice Emitted when new loss liquidator is set
-    event SetLossLiquidator(address indexed liquidator);
+    /// @notice Emitted when new loss policy is set
+    event SetLossPolicy(address indexed lossPolicy);
 
     /// @notice Emitted when a new expiration timestamp is set in the credit facade
     event SetExpirationDate(uint40 expirationDate);
@@ -154,7 +154,7 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
 
     function forbidBorrowing() external;
 
-    function setLossLiquidator(address newLossLiquidator) external;
+    function setLossPolicy(address newLossPolicy) external;
 
     function setExpirationDate(uint40 newExpirationDate) external;
 }
