@@ -27,8 +27,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    /// @dev "RK" stands for "rate keeper"
-    bytes32 public constant override contractType = "RK_TUMBLER";
+    bytes32 public constant override contractType = "RATE_KEEPER::TUMBLER";
 
     /// @notice Pool whose quota rates are set by this contract
     address public immutable override pool;

@@ -7,6 +7,7 @@ import {IVersion} from "./IVersion.sol";
 
 /// @title Rate keeper interface
 /// @notice Generic interface for a contract that can provide rates to the quota keeper
+/// @dev Bots must have type `RATE_KEEPER::{POSTFIX}`
 interface IRateKeeper is IVersion {
     /// @notice Pool rates are provided for
     function pool() external view returns (address);

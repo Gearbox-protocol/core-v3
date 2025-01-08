@@ -7,6 +7,7 @@ import {IVersion} from "./IVersion.sol";
 
 /// @title Price feed interface
 /// @notice Interface for Chainlink-like price feeds that can be plugged into Gearbox's price oracle
+/// @dev Price feeds must have type `PRICE_FEED::{POSTFIX}`
 interface IPriceFeed is IVersion {
     /// @notice Whether price feed implements its own staleness and sanity checks
     function skipPriceCheck() external view returns (bool);

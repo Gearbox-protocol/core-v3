@@ -7,6 +7,7 @@ import {IVersion} from "./IVersion.sol";
 
 /// @title Interest rate model interface
 /// @notice Generic interface for an interest rate model contract that can be used in a pool
+/// @dev Interest rate models must have type `IRM::{POSTFIX}`
 interface IInterestRateModel is IVersion {
     /// @notice Calculates borrow rate based on utilization
     /// @dev The last parameter can be used to prevent borrowing above maximum allowed utilization

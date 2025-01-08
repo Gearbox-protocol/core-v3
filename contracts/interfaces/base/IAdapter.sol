@@ -8,6 +8,7 @@ import {IVersion} from "./IVersion.sol";
 /// @title Adapter interface
 /// @notice Generic interface for an adapter that can be used to interact with external protocols.
 ///         Adapters can be assumed to be non-malicious since they are developed by Gearbox DAO.
+/// @dev Adapters must have type `ADAPTER::{POSTFIX}`
 interface IAdapter is IVersion {
     /// @notice Credit manager this adapter is connected to
     /// @dev Assumed to be an immutable state variable

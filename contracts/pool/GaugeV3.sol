@@ -35,8 +35,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    /// @dev "RK" stands for "rate keeper"
-    bytes32 public constant override contractType = "RK_GAUGE";
+    bytes32 public constant override contractType = "RATE_KEEPER::GAUGE";
 
     /// @notice Address of the pool this gauge is connected to
     address public immutable override pool;

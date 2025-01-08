@@ -7,7 +7,7 @@ import {ILossPolicy} from "../../../interfaces/base/ILossPolicy.sol";
 
 contract LossPolicyMock is ILossPolicy {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "LOSS_POLICY_MOCK";
+    bytes32 public constant override contractType = "LOSS_POLICY::MOCK";
 
     bool public enabled = true;
 

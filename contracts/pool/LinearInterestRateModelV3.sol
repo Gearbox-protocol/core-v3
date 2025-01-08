@@ -21,7 +21,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "IRM_LINEAR";
+    bytes32 public constant override contractType = "IRM::LINEAR";
 
     /// @notice Whether to prevent borrowing over `U_2` utilization
     bool public immutable override isBorrowingMoreU2Forbidden;
