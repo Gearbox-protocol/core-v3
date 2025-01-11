@@ -1289,8 +1289,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
+        _setCreditConfigurator(_creditConfigurator);
+    }
+
+    function _setCreditConfigurator(address _creditConfigurator) internal {
         creditConfigurator = _creditConfigurator; // U:[CM-46]
         emit SetCreditConfigurator(_creditConfigurator); // U:[CM-46]
+    }
+
+    // @notice Added for compatibility with the ByteCodeRepository Deployment
+    function transferOwnership(address _creditConfigurator) external creditConfiguratorOnly {
+        _setCreditConfigurator(_creditConfigurator);
     }
 
     // --------- //
