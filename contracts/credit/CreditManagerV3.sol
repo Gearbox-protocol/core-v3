@@ -1292,14 +1292,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _setCreditConfigurator(_creditConfigurator);
     }
 
+    /// @dev Same as above, added for compatibility with `BytecodeRepository` which only works with `Ownable` contracts
+    function transferOwnership(address newOwner)
+        external
+        creditConfiguratorOnly // U:[CM-4]
+    {
+        _setCreditConfigurator(newOwner);
+    }
+
+    /// @dev `setCreditConfigurator` implementation
     function _setCreditConfigurator(address _creditConfigurator) internal {
         creditConfigurator = _creditConfigurator; // U:[CM-46]
         emit SetCreditConfigurator(_creditConfigurator); // U:[CM-46]
-    }
-
-    // @notice Added for compatibility with the ByteCodeRepository Deployment
-    function transferOwnership(address _creditConfigurator) external creditConfiguratorOnly {
-        _setCreditConfigurator(_creditConfigurator);
     }
 
     // --------- //
