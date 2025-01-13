@@ -442,7 +442,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
 
         uint256 len = quotaTokensSet.length();
         for (uint256 i; i < len;) {
-            if (!IRateKeeper(gauge).isTokenAdded(quotaTokensSet.at(i))) {
+            if (!IRateKeeper(_gauge).isTokenAdded(quotaTokensSet.at(i))) {
                 revert TokenIsNotQuotedException(); // U:[PQK-8]
             }
             unchecked {

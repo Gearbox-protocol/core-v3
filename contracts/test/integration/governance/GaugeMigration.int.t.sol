@@ -107,9 +107,9 @@ contract GaugeMigrationIntegrationTest is Test {
         staking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
 
-        quotaKeeper.setGauge(address(newGauge));
         newGauge.addQuotaToken({token: address(token1), minRate: 600, maxRate: 3000});
         newGauge.addQuotaToken({token: address(token2), minRate: 400, maxRate: 2000});
+        quotaKeeper.setGauge(address(newGauge));
         vm.stopPrank();
 
         // users move their votes to the new gauge
@@ -175,9 +175,9 @@ contract GaugeMigrationIntegrationTest is Test {
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
         newStaking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
 
-        quotaKeeper.setGauge(address(newGauge));
         newGauge.addQuotaToken({token: address(token1), minRate: 600, maxRate: 3000});
         newGauge.addQuotaToken({token: address(token2), minRate: 400, maxRate: 2000});
+        quotaKeeper.setGauge(address(newGauge));
         vm.stopPrank();
 
         // users move their votes to the new gauge
