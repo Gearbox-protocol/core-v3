@@ -9,7 +9,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
-import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+import {IDefaultAccountFactoryV3} from "../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
@@ -32,7 +32,7 @@ struct QueuedAccount {
     uint40 reusableAfter;
 }
 
-/// @title Account factory V3
+/// @title Default account factory V3
 /// @notice Reusable credit accounts factory.
 ///         - Account deployment is cheap thanks to the clones proxy pattern
 ///         - Accounts are reusable: new accounts are only deployed when the queue of reusable accounts is empty
@@ -40,12 +40,12 @@ struct QueuedAccount {
 ///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
 ///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
 ///           as protection against potential attacks involving reopening an account right after closing it
-contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
+contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "ACCOUNT_FACTORY";
+    bytes32 public constant override contractType = "ACCOUNT_FACTORY::DEFAULT";
 
     /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;
@@ -115,11 +115,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
 
     /// @notice Adds a credit manager to the factory and deploys the master credit account for it
     /// @param creditManager Credit manager address
-    function addCreditManager(address creditManager)
-        external
-        override
-        onlyOwner // U:[AF-1]
-    {
+    function addCreditManager(address creditManager) external override {
         if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
             revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4A]
         }

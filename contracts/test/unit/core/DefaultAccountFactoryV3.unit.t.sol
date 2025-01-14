@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {IAccountFactoryV3Events} from "../../../interfaces/IAccountFactoryV3.sol";
+import {IDefaultAccountFactoryV3Events} from "../../../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
@@ -15,12 +15,12 @@ import {
 
 import {TestHelper} from "../../lib/helper.sol";
 
-import {AccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./AccountFactoryV3Harness.sol";
+import {DefaultAccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./DefaultAccountFactoryV3Harness.sol";
 
-/// @title Account factory V3 unit test
+/// @title Default account factory V3 unit test
 /// @notice U:[AF]: Unit tests for account factory
-contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
-    AccountFactoryV3Harness accountFactory;
+contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3Events {
+    DefaultAccountFactoryV3Harness accountFactory;
 
     address configurator;
     address creditManager;
@@ -29,7 +29,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         configurator = makeAddr("CONFIGURATOR");
         creditManager = makeAddr("CREDIT_MANAGER");
 
-        accountFactory = new AccountFactoryV3Harness(configurator);
+        accountFactory = new DefaultAccountFactoryV3Harness(configurator);
         vm.prank(configurator);
         accountFactory.addCreditManager(creditManager);
     }
@@ -44,10 +44,6 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         if (caller != creditManager) {
             vm.expectRevert(CallerNotCreditManagerException.selector);
             accountFactory.returnCreditAccount(address(0));
-        }
-        if (caller != configurator) {
-            vm.expectRevert("Ownable: caller is not the owner");
-            accountFactory.addCreditManager(address(0));
         }
         if (caller != configurator) {
             vm.expectRevert("Ownable: caller is not the owner");

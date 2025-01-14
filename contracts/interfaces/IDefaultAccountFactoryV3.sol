@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./base/IVersion.sol";
+import {IAccountFactory} from "./base/IAccountFactory.sol";
 
-interface IAccountFactoryV3Events {
+interface IDefaultAccountFactoryV3Events {
     /// @notice Emitted when new credit account is deployed
     event DeployCreditAccount(address indexed creditAccount, address indexed creditManager);
 
@@ -22,15 +22,9 @@ interface IAccountFactoryV3Events {
     event Rescue(address indexed creditAccount, address indexed target, bytes data);
 }
 
-/// @title Account factory V3 interface
-interface IAccountFactoryV3 is IVersion, IAccountFactoryV3Events {
+/// @title Default account factory V3 interface
+interface IDefaultAccountFactoryV3 is IAccountFactory, IDefaultAccountFactoryV3Events {
     function delay() external view returns (uint40);
-
-    function takeCreditAccount(uint256, uint256) external returns (address creditAccount);
-
-    function returnCreditAccount(address creditAccount) external;
-
-    function addCreditManager(address creditManager) external;
 
     function rescue(address creditAccount, address target, bytes calldata data) external;
 }
