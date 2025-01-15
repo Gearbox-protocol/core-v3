@@ -34,12 +34,13 @@ contract GenesisFactory is Ownable {
 
         priceOracle = new PriceOracleV3(address(acl));
         lossPolicy = new LossPolicyMock();
-        accountFactory = new DefaultAccountFactoryV3(msg.sender);
-        botList = new BotListV3(msg.sender);
+        accountFactory = new DefaultAccountFactoryV3(address(acl));
+        botList = new BotListV3(address(acl));
 
         ERC20 gearToken = new ERC20("Gearbox", "GEAR");
+        acl.setAddress(AP_GEAR_TOKEN, address(gearToken), false);
 
-        gearStaking = new GearStakingV3(msg.sender, address(gearToken), 1);
+        gearStaking = new GearStakingV3(address(acl));
 
         acl.grantRole("PAUSABLE_ADMIN", msg.sender);
         acl.grantRole("UNPAUSABLE_ADMIN", msg.sender);

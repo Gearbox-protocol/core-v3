@@ -3,12 +3,18 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+bytes32 constant AP_GEAR_TOKEN = "GEAR_TOKEN";
+bytes32 constant AP_INSTANCE_MANAGER_PROXY = "INSTANCE_MANAGER_PROXY";
+bytes32 constant AP_CROSS_CHAIN_GOVERNANCE_PROXY = "CROSS_CHAIN_GOVERNANCE_PROXY";
+uint256 constant NO_VERSION_CONTROL = 0;
+
 uint256 constant WAD = 1e18;
 uint256 constant RAY = 1e27;
 uint16 constant PERCENTAGE_FACTOR = 1e4;
 
 uint256 constant SECONDS_PER_YEAR = 365 days;
 uint256 constant EPOCH_LENGTH = 7 days;
+uint256 constant FIRST_EPOCH_TIMESTAMP = 1702900800;
 uint256 constant EPOCHS_TO_WITHDRAW = 4;
 
 uint8 constant MAX_WITHDRAW_FEE = 100;

@@ -31,34 +31,35 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
     GearStakingV3 gearStaking;
+    address owner;
 
     TargetContractMock votingContract;
 
     TokensTestSuite tokenTestSuite;
 
     function setUp() public {
-        vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
 
         tokenTestSuite = new TokensTestSuite();
 
         gearToken = tokenTestSuite.addressOf(TOKEN_WETH);
 
-        vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
-        gearStaking = new GearStakingV3(CONFIGURATOR, gearToken, block.timestamp + 1);
+        gearStaking = new GearStakingV3(address(addressProvider));
+        vm.warp(gearStaking.firstEpochTimestamp());
+
+        owner = gearStaking.owner();
 
         votingContract = new TargetContractMock();
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.ALLOWED);
     }
 
     /// @dev U:[GS-1]: constructor sets correct values
     function test_U_GS_01_constructor_sets_correct_values() public {
         assertEq(address(gearStaking.gear()), gearToken, "Gear token incorrect");
-        assertEq(gearStaking.getCurrentEpoch(), 0, "First epoch timestamp incorrect");
 
         vm.warp(block.timestamp + 1);
         assertEq(gearStaking.getCurrentEpoch(), 1, "First epoch timestamp incorrect");
@@ -171,7 +172,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
         TargetContractMock votingContract2 = new TargetContractMock();
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setVotingContractStatus(address(votingContract2), VotingContractStatus.ALLOWED);
 
         votes = new MultiVote[](3);
@@ -226,7 +227,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.prank(USER);
         gearStaking.deposit(uint96(WAD), votes);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.NOT_ALLOWED);
 
         votes = new MultiVote[](1);
@@ -255,7 +256,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.prank(USER);
         gearStaking.multivote(votes);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.UNVOTE_ONLY);
 
         votes = new MultiVote[](1);
@@ -382,13 +383,13 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.expectEmit(true, false, false, true);
         emit SetVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(gearStaking.owner());
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
     }
 
     /// @dev U:[GS-7]: migrate and depositOnMigration perform operations in order and emits events
     function test_U_GS_07_migrate_and_depositOnMigration_work_correctly() public {
-        GearStakingV3 gearStakingSuccessor = new GearStakingV3(CONFIGURATOR, gearToken, block.timestamp + 1);
+        GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider));
 
         {
             MultiVote[] memory votes = new MultiVote[](1);
@@ -410,18 +411,18 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.prank(USER);
         gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStakingSuccessor.setMigrator(address(gearStaking));
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setSuccessor(address(gearStakingSuccessor));
 
         address newVotingContract = address(new TargetContractMock());
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStakingSuccessor.setVotingContractStatus(newVotingContract, VotingContractStatus.ALLOWED);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.UNVOTE_ONLY);
 
         MultiVote[] memory votesBefore = new MultiVote[](1);
@@ -468,7 +469,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(0)));
 
         vm.expectRevert(IncompatibleSuccessorException.selector);
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setSuccessor(DUMB_ADDRESS);
 
         vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(gearStaking)));
@@ -476,7 +477,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.expectEmit(true, false, false, false);
         emit SetSuccessor(DUMB_ADDRESS);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setSuccessor(DUMB_ADDRESS);
 
         assertEq(gearStaking.successor(), DUMB_ADDRESS, "Successor address incorrect");
@@ -490,7 +491,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.expectEmit(true, false, false, false);
         emit SetMigrator(DUMB_ADDRESS);
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         gearStaking.setMigrator(DUMB_ADDRESS);
 
         assertEq(gearStaking.migrator(), DUMB_ADDRESS, "Migrator address incorrect");

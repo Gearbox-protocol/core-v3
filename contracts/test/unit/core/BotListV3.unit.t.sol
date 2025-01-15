@@ -10,6 +10,7 @@ import {IBotListV3Events} from "../../../interfaces/IBotListV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // EXCEPTIONS
@@ -19,6 +20,7 @@ import "../../../interfaces/IExceptions.sol";
 /// @notice U:[BL]: Unit tests for bot list v3
 contract BotListV3UnitTest is Test, IBotListV3Events {
     BotListV3 botList;
+    address owner;
 
     address bot;
     address otherBot;
@@ -29,6 +31,8 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
     address invalidAccount;
 
     function setUp() public {
+        AddressProviderV3ACLMock addressProvider = new AddressProviderV3ACLMock();
+
         bot = address(new BotMock());
         otherBot = address(new BotMock());
         creditManager = makeAddr("CREDIT_MANAGER");
@@ -52,7 +56,8 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
             abi.encodeWithSignature("CreditAccountDoesNotExistException()")
         );
 
-        botList = new BotListV3(CONFIGURATOR);
+        botList = new BotListV3(address(addressProvider));
+        owner = botList.owner();
     }
 
     /// @notice U:[BL-1]: `setBotPermissions` works correctly
@@ -72,7 +77,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         botList.forbidBot(otherBot);
 
         vm.expectRevert(InvalidBotException.selector);
@@ -105,7 +110,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         assertEq(bots.length, 1, "Incorrect active bots array length");
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         botList.forbidBot(bot);
 
         vm.expectEmit(true, true, true, true);

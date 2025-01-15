@@ -15,6 +15,9 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
+
+import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
 /// @dev Struct holding factory and queue params for a credit manager
 /// @param masterCreditAccount Address of the contract to clone to create new accounts for the credit manager
@@ -57,9 +60,11 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
     mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
     /// @notice Constructor
-    /// @param owner_ Contract owner
-    constructor(address owner_) {
-        transferOwnership(owner_);
+    /// @param addressProvider_ Address provider contract address
+    constructor(address addressProvider_) {
+        transferOwnership(
+            IAddressProvider(addressProvider_).getAddressOrRevert(AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL)
+        );
     }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.

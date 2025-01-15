@@ -240,6 +240,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         botList = gp.botList();
         cr = gp.contractsRegister();
         gearStaking = gp.gearStaking();
+        vm.warp(gearStaking.firstEpochTimestamp());
 
         vm.stopPrank();
     }

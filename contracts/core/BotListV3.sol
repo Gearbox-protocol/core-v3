@@ -15,7 +15,10 @@ import {
     IncorrectBotPermissionsException,
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IBot} from "../interfaces/base/IBot.sol";
+
+import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
@@ -37,9 +40,11 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
     /// @notice Constructor
-    /// @param owner_ Contract owner
-    constructor(address owner_) {
-        transferOwnership(owner_);
+    /// @param addressProvider_ Address provider contract address
+    constructor(address addressProvider_) {
+        transferOwnership(
+            IAddressProvider(addressProvider_).getAddressOrRevert(AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL)
+        );
     }
 
     // ----------- //
