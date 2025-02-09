@@ -81,6 +81,14 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         isBorrowingMoreU2Forbidden = _isBorrowingMoreU2Forbidden; // U:[LIM-1]
     }
 
+    /// @notice Returns serialized IRM parameters
+    function serialize() external view override returns (bytes memory) {
+        (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
+            getModelParameters();
+
+        return abi.encode(U_1, U_2, R_base, R_slope1, R_slope2, R_slope3, isBorrowingMoreU2Forbidden); // U:[LIM-1]
+    }
+
     /// @notice Returns the borrow rate calculated based on expected and available liquidity
     /// @param expectedLiquidity Expected liquidity in the pool
     /// @param availableLiquidity Available liquidity in the pool
@@ -135,7 +143,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
 
     /// @notice Returns the model's parameters in basis points
     function getModelParameters()
-        external
+        public
         view
         override
         returns (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3)

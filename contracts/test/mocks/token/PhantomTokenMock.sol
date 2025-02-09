@@ -50,7 +50,7 @@ contract PhantomTokenMock is IPhantomToken, ERC20 {
 
 contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "PHANTOM_TOKEN_WITHDRAWER::MOCK";
+    bytes32 public constant override contractType = "ADAPTER::PT_WITHDRAWER_MOCK";
 
     address public immutable override creditManager;
     address public immutable override targetContract;
@@ -63,6 +63,8 @@ contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {
         phantomToken = phantomToken_;
         (targetContract, depositedToken) = IPhantomToken(phantomToken_).getPhantomTokenInfo();
     }
+
+    function serialize() external view override returns (bytes memory) {}
 
     function withdrawPhantomToken(address, uint256 amount) external override returns (bool) {
         address creditAccount = ICreditManagerV3(creditManager).getActiveCreditAccountOrRevert();

@@ -11,6 +11,8 @@ contract LossPolicyMock is ILossPolicy {
 
     bool public enabled = true;
 
+    function serialize() external view override returns (bytes memory) {}
+
     function isLiquidatable(address, address, bytes calldata) external view override returns (bool) {
         return enabled;
     }

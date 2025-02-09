@@ -3,13 +3,14 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {IStateSerializer} from "./IStateSerializer.sol";
 import {IVersion} from "./IVersion.sol";
 
 /// @title Zapper interface
 /// @notice Generic interface for a zapper contract contract that can be used to perform complex batched
 ///         deposits into a pool which can, e.g., involve native token wrapping or staking pool's shares
 /// @dev Zappers must have contract type `ZAPPER::{POSTFIX}`
-interface IZapper is IVersion {
+interface IZapper is IVersion, IStateSerializer {
     /// @notice Pool a zapper deposits into
     function pool() external view returns (address);
 

@@ -4,11 +4,12 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "./IVersion.sol";
+import {IStateSerializer} from "./IStateSerializer.sol";
 
 /// @title Account factory interface
 /// @notice Generic interface for an account factory that can be used by credit managers to create credit accounts
 /// @dev Account factories must have type `ACCOUNT_FACTORY::{POSTFIX}`
-interface IAccountFactory is IVersion {
+interface IAccountFactory is IVersion, IStateSerializer {
     /// @notice Takes `creditAccount` from the account factory
     /// @dev Parameters are kept for backward compatibility
     function takeCreditAccount(uint256, uint256) external returns (address creditAccount);

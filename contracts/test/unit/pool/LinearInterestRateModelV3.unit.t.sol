@@ -42,6 +42,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
         assertEq(R_slope2, 3000);
         assertEq(R_slope3, 4000);
         assertTrue(irm.isBorrowingMoreU2Forbidden());
+        assertEq(irm.serialize(), abi.encode(8000, 9500, 1000, 2000, 3000, 4000, true), "Incorrect serialized state");
     }
 
     struct IncorrectParamCase {

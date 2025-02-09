@@ -3,12 +3,13 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {IStateSerializer} from "./IStateSerializer.sol";
 import {IVersion} from "./IVersion.sol";
 
 /// @title Rate keeper interface
 /// @notice Generic interface for a contract that can provide rates to the quota keeper
 /// @dev Bots must have type `RATE_KEEPER::{POSTFIX}`
-interface IRateKeeper is IVersion {
+interface IRateKeeper is IVersion, IStateSerializer {
     /// @notice Pool rates are provided for
     function pool() external view returns (address);
 

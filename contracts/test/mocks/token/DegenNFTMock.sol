@@ -17,6 +17,8 @@ contract DegenNFTMock is ERC721, IDegenNFT {
         minter = msg.sender;
     }
 
+    function serialize() external view override returns (bytes memory) {}
+
     function mint(address to, uint256 amount) external {
         uint256 balanceBefore = balanceOf(to);
         for (uint256 i; i < amount; ++i) {

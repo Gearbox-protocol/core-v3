@@ -67,6 +67,9 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
         );
     }
 
+    /// @notice Empty state serialization
+    function serialize() external view override returns (bytes memory) {}
+
     /// @notice Provides a reusable credit account from the queue to the credit manager.
     ///         If there are no accounts that can be reused in the queue, deploys a new one.
     /// @return creditAccount Address of the provided credit account

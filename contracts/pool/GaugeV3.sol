@@ -2,7 +2,6 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
-pragma abicoder v1;
 
 // INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "../interfaces/IGaugeV3.sol";
@@ -78,6 +77,17 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
         emit SetFrozenEpoch(true); // U:[GA-1]
+    }
+
+    /// @notice Returns serialized gauge state
+    function serialize() external view override returns (bytes memory) {
+        address[] memory tokens = _poolQuotaKeeper().quotedTokens();
+        uint256 numTokens = tokens.length;
+        QuotaRateParams[] memory tokenParams = new QuotaRateParams[](numTokens);
+        for (uint256 i; i < numTokens; ++i) {
+            tokenParams[i] = quotaRateParams[tokens[i]];
+        }
+        return abi.encode(voter, epochLastUpdate, epochFrozen, tokens, tokenParams); // U:[GA-1]
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper

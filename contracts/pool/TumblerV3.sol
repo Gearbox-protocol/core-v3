@@ -62,6 +62,18 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
         epochLength = epochLength_;
     }
 
+    /// @notice Returns serialized tumbler state
+    /// @custom:tests U:[TU-1]
+    function serialize() external view override returns (bytes memory) {
+        address[] memory tokens = _tokensSet.values();
+        uint256 numTokens = tokens.length;
+        uint16[] memory rates = new uint16[](numTokens);
+        for (uint256 i; i < numTokens; ++i) {
+            rates[i] = _rates[tokens[i]];
+        }
+        return abi.encode(epochLength, tokens, rates);
+    }
+
     /// @notice Whether `token` is added
     /// @custom:tests U:[TU-2]
     function isTokenAdded(address token) external view override returns (bool) {

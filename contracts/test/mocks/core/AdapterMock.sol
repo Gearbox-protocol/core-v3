@@ -21,6 +21,8 @@ contract AdapterMock is IAdapter {
         targetContract = _targetContract;
     }
 
+    function serialize() external view override returns (bytes memory) {}
+
     function dumbCall() external returns (bool) {
         _execute(dumbCallData());
         return _return_useSafePrices;

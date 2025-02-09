@@ -39,6 +39,8 @@ contract PriceFeedMock is IPriceFeed {
         updatedAt = block.timestamp + 36500 days;
     }
 
+    function serialize() external view override returns (bytes memory) {}
+
     function setParams(uint80 _roundId, uint256 _startedAt, uint256 _updatedAt, uint80 _answerInRound) external {
         roundId = _roundId;
         startedAt = _startedAt;

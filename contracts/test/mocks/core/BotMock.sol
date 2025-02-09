@@ -10,6 +10,8 @@ contract BotMock is IBot {
     bytes32 public constant override contractType = "BOT::MOCK";
     uint192 public override requiredPermissions;
 
+    function serialize() external view override returns (bytes memory) {}
+
     function setRequiredPermissions(uint192 permissions) external {
         requiredPermissions = permissions;
     }
