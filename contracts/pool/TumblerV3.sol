@@ -14,6 +14,7 @@ import {
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
+import {MarketHelper} from "../libraries/MarketHelper.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
@@ -22,6 +23,7 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 ///         instead of voting, allows configurator to set rates directly with custom epoch length
 contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using MarketHelper for IPoolV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -53,7 +55,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
     /// @param pool_ Pool whose rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address pool_, uint256 epochLength_) ACLTrait(ACLTrait(pool_).acl()) {
+    constructor(address pool_, uint256 epochLength_) ACLTrait(IPoolV3(pool_).getACL()) {
         pool = pool_;
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();
         underlying = IPoolQuotaKeeperV3(poolQuotaKeeper).underlying();

@@ -10,6 +10,9 @@ import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
+// LIBRARIES
+import {MarketHelper} from "../libraries/MarketHelper.sol";
+
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
@@ -31,6 +34,8 @@ import {
 ///         or for LP side, which moves it towards max.
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
 contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
+    using MarketHelper for IPoolV3;
+
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
@@ -65,7 +70,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
-        ACLTrait(ACLTrait(_pool).acl())
+        ACLTrait(IPoolV3(_pool).getACL())
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {
         pool = _pool; // U:[GA-1]

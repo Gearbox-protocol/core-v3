@@ -41,6 +41,7 @@ import {
     UNDERLYING_TOKEN_MASK,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER
 } from "../libraries/Constants.sol";
+import {MarketHelper} from "../libraries/MarketHelper.sol";
 
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -68,6 +69,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     using BitMask for uint256;
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using MarketHelper for ICreditManagerV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -152,7 +154,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _lossPolicy Loss policy address
     /// @param _botList Bot list address
@@ -161,14 +162,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
     constructor(
-        address _acl,
         address _creditManager,
         address _lossPolicy,
         address _botList,
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) ACLTrait(_acl) nonZeroAddress(_lossPolicy) nonZeroAddress(_botList) {
+    ) ACLTrait(ICreditManagerV3(_creditManager).getACL()) nonZeroAddress(_lossPolicy) nonZeroAddress(_botList) {
         creditManager = _creditManager; // U:[FA-1]
         lossPolicy = _lossPolicy; // U:[FA-1]
         botList = _botList; // U:[FA-1]
@@ -177,7 +177,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         expirable = _expirable; // U:[FA-1]
 
         underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
-        treasury = IPoolV3(ICreditManagerV3(_creditManager).pool()).treasury(); // U:[FA-1]
+        treasury = ICreditManagerV3(_creditManager).getTreasury(); // U:[FA-1]
     }
 
     // ------------------ //

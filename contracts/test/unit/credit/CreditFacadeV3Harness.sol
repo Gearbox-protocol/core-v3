@@ -10,14 +10,13 @@ import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
     constructor(
-        address _acl,
         address _creditManager,
         address _lossPolicy,
         address _botList,
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) CreditFacadeV3(_acl, _creditManager, _lossPolicy, _botList, _weth, _degenNFT, _expirable) {}
+    ) CreditFacadeV3(_creditManager, _lossPolicy, _botList, _weth, _degenNFT, _expirable) {}
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
