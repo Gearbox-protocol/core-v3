@@ -123,9 +123,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             revert IncorrectTokenContractException(); // I:[CC-3]
         }
 
-        /// NOTE: Some external tokens without getPhantomTokenInfo may have a fallback function that changes state, which can cause a THROW
-        ///      that burns all gas, or does not change state and instead returns empty data. To handle these cases,
-        ///      we use a special call construction with a strict gas limit.
+        // NOTE: Some external tokens without `getPhantomTokenInfo` may have a fallback function that changes state,
+        // which can cause a `THROW` that burns all gas, or does not change state and instead returns empty data.
+        // To handle these cases, we use a special call construction with a strict gas limit.
         (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
             target: token,
             data: abi.encodeWithSelector(IPhantomToken.getPhantomTokenInfo.selector),

@@ -28,7 +28,7 @@ abstract contract PriceFeedValidationTrait {
     }
 
     /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
-    /// @custom:tests U:[PO-8]
+    /// @custom:tests U:[PO-8], U:[PO-10]
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
         if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed);
 
@@ -38,9 +38,9 @@ abstract contract PriceFeedValidationTrait {
             revert IncorrectPriceFeedException();
         }
 
-        /// NOTE: Some external price feeds without skipPriceCheck may have a fallback function that changes state, which can cause a THROW
-        ///      that burns all gas, or does not change state and instead returns empty data. To handle these cases,
-        ///      we use a special call construction with a strict gas limit.
+        // NOTE: Some external price feeds without `skipPriceCheck` may have a fallback function that changes state,
+        // which can cause a `THROW` that burns all gas, or does not change state and instead returns empty data.
+        // To handle these cases, we use a special call construction with a strict gas limit.
         (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
             target: priceFeed,
             data: abi.encodeWithSelector(IPriceFeed.skipPriceCheck.selector),
@@ -76,9 +76,18 @@ abstract contract PriceFeedValidationTrait {
     }
 
     /// @dev Checks whether price feed is updatable
+    /// @custom:tests U:[PO-10]
     function _isUpdatable(address priceFeed) internal view returns (bool updatable) {
-        try IUpdatablePriceFeed(priceFeed).updatable() returns (bool value) {
-            updatable = value;
-        } catch {}
+        // NOTE: Some external price feeds without `updatable` may have a fallback function that changes state,
+        // which can cause a `THROW` that burns all gas, or does not change state and instead returns empty data.
+        // To handle these cases, we use a special call construction with a strict gas limit.
+        (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
+            target: priceFeed,
+            data: abi.encodeWithSelector(IUpdatablePriceFeed.updatable.selector),
+            gasAllowance: 10_000
+        });
+        if (success) {
+            updatable = abi.decode(returnData, (bool));
+        }
     }
 }

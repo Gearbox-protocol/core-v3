@@ -14,6 +14,7 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {PriceFeedFallbackMock} from "../../mocks/oracles/PriceFeedFallbackMock.sol";
 
 import {PriceOracleV3Harness} from "./PriceOracleV3Harness.sol";
 
@@ -394,5 +395,16 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         );
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
         assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, false), 123, "Incorrect price");
+    }
+
+    /// @notice U:[PO-10]: `_validatePriceFeed` and `_isUpdatable` work correctly for price feeds with fallback
+    function test_U_PO_10_validatePriceFeed_and_isUpdatable_work_correctly_for_price_feeds_with_fallback() public {
+        address priceFeed = address(new PriceFeedFallbackMock(1e8, 8, false));
+        assertFalse(priceOracle.exposed_validatePriceFeed(priceFeed, 1000));
+        assertFalse(priceOracle.exposed_isUpdatable(priceFeed));
+
+        priceFeed = address(new PriceFeedFallbackMock(1e8, 8, true));
+        assertFalse(priceOracle.exposed_validatePriceFeed(priceFeed, 1000));
+        assertFalse(priceOracle.exposed_isUpdatable(priceFeed));
     }
 }
