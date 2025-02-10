@@ -38,7 +38,7 @@ abstract contract PriceFeedValidationTrait {
             revert IncorrectPriceFeedException();
         }
 
-        /// @dev Some external price feeds without skipPriceCheck may have a fallback function that changes state, which can cause a THROW
+        /// NOTE: Some external price feeds without skipPriceCheck may have a fallback function that changes state, which can cause a THROW
         ///      that burns all gas, or does not change state and instead returns empty data. To handle these cases,
         ///      we use a special call construction with a strict gas limit.
         (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
