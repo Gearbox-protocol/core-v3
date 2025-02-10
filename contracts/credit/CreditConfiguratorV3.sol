@@ -10,6 +10,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBRARIES & CONSTANTS
 import {BitMask} from "../libraries/BitMask.sol";
+import {OptionalCall} from "../libraries/OptionalCall.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
@@ -121,9 +122,18 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
             revert IncorrectTokenContractException(); // I:[CC-3]
         }
 
-        try IPhantomToken(token).getPhantomTokenInfo() returns (address, address depositedToken) {
+        /// @dev Some external tokens without getPhantomTokenInfo may have a fallback function that changes state, which can cause a THROW
+        ///      that burns all gas, or does not change state and instead returns empty data. To handle these cases,
+        ///      we use a special call construction with a strict gas limit.
+        (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
+            target: token,
+            data: abi.encodeWithSelector(IPhantomToken.getPhantomTokenInfo.selector),
+            gasAllowance: 30_000
+        });
+        if (success) {
+            (, address depositedToken) = abi.decode(returnData, (address, address));
             _getTokenMaskOrRevert(depositedToken); // I:[CC-3]
-        } catch {}
+        }
 
         if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).priceFeeds(token) == address(0)) {
             revert PriceFeedDoesNotExistException(); // I:[CC-3]
