@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
+import {DefaultAccountFactoryV3} from "../../core/DefaultAccountFactoryV3.sol";
 import {IACL} from "../../interfaces//base/IACL.sol";
 import {IContractsRegister} from "../../interfaces/base/IContractsRegister.sol";
 
@@ -65,7 +65,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     // CORE
     IACL acl;
     IContractsRegister cr;
-    AccountFactoryV3 accountFactory;
+    DefaultAccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     ILossPolicy lossPolicy;
     BotListV3 botList;
@@ -240,6 +240,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         botList = gp.botList();
         cr = gp.contractsRegister();
         gearStaking = gp.gearStaking();
+        vm.warp(gearStaking.firstEpochTimestamp());
 
         vm.stopPrank();
     }
@@ -272,7 +273,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         address cm = cms[0];
 
-        accountFactory = AccountFactoryV3(CreditManagerV3(cm).accountFactory());
+        accountFactory = DefaultAccountFactoryV3(CreditManagerV3(cm).accountFactory());
         priceOracle = IPriceOracleV3(CreditManagerV3(cm).priceOracle());
 
         address cf = CreditManagerV3(cm).creditFacade();
@@ -455,16 +456,13 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             }
 
             vm.prank(CONFIGURATOR);
-            AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
+            DefaultAccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             poolQuotaKeeper.addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
-
-            vm.prank(CONFIGURATOR);
-            botList.approveCreditManager(address(creditManager));
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");

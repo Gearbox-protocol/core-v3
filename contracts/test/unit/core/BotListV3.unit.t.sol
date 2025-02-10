@@ -10,6 +10,7 @@ import {IBotListV3Events} from "../../../interfaces/IBotListV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // EXCEPTIONS
@@ -19,6 +20,7 @@ import "../../../interfaces/IExceptions.sol";
 /// @notice U:[BL]: Unit tests for bot list v3
 contract BotListV3UnitTest is Test, IBotListV3Events {
     BotListV3 botList;
+    address owner;
 
     address bot;
     address otherBot;
@@ -26,27 +28,44 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
     address creditFacade;
     address creditAccount;
     address invalidFacade;
+    address invalidAccount;
 
     function setUp() public {
+        AddressProviderV3ACLMock addressProvider = new AddressProviderV3ACLMock();
+
         bot = address(new BotMock());
         otherBot = address(new BotMock());
         creditManager = makeAddr("CREDIT_MANAGER");
         creditFacade = makeAddr("CREDIT_FACADE");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
         invalidFacade = makeAddr("INVALID_FACADE");
+        invalidAccount = makeAddr("INVALID_ACCOUNT");
 
         vm.mockCall(creditManager, abi.encodeWithSignature("creditFacade()"), abi.encode(creditFacade));
-        vm.mockCall(creditFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
-        vm.mockCall(invalidFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
         vm.mockCall(creditAccount, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
+        vm.mockCall(
+            creditManager,
+            abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount),
+            abi.encode(makeAddr("borrower"))
+        );
 
-        botList = new BotListV3(CONFIGURATOR);
-        vm.prank(CONFIGURATOR);
-        botList.approveCreditManager(creditManager);
+        vm.mockCall(invalidAccount, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
+        vm.mockCallRevert(
+            creditManager,
+            abi.encodeWithSignature("getBorrowerOrRevert(address)", invalidAccount),
+            abi.encodeWithSignature("CreditAccountDoesNotExistException()")
+        );
+
+        botList = new BotListV3(address(addressProvider));
+        owner = botList.owner();
     }
 
     /// @notice U:[BL-1]: `setBotPermissions` works correctly
     function test_U_BL_01_setBotPermissions_works_correctly() public {
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        vm.prank(creditFacade);
+        botList.setBotPermissions({bot: bot, creditAccount: invalidAccount, permissions: type(uint192).max});
+
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
@@ -58,7 +77,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         botList.forbidBot(otherBot);
 
         vm.expectRevert(InvalidBotException.selector);
@@ -91,7 +110,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         assertEq(bots.length, 1, "Incorrect active bots array length");
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
 
-        vm.prank(CONFIGURATOR);
+        vm.prank(owner);
         botList.forbidBot(bot);
 
         vm.expectEmit(true, true, true, true);
@@ -119,6 +138,10 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
             botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 2});
 
         assertEq(activeBotsRemaining, 2, "Incorrect number of active bots");
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        vm.prank(creditFacade);
+        botList.eraseAllBotPermissions(invalidAccount);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidFacade);

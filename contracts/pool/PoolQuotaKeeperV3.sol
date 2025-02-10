@@ -18,6 +18,7 @@ import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IRateKeeper} from "../interfaces/base/IRateKeeper.sol";
 
 import {PERCENTAGE_FACTOR, RAY} from "../libraries/Constants.sol";
+import {MarketHelper} from "../libraries/MarketHelper.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -33,6 +34,7 @@ import "../interfaces/IExceptions.sol";
 contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
+    using MarketHelper for IPoolV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -81,8 +83,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
     /// @notice Constructor
     /// @param _pool Pool address
     constructor(address _pool)
-        ACLTrait(ACLTrait(_pool).acl())
-        ContractsRegisterTrait(ContractsRegisterTrait(_pool).contractsRegister())
+        ACLTrait(IPoolV3(_pool).getACL())
+        ContractsRegisterTrait(IPoolV3(_pool).getContractsRegister())
     {
         pool = _pool; // U:[PQK-1]
         underlying = IPoolV3(_pool).asset(); // U:[PQK-1]
@@ -442,7 +444,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
 
         uint256 len = quotaTokensSet.length();
         for (uint256 i; i < len;) {
-            if (!IRateKeeper(gauge).isTokenAdded(quotaTokensSet.at(i))) {
+            if (!IRateKeeper(_gauge).isTokenAdded(quotaTokensSet.at(i))) {
                 revert TokenIsNotQuotedException(); // U:[PQK-8]
             }
             unchecked {

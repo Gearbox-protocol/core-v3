@@ -3,16 +3,9 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
-
-import "../interfaces/IAddressProviderV3.sol";
-import {IACLTrait} from "../../interfaces/base/IACLTrait.sol";
-
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
-
-import {DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER} from "../../libraries/Constants.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -56,9 +49,7 @@ contract CreditManagerFactory {
             cmParams.name
         );
 
-        address acl = IACLTrait(pool).acl();
         creditFacade = new CreditFacadeV3(
-            acl,
             address(creditManager),
             cfParams.lossPolicy,
             cfParams.botList,
@@ -68,7 +59,7 @@ contract CreditManagerFactory {
         );
         creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager));
+        creditConfigurator = new CreditConfiguratorV3(address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
     }
 }

@@ -4,10 +4,12 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "./IVersion.sol";
+import {IStateSerializer} from "./IStateSerializer.sol";
 
 /// @title Price feed interface
 /// @notice Interface for Chainlink-like price feeds that can be plugged into Gearbox's price oracle
-interface IPriceFeed is IVersion {
+/// @dev Price feeds must have type `PRICE_FEED::{POSTFIX}`
+interface IPriceFeed is IVersion, IStateSerializer {
     /// @notice Whether price feed implements its own staleness and sanity checks
     function skipPriceCheck() external view returns (bool);
 

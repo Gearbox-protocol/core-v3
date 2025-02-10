@@ -29,9 +29,6 @@ interface IBotListV3Events {
 
     /// @notice Emitted when `bot` is forbidden
     event ForbidBot(address indexed bot);
-
-    /// @notice Emitted when `creditManager` is approved
-    event ApproveCreditManager(address indexed creditManager);
 }
 
 /// @title Bot list V3 interface
@@ -61,9 +58,5 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function botForbiddenStatus(address bot) external view returns (bool);
 
-    function approvedCreditManager(address creditManager) external view returns (bool);
-
     function forbidBot(address bot) external;
-
-    function approveCreditManager(address creditManager) external;
 }

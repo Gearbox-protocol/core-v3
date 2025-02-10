@@ -12,6 +12,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {BitMask} from "../libraries/BitMask.sol";
 import {OptionalCall} from "../libraries/OptionalCall.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
+import {MarketHelper} from "../libraries/MarketHelper.sol";
 
 // CONTRACTS
 import {CreditFacadeV3} from "./CreditFacadeV3.sol";
@@ -38,6 +39,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;
+    using MarketHelper for CreditManagerV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -61,10 +63,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     }
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager) ACLTrait(_acl) {
+    constructor(address _creditManager) ACLTrait(CreditManagerV3(_creditManager).getACL()) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 

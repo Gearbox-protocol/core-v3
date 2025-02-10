@@ -50,6 +50,9 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         assertEq(tumbler.poolQuotaKeeper(), address(poolQuotaKeeper), "Incorrect poolQuotaKeeper");
         assertEq(tumbler.epochLength(), 1 days, "Incorrect epochLength");
         assertEq(tumbler.getTokens().length, 0, "Non-empty quoted tokens set");
+        assertEq(
+            tumbler.serialize(), abi.encode(1 days, new address[](0), new address[](0)), "Incorrect serialized state"
+        );
     }
 
     /// @notice U:[TU-2]: `addToken` works as expected

@@ -41,6 +41,9 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         _setAddress(AP_TREASURY, address(1234), 0);
 
         _setAddress(AP_WETH_TOKEN, address(new WETHMock()), 0);
+
+        _setAddress(AP_INSTANCE_MANAGER_PROXY, makeAddr("INSTANCE_MANAGER_PROXY"), 0);
+        _setAddress(AP_CROSS_CHAIN_GOVERNANCE_PROXY, makeAddr("CROSS_CHAIN_GOVERNANCE_PROXY"), 0);
     }
 
     function isConfigurator(address addr) external view returns (bool) {

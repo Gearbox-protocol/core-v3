@@ -9,7 +9,7 @@ import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 /// @title Adapter Mock
 contract AdapterMock is IAdapter {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "ADAPTER_MOCK";
+    bytes32 public constant override contractType = "ADAPTER::MOCK";
 
     address public immutable override creditManager;
     address public immutable override targetContract;
@@ -20,6 +20,8 @@ contract AdapterMock is IAdapter {
         creditManager = _creditManager;
         targetContract = _targetContract;
     }
+
+    function serialize() external view override returns (bytes memory) {}
 
     function dumbCall() external returns (bool) {
         _execute(dumbCallData());

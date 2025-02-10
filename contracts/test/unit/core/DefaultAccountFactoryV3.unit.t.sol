@@ -3,9 +3,11 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {IAccountFactoryV3Events} from "../../../interfaces/IAccountFactoryV3.sol";
+import {IDefaultAccountFactoryV3Events} from "../../../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
@@ -15,22 +17,24 @@ import {
 
 import {TestHelper} from "../../lib/helper.sol";
 
-import {AccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./AccountFactoryV3Harness.sol";
+import {DefaultAccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./DefaultAccountFactoryV3Harness.sol";
 
-/// @title Account factory V3 unit test
+/// @title Default account factory V3 unit test
 /// @notice U:[AF]: Unit tests for account factory
-contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
-    AccountFactoryV3Harness accountFactory;
+contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3Events {
+    DefaultAccountFactoryV3Harness accountFactory;
 
-    address configurator;
+    address owner;
     address creditManager;
 
     function setUp() public {
-        configurator = makeAddr("CONFIGURATOR");
+        AddressProviderV3ACLMock addressProvider = new AddressProviderV3ACLMock();
+        accountFactory = new DefaultAccountFactoryV3Harness(address(addressProvider));
+
+        owner = accountFactory.owner();
         creditManager = makeAddr("CREDIT_MANAGER");
 
-        accountFactory = new AccountFactoryV3Harness(configurator);
-        vm.prank(configurator);
+        vm.prank(owner);
         accountFactory.addCreditManager(creditManager);
     }
 
@@ -45,11 +49,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
             vm.expectRevert(CallerNotCreditManagerException.selector);
             accountFactory.returnCreditAccount(address(0));
         }
-        if (caller != configurator) {
-            vm.expectRevert("Ownable: caller is not the owner");
-            accountFactory.addCreditManager(address(0));
-        }
-        if (caller != configurator) {
+        if (caller != owner) {
             vm.expectRevert("Ownable: caller is not the owner");
             accountFactory.rescue(address(0), address(0), bytes(""));
         }
@@ -135,7 +135,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         accountFactory.setFactoryParams(manager, creditAccount, 0, 0);
 
         vm.expectRevert(MasterCreditAccountAlreadyDeployedException.selector);
-        vm.prank(configurator);
+        vm.prank(owner);
         accountFactory.addCreditManager(manager);
     }
 
@@ -146,7 +146,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(manager, address(0));
 
-        vm.prank(configurator);
+        vm.prank(owner);
         accountFactory.addCreditManager(manager);
 
         address account = accountFactory.factoryParams(manager).masterCreditAccount;
@@ -173,7 +173,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         );
 
         vm.expectRevert(CreditAccountIsInUseException.selector);
-        vm.prank(configurator);
+        vm.prank(owner);
         accountFactory.rescue(creditAccount, address(0), bytes(""));
     }
 
@@ -196,7 +196,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         emit Rescue(creditAccount, target, data);
 
         vm.expectCall(creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).rescue, (target, data)));
-        vm.prank(configurator);
+        vm.prank(owner);
         accountFactory.rescue(creditAccount, target, data);
     }
 }

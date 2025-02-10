@@ -8,11 +8,16 @@ import {IDegenNFT} from "../../../interfaces/base/IDegenNFT.sol";
 import {InsufficientBalanceException} from "../../../interfaces/IExceptions.sol";
 
 contract DegenNFTMock is ERC721, IDegenNFT {
+    uint256 public constant override version = 3_10;
+    bytes32 public constant override contractType = "DEGEN_NFT::MOCK";
+
     address public minter;
 
     constructor(string memory name, string memory symbol) ERC721(name, symbol) {
         minter = msg.sender;
     }
+
+    function serialize() external view override returns (bytes memory) {}
 
     function mint(address to, uint256 amount) external {
         uint256 balanceBefore = balanceOf(to);

@@ -19,7 +19,7 @@ import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // INTERFACES
-import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+import {IAccountFactory} from "../interfaces/base/IAccountFactory.sol";
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {
@@ -212,7 +212,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (address creditAccount)
     {
-        creditAccount = IAccountFactoryV3(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
+        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
 
@@ -277,7 +277,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // even without this line, interest index should never be used for calculations when account has no debt
         currentCreditAccountInfo.cumulativeIndexLastUpdate = 0; // U:[CM-7]
 
-        IAccountFactoryV3(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
+        IAccountFactory(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
     }
 
@@ -1289,6 +1289,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
+        _setCreditConfigurator(_creditConfigurator);
+    }
+
+    /// @dev Same as above, added for compatibility with `BytecodeRepository` which only works with `Ownable` contracts
+    function transferOwnership(address newOwner)
+        external
+        creditConfiguratorOnly // U:[CM-4]
+    {
+        _setCreditConfigurator(newOwner);
+    }
+
+    /// @dev `setCreditConfigurator` implementation
+    function _setCreditConfigurator(address _creditConfigurator) internal {
         creditConfigurator = _creditConfigurator; // U:[CM-46]
         emit SetCreditConfigurator(_creditConfigurator); // U:[CM-46]
     }

@@ -4,10 +4,12 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "./IVersion.sol";
+import {IStateSerializer} from "./IStateSerializer.sol";
 
 /// @title Interest rate model interface
 /// @notice Generic interface for an interest rate model contract that can be used in a pool
-interface IInterestRateModel is IVersion {
+/// @dev Interest rate models must have type `IRM::{POSTFIX}`
+interface IInterestRateModel is IVersion, IStateSerializer {
     /// @notice Calculates borrow rate based on utilization
     /// @dev The last parameter can be used to prevent borrowing above maximum allowed utilization
     /// @dev This function can be state-changing in case the IRM is stateful

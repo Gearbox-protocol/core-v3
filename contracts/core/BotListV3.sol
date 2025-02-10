@@ -15,7 +15,10 @@ import {
     IncorrectBotPermissionsException,
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IBot} from "../interfaces/base/IBot.sol";
+
+import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
@@ -30,9 +33,6 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @notice Contract type
     bytes32 public constant override contractType = "BOT_LIST";
 
-    /// @notice Credit manager's approved status
-    mapping(address => bool) public override approvedCreditManager;
-
     /// @dev Mapping bot => info
     mapping(address => BotInfo) internal _botInfo;
 
@@ -40,9 +40,11 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
     /// @notice Constructor
-    /// @param owner_ Contract owner
-    constructor(address owner_) {
-        transferOwnership(owner_);
+    /// @param addressProvider_ Address provider contract address
+    constructor(address addressProvider_) {
+        transferOwnership(
+            IAddressProvider(addressProvider_).getAddressOrRevert(AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL)
+        );
     }
 
     // ----------- //
@@ -77,7 +79,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
 
     /// @notice Sets `bot`'s permissions for `creditAccount` in its credit manager to `permissions`
     /// @return activeBotsRemaining Number of bots with non-zero permissions remaining after the update
-    /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
+    /// @dev Reverts if `creditAccount` is not opened in its credit manager or caller is not a facade connected to it
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
     /// @custom:tests U:[BL-1]
@@ -88,7 +90,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         returns (uint256 activeBotsRemaining)
     {
         address creditManager = ICreditAccountV3(creditAccount).creditManager();
-        _revertIfCallerNotValidCreditFacade(creditManager);
+        _validateCreditAccountAndCaller(creditManager, creditAccount);
 
         BotInfo storage info = _botInfo[bot];
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
@@ -108,11 +110,11 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     }
 
     /// @notice Removes all bots' permissions for `creditAccount` in its credit manager
-    /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
+    /// @dev Reverts if `creditAccount` is not opened in its credit manager or caller is not a facade connected to it
     /// @custom:tests U:[BL-2]
     function eraseAllBotPermissions(address creditAccount) external override {
         address creditManager = ICreditAccountV3(creditAccount).creditManager();
-        _revertIfCallerNotValidCreditFacade(creditManager);
+        _validateCreditAccountAndCaller(creditManager, creditAccount);
 
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
         unchecked {
@@ -143,21 +145,14 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         }
     }
 
-    /// @notice Approves `creditManager`
-    function approveCreditManager(address creditManager) external override onlyOwner {
-        if (!approvedCreditManager[creditManager]) {
-            approvedCreditManager[creditManager] = true;
-            emit ApproveCreditManager(creditManager);
-        }
-    }
-
     // --------- //
     // INTERNALS //
     // --------- //
 
-    /// @dev Reverts if `creditManager` is not approved or caller is not a facade connected to it
-    function _revertIfCallerNotValidCreditFacade(address creditManager) internal view {
-        if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
+    /// @dev Reverts if `creditAccount` is not opened in `creditManager` or caller is not a facade connected to it
+    function _validateCreditAccountAndCaller(address creditManager, address creditAccount) internal view {
+        ICreditManagerV3(creditManager).getBorrowerOrRevert(creditAccount);
+        if (ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
         }
     }

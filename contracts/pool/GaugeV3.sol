@@ -2,13 +2,15 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
-pragma abicoder v1;
 
 // INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "../interfaces/IGaugeV3.sol";
 import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
+
+// LIBRARIES
+import {MarketHelper} from "../libraries/MarketHelper.sol";
 
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -31,12 +33,13 @@ import {
 ///         or for LP side, which moves it towards max.
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
 contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
+    using MarketHelper for IPoolV3;
+
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
     /// @notice Contract type
-    /// @dev "RK" stands for "rate keeper"
-    bytes32 public constant override contractType = "RK_GAUGE";
+    bytes32 public constant override contractType = "RATE_KEEPER::GAUGE";
 
     /// @notice Address of the pool this gauge is connected to
     address public immutable override pool;
@@ -66,7 +69,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
-        ACLTrait(ACLTrait(_pool).acl())
+        ACLTrait(IPoolV3(_pool).getACL())
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {
         pool = _pool; // U:[GA-1]
@@ -74,6 +77,17 @@ contract GaugeV3 is IGaugeV3, ACLTrait, SanityCheckTrait {
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
         emit SetFrozenEpoch(true); // U:[GA-1]
+    }
+
+    /// @notice Returns serialized gauge state
+    function serialize() external view override returns (bytes memory) {
+        address[] memory tokens = _poolQuotaKeeper().quotedTokens();
+        uint256 numTokens = tokens.length;
+        QuotaRateParams[] memory tokenParams = new QuotaRateParams[](numTokens);
+        for (uint256 i; i < numTokens; ++i) {
+            tokenParams[i] = quotaRateParams[tokens[i]];
+        }
+        return abi.encode(voter, epochLastUpdate, epochFrozen, tokens, tokenParams); // U:[GA-1]
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper

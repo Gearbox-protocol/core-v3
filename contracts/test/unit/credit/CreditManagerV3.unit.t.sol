@@ -540,6 +540,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCreditConfigurator(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditManager.transferOwnership(DUMB_ADDRESS);
     }
 
     /// @dev U:[CM-5]: non-reentrant functions revert if called in reentrancy

@@ -3,10 +3,10 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {AccountFactoryV3, FactoryParams, QueuedAccount} from "../../../core/AccountFactoryV3.sol";
+import {DefaultAccountFactoryV3, FactoryParams, QueuedAccount} from "../../../core/DefaultAccountFactoryV3.sol";
 
-contract AccountFactoryV3Harness is AccountFactoryV3 {
-    constructor(address addressProvider) AccountFactoryV3(addressProvider) {}
+contract DefaultAccountFactoryV3Harness is DefaultAccountFactoryV3 {
+    constructor(address addressProvider) DefaultAccountFactoryV3(addressProvider) {}
 
     function queuedAccounts(address creditManager, uint256 index) external view returns (QueuedAccount memory) {
         return _queuedAccounts[creditManager][index];

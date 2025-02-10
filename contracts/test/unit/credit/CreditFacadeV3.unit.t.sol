@@ -172,7 +172,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
-            address(addressProvider),
             address(creditManagerMock),
             address(lossPolicyMock),
             address(botListMock),
@@ -199,18 +198,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(ZeroAddressException.selector);
         new CreditFacadeV3Harness(
-            address(addressProvider),
-            address(creditManagerMock),
-            address(0),
-            address(botListMock),
-            address(0),
-            address(degenNFTMock),
-            expirable
+            address(creditManagerMock), address(0), address(botListMock), address(0), address(degenNFTMock), expirable
         );
 
         vm.expectRevert(ZeroAddressException.selector);
         new CreditFacadeV3Harness(
-            address(addressProvider),
             address(creditManagerMock),
             address(lossPolicyMock),
             address(0),

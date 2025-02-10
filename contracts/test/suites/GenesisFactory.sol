@@ -8,7 +8,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
 import {LossPolicyMock} from "../mocks/core/LossPolicyMock.sol";
-import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
+import {DefaultAccountFactoryV3} from "../../core/DefaultAccountFactoryV3.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
 import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
@@ -24,7 +24,7 @@ contract GenesisFactory is Ownable {
     PriceOracleV3 public priceOracle;
     LossPolicyMock public lossPolicy;
     BotListV3 public botList;
-    AccountFactoryV3 public accountFactory;
+    DefaultAccountFactoryV3 public accountFactory;
     IContractsRegister public contractsRegister;
     GearStakingV3 public gearStaking;
 
@@ -34,12 +34,13 @@ contract GenesisFactory is Ownable {
 
         priceOracle = new PriceOracleV3(address(acl));
         lossPolicy = new LossPolicyMock();
-        accountFactory = new AccountFactoryV3(msg.sender);
-        botList = new BotListV3(msg.sender);
+        accountFactory = new DefaultAccountFactoryV3(address(acl));
+        botList = new BotListV3(address(acl));
 
         ERC20 gearToken = new ERC20("Gearbox", "GEAR");
+        acl.setAddress(AP_GEAR_TOKEN, address(gearToken), false);
 
-        gearStaking = new GearStakingV3(msg.sender, address(gearToken), 1);
+        gearStaking = new GearStakingV3(address(acl));
 
         acl.grantRole("PAUSABLE_ADMIN", msg.sender);
         acl.grantRole("UNPAUSABLE_ADMIN", msg.sender);

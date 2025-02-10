@@ -54,6 +54,9 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         poolMock = new PoolMock(address(addressProvider), underlying);
 
         poolQuotaKeeperMock = address(new GeneralMock());
+        vm.mockCall(
+            poolQuotaKeeperMock, abi.encodeCall(IPoolQuotaKeeperV3.quotedTokens, ()), abi.encode(new address[](0))
+        );
         poolMock.setPoolQuotaKeeper(poolQuotaKeeperMock);
 
         gearStakingMock = new GearStakingMock();
@@ -72,6 +75,11 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
         assertEq(gauge.epochLastUpdate(), 900, "Incorrect epoch");
         assertTrue(gauge.epochFrozen(), "Epoch not frozen");
+        assertEq(
+            gauge.serialize(),
+            abi.encode(address(gearStakingMock), 900, true, new address[](0), new address[](0)),
+            "Incorrect serialized state"
+        );
 
         vm.expectRevert(ZeroAddressException.selector);
         new GaugeV3Harness(address(poolMock), address(0));

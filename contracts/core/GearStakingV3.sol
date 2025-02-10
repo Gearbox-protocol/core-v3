@@ -17,9 +17,17 @@ import {
     VotingContractStatus
 } from "../interfaces/IGearStakingV3.sol";
 import "../interfaces/IExceptions.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IVotingContract} from "../interfaces/base/IVotingContract.sol";
 
-import {EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "../libraries/Constants.sol";
+import {
+    AP_GEAR_TOKEN,
+    AP_CROSS_CHAIN_GOVERNANCE_PROXY,
+    EPOCHS_TO_WITHDRAW,
+    EPOCH_LENGTH,
+    FIRST_EPOCH_TIMESTAMP,
+    NO_VERSION_CONTROL
+} from "../libraries/Constants.sol";
 
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
@@ -39,7 +47,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     address public immutable override gear;
 
     /// @notice Timestamp of the first epoch of voting
-    uint256 public immutable override firstEpochTimestamp;
+    uint256 public constant override firstEpochTimestamp = FIRST_EPOCH_TIMESTAMP;
 
     /// @dev Mapping from user to their stake amount and tokens available for voting
     mapping(address => UserVoteLockData) internal voteLockData;
@@ -63,14 +71,12 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     }
 
     /// @notice Constructor
-    /// @param owner_ Contract owner
-    /// @param gear_ GEAR token address
-    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start.
-    ///        Setting this too far into the future poses a risk of locking user deposits.
-    constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
-        gear = gear_; // U:[GS-1]
-        firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
-        transferOwnership(owner_); // U:[GS-1]
+    /// @param addressProvider_ Address provider contract address
+    constructor(address addressProvider_) {
+        gear = IAddressProvider(addressProvider_).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-1]
+        transferOwnership(
+            IAddressProvider(addressProvider_).getAddressOrRevert(AP_CROSS_CHAIN_GOVERNANCE_PROXY, NO_VERSION_CONTROL)
+        ); // U:[GS-1]
     }
 
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes

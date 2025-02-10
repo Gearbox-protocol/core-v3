@@ -3,12 +3,10 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
-
 /// @title Phantom token interface
 /// @notice Broadly speaking, by saying "phantom" we imply that token is not transferable. In Gearbox, we use such tokens
 ///         to track balances of non-tokenized positions in integrated protocols to allow those to be used as collateral.
-interface IPhantomToken is IVersion {
+interface IPhantomToken {
     /// @notice Returns phantom token's target contract and deposited token
     function getPhantomTokenInfo() external view returns (address target, address depositedToken);
 }

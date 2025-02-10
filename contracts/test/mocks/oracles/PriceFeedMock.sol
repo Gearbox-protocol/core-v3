@@ -15,7 +15,7 @@ enum FlagState {
 /// @notice Used for test purposes only
 contract PriceFeedMock is IPriceFeed {
     uint256 public constant override version = 3_10;
-    bytes32 public constant override contractType = "PRICE_FEED_MOCK";
+    bytes32 public constant override contractType = "PRICE_FEED::MOCK";
 
     int256 public price;
     uint8 public immutable override decimals;
@@ -38,6 +38,8 @@ contract PriceFeedMock is IPriceFeed {
         startedAt = block.timestamp + 36500 days;
         updatedAt = block.timestamp + 36500 days;
     }
+
+    function serialize() external view override returns (bytes memory) {}
 
     function setParams(uint80 _roundId, uint256 _startedAt, uint256 _updatedAt, uint80 _answerInRound) external {
         roundId = _roundId;
