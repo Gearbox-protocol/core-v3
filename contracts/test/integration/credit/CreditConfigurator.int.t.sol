@@ -13,6 +13,7 @@ import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfi
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
+import {IPriceOracleV3} from "../../../interfaces/IPriceOracleV3.sol";
 
 //
 import "../../../libraries/Constants.sol";
@@ -33,6 +34,8 @@ import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
+import {WETHFallbackMock} from "../../mocks/token/WETHFallbackMock.sol";
+import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -1079,5 +1082,29 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 2 days);
+    }
+
+    function test_I_CC_31_addCollateralToken_works_with_fallback() public creditTest {
+        PriceFeedMock pf = new PriceFeedMock(10 ** 8, 8);
+
+        WETHFallbackMock wethFallback = new WETHFallbackMock();
+
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 snapshot = vm.snapshot();
+
+            wethFallback.setDepositOnFallback(i == 0);
+
+            vm.prank(CONFIGURATOR);
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(wethFallback), address(pf), 1 hours);
+
+            makeTokenQuoted(address(wethFallback), 1, uint96(type(int96).max));
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.addCollateralToken(address(wethFallback), 8800);
+
+            assertTrue(creditManager.getTokenMaskOrRevert(address(wethFallback)) > 0, "Token wasn't added");
+
+            vm.revertTo(snapshot);
+        }
     }
 }

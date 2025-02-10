@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {OptionalCall} from "../libraries/OptionalCall.sol";
 
 import {
     AddressIsNotContractException,
@@ -37,9 +38,17 @@ abstract contract PriceFeedValidationTrait {
             revert IncorrectPriceFeedException();
         }
 
-        try IPriceFeed(priceFeed).skipPriceCheck() returns (bool _skipCheck) {
-            skipCheck = _skipCheck;
-        } catch {}
+        /// NOTE: Some external price feeds without skipPriceCheck may have a fallback function that changes state, which can cause a THROW
+        ///      that burns all gas, or does not change state and instead returns empty data. To handle these cases,
+        ///      we use a special call construction with a strict gas limit.
+        (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
+            target: priceFeed,
+            data: abi.encodeWithSelector(IPriceFeed.skipPriceCheck.selector),
+            gasAllowance: 10_000
+        });
+        if (success) {
+            skipCheck = abi.decode(returnData, (bool));
+        }
 
         try IPriceFeed(priceFeed).latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80)
         {
