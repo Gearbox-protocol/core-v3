@@ -63,8 +63,6 @@ interface IGearStakingV3Events {
 
 /// @title Gear staking V3 interface
 interface IGearStakingV3 is IGearStakingV3Events, IVersion {
-    error GearIsNotSetException();
-
     function gear() external view returns (address);
 
     function firstEpochTimestamp() external view returns (uint256);

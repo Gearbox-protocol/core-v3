@@ -43,11 +43,11 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Contract type
     bytes32 public constant override contractType = "GEAR_STAKING";
 
-    ///
-    address public immutable addressProvider;
+    /// @dev Address provider contract address
+    address internal immutable _addressProvider;
 
-    /// @notice Address of the GEAR token
-    address public gear;
+    /// @dev Cached GEAR token address
+    address internal _gearCached;
 
     /// @notice Timestamp of the first epoch of voting
     uint256 public constant override firstEpochTimestamp = FIRST_EPOCH_TIMESTAMP;
@@ -76,15 +76,28 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Constructor
     /// @param addressProvider_ Address provider contract address
     constructor(address addressProvider_) {
-        addressProvider = addressProvider_;
-        try IAddressProvider(addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL) returns (
+        _addressProvider = addressProvider_;
+        try IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL) returns (
             address gear_
         ) {
-            gear = gear_;
+            _gearCached = gear_;
         } catch {}
         transferOwnership(
             IAddressProvider(addressProvider_).getAddressOrRevert(AP_CROSS_CHAIN_GOVERNANCE_PROXY, NO_VERSION_CONTROL)
         ); // U:[GS-1]
+    }
+
+    /// @notice Returns the address of the GEAR token
+    function gear() external view override returns (address) {
+        if (_gearCached != address(0)) return _gearCached;
+        return IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
+    }
+
+    /// @dev Caches the address of the GEAR token and returns it
+    function _gear() internal returns (address) {
+        if (_gearCached != address(0)) return _gearCached;
+        _gearCached = IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
+        return _gearCached;
     }
 
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes
@@ -355,18 +368,5 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
 
             emit SetMigrator(newMigrator); // U:[GS-9]
         }
-    }
-
-    function _gear() public returns (address) {
-        if (gear == address(0)) {
-            try IAddressProvider(addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL) returns (
-                address gear_
-            ) {
-                gear = gear_;
-            } catch {
-                revert GearIsNotSetException();
-            }
-        }
-        return gear;
     }
 }
