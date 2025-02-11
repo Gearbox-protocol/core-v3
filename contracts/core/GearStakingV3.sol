@@ -43,8 +43,11 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Contract type
     bytes32 public constant override contractType = "GEAR_STAKING";
 
-    /// @notice Address of the GEAR token
-    address public immutable override gear;
+    /// @dev Address provider contract address
+    address internal immutable _addressProvider;
+
+    /// @dev Cached GEAR token address
+    address internal _gearCached;
 
     /// @notice Timestamp of the first epoch of voting
     uint256 public constant override firstEpochTimestamp = FIRST_EPOCH_TIMESTAMP;
@@ -73,10 +76,28 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @notice Constructor
     /// @param addressProvider_ Address provider contract address
     constructor(address addressProvider_) {
-        gear = IAddressProvider(addressProvider_).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-1]
+        _addressProvider = addressProvider_;
+        try IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL) returns (
+            address gear_
+        ) {
+            _gearCached = gear_;
+        } catch {}
         transferOwnership(
             IAddressProvider(addressProvider_).getAddressOrRevert(AP_CROSS_CHAIN_GOVERNANCE_PROXY, NO_VERSION_CONTROL)
         ); // U:[GS-1]
+    }
+
+    /// @notice Returns the address of the GEAR token
+    function gear() external view override returns (address) {
+        if (_gearCached != address(0)) return _gearCached;
+        return IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
+    }
+
+    /// @dev Caches the address of the GEAR token and returns it
+    function _gear() internal returns (address) {
+        if (_gearCached != address(0)) return _gearCached;
+        _gearCached = IAddressProvider(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
+        return _gearCached;
     }
 
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes
@@ -100,13 +121,13 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
         bytes32 r,
         bytes32 s
     ) external override nonReentrant {
-        try IERC20Permit(gear).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {} // U:[GS-2]
+        try IERC20Permit(_gear()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {} // U:[GS-2]
         _deposit(amount, msg.sender, votes); // U:[GS-2]
     }
 
     /// @dev Implementation of `deposit`
     function _deposit(uint96 amount, address to, MultiVote[] calldata votes) internal {
-        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(_gear()).safeTransferFrom(msg.sender, address(this), amount);
 
         UserVoteLockData storage vld = voteLockData[to];
 
@@ -173,7 +194,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
             vld.totalStaked -= amount; // U:[GS-7]
         }
 
-        IERC20(gear).approve(successor, uint256(amount));
+        IERC20(_gear()).approve(successor, uint256(amount));
         IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter); // U:[GS-7]
 
         emit MigrateGear(msg.sender, successor, amount); // U:[GS-7]
@@ -218,7 +239,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
             }
 
             if (totalClaimable != 0) {
-                IERC20(gear).safeTransfer(to, totalClaimable);
+                IERC20(_gear()).safeTransfer(to, totalClaimable);
 
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
 
