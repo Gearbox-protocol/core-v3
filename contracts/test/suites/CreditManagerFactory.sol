@@ -35,7 +35,7 @@ contract CreditManagerFactory {
         bool expirable;
     }
 
-    constructor(address pool, ManagerParams memory cmParams, FacadeParams memory cfParams) {
+    constructor(address addressProvider, address pool, ManagerParams memory cmParams, FacadeParams memory cfParams) {
         creditManager = new CreditManagerV3(
             pool,
             cmParams.accountFactory,
@@ -50,6 +50,7 @@ contract CreditManagerFactory {
         );
 
         creditFacade = new CreditFacadeV3(
+            addressProvider,
             address(creditManager),
             cfParams.lossPolicy,
             cfParams.botList,

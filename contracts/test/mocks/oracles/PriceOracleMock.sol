@@ -4,8 +4,6 @@
 pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
-import {PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
-
 // EXCEPTIONS
 
 import {Test} from "forge-std/Test.sol";
@@ -21,8 +19,6 @@ contract PriceOracleMock is Test {
     mapping(address => mapping(bool => address)) priceFeedsInt;
 
     constructor() {}
-
-    function updatePrices(PriceUpdate[] calldata) external pure {}
 
     function priceFeeds(address token) public view returns (address) {
         return priceFeedsInt[token][false];

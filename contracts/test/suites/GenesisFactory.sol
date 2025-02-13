@@ -12,6 +12,7 @@ import {DefaultAccountFactoryV3} from "../../core/DefaultAccountFactoryV3.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
 import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
+import {IPriceFeedStore} from "../../interfaces/base/IPriceFeedStore.sol";
 import {IContractsRegister} from "../../interfaces/base/IContractsRegister.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
 
@@ -26,6 +27,7 @@ contract GenesisFactory is Ownable {
     BotListV3 public botList;
     DefaultAccountFactoryV3 public accountFactory;
     IContractsRegister public contractsRegister;
+    IPriceFeedStore public priceFeedStore;
     GearStakingV3 public gearStaking;
 
     constructor() {
@@ -36,6 +38,7 @@ contract GenesisFactory is Ownable {
         lossPolicy = new LossPolicyMock();
         accountFactory = new DefaultAccountFactoryV3(address(acl));
         botList = new BotListV3(address(acl));
+        priceFeedStore = IPriceFeedStore(acl.getAddressOrRevert(AP_PRICE_FEED_STORE, 0));
 
         ERC20 gearToken = new ERC20("Gearbox", "GEAR");
         acl.setAddress(AP_GEAR_TOKEN, address(gearToken), false);

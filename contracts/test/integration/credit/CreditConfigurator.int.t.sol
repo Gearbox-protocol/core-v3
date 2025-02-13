@@ -801,7 +801,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             if (expirable) {
                 CreditFacadeV3 initialCf = new CreditFacadeV3(
-                    address(creditManager), address(lossPolicy), address(botList), address(0), address(0), true
+                    address(acl),
+                    address(creditManager),
+                    address(lossPolicy),
+                    address(botList),
+                    address(0),
+                    address(0),
+                    true
                 );
 
                 vm.prank(CONFIGURATOR);
@@ -817,7 +823,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
             CreditFacadeV3 cf = new CreditFacadeV3(
-                address(creditManager), address(lossPolicy), address(botList), address(0), address(0), expirable
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                expirable
             );
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -859,7 +871,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.startPrank(CONFIGURATOR);
 
         CreditFacadeV3 cf = new CreditFacadeV3(
-            address(creditManager), address(lossPolicy), address(botList), address(0), address(0), false
+            address(acl), address(creditManager), address(lossPolicy), address(botList), address(0), address(0), false
         );
         AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
         TargetContractMock target = new TargetContractMock();
@@ -898,7 +910,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.stopPrank();
 
             CreditFacadeV3 cf = new CreditFacadeV3(
-                address(creditManager), address(lossPolicy), address(botList), address(0), address(0), false
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                false
             );
 
             vm.prank(CONFIGURATOR);

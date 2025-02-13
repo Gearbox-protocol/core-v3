@@ -5,8 +5,8 @@ pragma solidity ^0.8.17;
 
 import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
-import {PriceUpdate} from "./IPriceOracleV3.sol";
 import {IACLTrait} from "./base/IACLTrait.sol";
+import {PriceUpdate} from "./base/IPriceFeedStore.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Multicall element
@@ -84,6 +84,8 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     function underlying() external view returns (address);
 
     function treasury() external view returns (address);
+
+    function priceFeedStore() external view returns (address);
 
     function degenNFT() external view returns (address);
 

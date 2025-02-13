@@ -26,6 +26,7 @@ import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
+import {PriceFeedStoreMock} from "../../mocks/oracles/PriceFeedStoreMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
@@ -38,7 +39,8 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
-import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceFeedStore, PriceUpdate} from "../../../interfaces/base/IPriceFeedStore.sol";
+import {IUpdatablePriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
 
 import {BitMask} from "../../../libraries/BitMask.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
@@ -46,6 +48,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
 import {
+    AP_PRICE_FEED_STORE,
     BOT_PERMISSIONS_SET_FLAG,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
     PERCENTAGE_FACTOR,
@@ -78,6 +81,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     PriceOracleMock priceOracleMock;
     LossPolicyMock lossPolicyMock;
     BotListMock botListMock;
+    PriceFeedStoreMock priceFeedStoreMock;
 
     DegenNFTMock degenNFTMock;
     address treasury;
@@ -136,6 +140,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(TOKEN_WETH), false);
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10));
+        priceFeedStoreMock = PriceFeedStoreMock(addressProvider.getAddressOrRevert(AP_PRICE_FEED_STORE, 0));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
@@ -172,6 +177,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _deploy() internal {
         creditFacade = new CreditFacadeV3Harness(
+            address(addressProvider),
             address(creditManagerMock),
             address(lossPolicyMock),
             address(botListMock),
@@ -186,6 +192,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-1]: constructor sets correct values
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
         assertEq(creditFacade.creditManager(), address(creditManagerMock), "Incorrect creditManager");
+        assertEq(creditFacade.priceFeedStore(), address(priceFeedStoreMock), "Incorrect priceFeedStore");
         assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(TOKEN_DAI), "Incorrect underlying");
         assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
@@ -198,11 +205,18 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(ZeroAddressException.selector);
         new CreditFacadeV3Harness(
-            address(creditManagerMock), address(0), address(botListMock), address(0), address(degenNFTMock), expirable
+            address(addressProvider),
+            address(creditManagerMock),
+            address(0),
+            address(botListMock),
+            address(0),
+            address(degenNFTMock),
+            expirable
         );
 
         vm.expectRevert(ZeroAddressException.selector);
         new CreditFacadeV3Harness(
+            address(addressProvider),
             address(creditManagerMock),
             address(lossPolicyMock),
             address(0),
@@ -684,6 +698,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-15]: `_calcPartialLiquidationPayments` works as expected
     function test_U_FA_15_calcPartialLiquidationPayments_works_as_expected() public notExpirableCase {
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
         address dai = tokenTestSuite.addressOf(TOKEN_DAI);
         address link = tokenTestSuite.addressOf(TOKEN_LINK);
         priceOracleMock.setPrice(dai, 1e8);
@@ -701,12 +717,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(expiredLiquidationDiscount, 98_00, "[setup]: Incorrect expired liquidation discount");
         assertEq(expiredLiquidationFee, 1_00, "[setup]: Incorrect expired liquidation fee");
 
-        (uint256 repaidAmount, uint256 feeAmount, uint256 seizedAmount) = creditFacade.calcPartialLiquidationPayments({
-            amount: 1000e18,
-            token: link,
-            priceOracle: address(priceOracleMock),
-            isExpired: false
-        });
+        (uint256 repaidAmount, uint256 feeAmount, uint256 seizedAmount) =
+            creditFacade.calcPartialLiquidationPayments({amount: 1000e18, token: link, isExpired: false});
 
         assertEq(repaidAmount, 985e18, "Incorrect repaidAmount (non-expired case)");
         assertEq(feeAmount, 15e18, "Incorrect feeAmount (non-expired case)");
@@ -716,12 +728,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             "Incorrect seizedAmount (non-expired case)"
         );
 
-        (repaidAmount, feeAmount, seizedAmount) = creditFacade.calcPartialLiquidationPayments({
-            amount: 1000e18,
-            token: link,
-            priceOracle: address(priceOracleMock),
-            isExpired: true
-        });
+        (repaidAmount, feeAmount, seizedAmount) =
+            creditFacade.calcPartialLiquidationPayments({amount: 1000e18, token: link, isExpired: true});
 
         assertEq(repaidAmount, 990e18, "Incorrect repaidAmount (expired case)");
         assertEq(feeAmount, 10e18, "Incorrect feeAmount (expired case)");
@@ -1363,11 +1371,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_25_multicall_onDemandPriceUpdates_works_properly() public notExpirableCase {
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
+        address token0 = makeAddr("token0");
+        address token1 = makeAddr("token1");
         PriceUpdate[] memory updates = new PriceUpdate[](2);
-        updates[0] = PriceUpdate(makeAddr("token0"), "data0");
-        updates[1] = PriceUpdate(makeAddr("token1"), "data1");
+        updates[0] = PriceUpdate(token0, "data0");
+        updates[1] = PriceUpdate(token1, "data1");
 
-        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleV3.updatePrices, (updates)));
+        vm.mockCall(token0, abi.encodeCall(IUpdatablePriceFeed.updatePrice, ("data0")), abi.encode());
+        vm.mockCall(token1, abi.encodeCall(IUpdatablePriceFeed.updatePrice, ("data1")), abi.encode());
+
+        vm.expectCall(address(priceFeedStoreMock), abi.encodeCall(IPriceFeedStore.updatePrices, (updates)));
         creditFacade.multicallInt({
             creditAccount: DUMB_ADDRESS,
             calls: MultiCallBuilder.build(

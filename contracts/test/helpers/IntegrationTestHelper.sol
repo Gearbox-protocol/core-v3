@@ -9,6 +9,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {DefaultAccountFactoryV3} from "../../core/DefaultAccountFactoryV3.sol";
 import {IACL} from "../../interfaces//base/IACL.sol";
 import {IContractsRegister} from "../../interfaces/base/IContractsRegister.sol";
+import {IPriceFeedStore} from "../../interfaces/base/IPriceFeedStore.sol";
 
 import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -65,6 +66,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     // CORE
     IACL acl;
     IContractsRegister cr;
+    IPriceFeedStore priceFeedStore;
     DefaultAccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     ILossPolicy lossPolicy;
@@ -239,6 +241,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         accountFactory = gp.accountFactory();
         botList = gp.botList();
         cr = gp.contractsRegister();
+        priceFeedStore = gp.priceFeedStore();
         gearStaking = gp.gearStaking();
         vm.warp(gearStaking.firstEpochTimestamp());
 
@@ -434,7 +437,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable
             });
-            CreditManagerFactory cmf = new CreditManagerFactory(address(pool), managerParams, facadeParams);
+            CreditManagerFactory cmf =
+                new CreditManagerFactory(address(acl), address(pool), managerParams, facadeParams);
 
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();

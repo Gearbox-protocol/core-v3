@@ -14,7 +14,7 @@ import {
     PriceFeedDoesNotExistException,
     PriceFeedIsNotUpdatableException
 } from "../interfaces/IExceptions.sol";
-import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3, PriceFeedParams} from "../interfaces/IPriceOracleV3.sol";
 import {IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol";
 
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -32,8 +32,6 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 ///         The primary purpose of reserve price feeds is to upper-bound main ones during the collateral check after
 ///         operations that allow users to offload mispriced tokens on Gearbox and withdraw underlying; they should
 ///         not be used for general collateral evaluation, including decisions on whether accounts are liquidatable.
-///         - Finally, this contract serves as register for updatable price feeds and can be used to apply batched
-///         on-demand price updates while ensuring that those are not calls to arbitrary contracts.
 contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, SanityCheckTrait, IPriceOracleV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -48,9 +46,6 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, SanityCheckTrait, 
 
     /// @dev Set of all tokens that have price feeds
     EnumerableSet.AddressSet internal _tokensSet;
-
-    /// @dev Set of all updatable price feeds
-    EnumerableSet.AddressSet internal _updatablePriceFeedsSet;
 
     /// @notice Constructor
     /// @param _acl ACL contract address
@@ -126,27 +121,6 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, SanityCheckTrait, 
     }
 
     // ------------- //
-    // PRICE UPDATES //
-    // ------------- //
-
-    /// @notice Returns all updatable price feeds
-    function getUpdatablePriceFeeds() external view override returns (address[] memory) {
-        return _updatablePriceFeedsSet.values();
-    }
-
-    /// @notice Applies on-demand price feed updates, see `PriceUpdate` for details
-    /// @custom:tests U:[PO-5]
-    function updatePrices(PriceUpdate[] calldata updates) external override {
-        unchecked {
-            uint256 len = updates.length;
-            for (uint256 i; i < len; ++i) {
-                if (!_updatablePriceFeedsSet.contains(updates[i].priceFeed)) revert PriceFeedIsNotUpdatableException();
-                IUpdatablePriceFeed(updates[i].priceFeed).updatePrice(updates[i].data);
-            }
-        }
-    }
-
-    // ------------- //
     // CONFIGURATION //
     // ------------- //
 
@@ -202,15 +176,6 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, SanityCheckTrait, 
             tokenDecimals: params.tokenDecimals
         });
         emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
-    }
-
-    /// @notice Adds `priceFeed` to the set of updatable price feeds
-    /// @dev Price feed must be updatable but is not required to satisfy all validity conditions,
-    ///      e.g., decimals need not to be equal to 8
-    /// @custom:tests U:[PO-5]
-    function addUpdatablePriceFeed(address priceFeed) external override nonZeroAddress(priceFeed) configuratorOnly {
-        if (!_isUpdatable(priceFeed)) revert PriceFeedIsNotUpdatableException();
-        if (_updatablePriceFeedsSet.add(priceFeed)) emit AddUpdatablePriceFeed(priceFeed);
     }
 
     // --------- //

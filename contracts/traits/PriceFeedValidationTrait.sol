@@ -74,20 +74,4 @@ abstract contract PriceFeedValidationTrait {
         (, answer,, updatedAt,) = IPriceFeed(priceFeed).latestRoundData();
         if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod);
     }
-
-    /// @dev Checks whether price feed is updatable
-    /// @custom:tests U:[PO-10]
-    function _isUpdatable(address priceFeed) internal view returns (bool updatable) {
-        // NOTE: Some external price feeds without `updatable` may have a fallback function that changes state,
-        // which can cause a `THROW` that burns all gas, or does not change state and instead returns empty data.
-        // To handle these cases, we use a special call construction with a strict gas limit.
-        (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
-            target: priceFeed,
-            data: abi.encodeWithSelector(IUpdatablePriceFeed.updatable.selector),
-            gasAllowance: 10_000
-        });
-        if (success) {
-            updatable = abi.decode(returnData, (bool));
-        }
-    }
 }

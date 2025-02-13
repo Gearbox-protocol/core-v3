@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {BalanceDelta} from "../libraries/BalancesLogic.sol";
-import {PriceUpdate} from "./IPriceOracleV3.sol";
+import {PriceUpdate} from "./base/IPriceFeedStore.sol";
 
 // ----------- //
 // PERMISSIONS //
