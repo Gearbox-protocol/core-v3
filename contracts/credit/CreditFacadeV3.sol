@@ -324,7 +324,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         (CollateralDebtData memory collateralDebtData, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,14]
         if (isUnhealthy && _hasBadDebt(collateralDebtData)) {
-            if (!ILossPolicy(lossPolicy).isLiquidatable(creditAccount, msg.sender, lossPolicyData)) {
+            ILossPolicy.Params memory params = ILossPolicy.Params({
+                totalDebtUSD: collateralDebtData.totalDebtUSD,
+                twvUSD: collateralDebtData.twvUSD,
+                extraData: lossPolicyData
+            });
+            if (!ILossPolicy(lossPolicy).isLiquidatable(creditAccount, msg.sender, params)) {
                 revert CreditAccountNotLiquidatableWithLossException(); // U:[FA-17]
             }
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]

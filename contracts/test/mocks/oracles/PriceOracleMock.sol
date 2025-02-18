@@ -44,6 +44,7 @@ contract PriceOracleMock is Test {
     /// @param amount Amount to convert
     /// @param token Address of the token to be converted
     function convertToUSD(uint256 amount, address token) public view returns (uint256) {
+        // FIXME: wrong formula, must use 10 ** token.decimals()
         return amount * getPrice(token) / 10 ** 8;
     }
 
@@ -51,6 +52,7 @@ contract PriceOracleMock is Test {
     /// @param amount Amount to convert
     /// @param token Address of the token converted to
     function convertFromUSD(uint256 amount, address token) public view returns (uint256) {
+        // FIXME: wrong formula, must use 10 ** token.decimals()
         return amount * 10 ** 8 / getPrice(token);
     }
 

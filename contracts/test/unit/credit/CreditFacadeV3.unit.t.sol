@@ -41,7 +41,7 @@ import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 import {IPriceFeedStore, PriceUpdate} from "../../../interfaces/base/IPriceFeedStore.sol";
 import {IUpdatablePriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
-
+import {ILossPolicy} from "../../../interfaces/base/ILossPolicy.sol";
 import {BitMask} from "../../../libraries/BitMask.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
@@ -627,6 +627,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_COLLATERAL))
         );
 
+        vm.expectCall(
+            address(lossPolicyMock),
+            abi.encodeCall(
+                ILossPolicy.isLiquidatable,
+                (creditAccount, LIQUIDATOR, ILossPolicy.Params({totalDebtUSD: 101, twvUSD: 100, extraData: ""}))
+            )
+        );
+
         CollateralDebtData memory collateralDebtDataAfter = collateralDebtData;
         collateralDebtDataAfter.enabledTokensMask = 1 | 2 | 4;
         vm.expectCall(
@@ -962,13 +970,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
         // reverts if loss policy is violated
-        lossPolicyMock.disable();
+        lossPolicyMock.setIsLiquidatableResult(false);
         vm.expectRevert(CreditAccountNotLiquidatableWithLossException.selector);
         vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
         // if loss policy is not violated, further borrowing is forbidden
-        lossPolicyMock.enable();
+        lossPolicyMock.setIsLiquidatableResult(true);
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
         assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");

@@ -9,19 +9,28 @@ contract LossPolicyMock is ILossPolicy {
     uint256 public constant override version = 3_10;
     bytes32 public constant override contractType = "LOSS_POLICY::MOCK";
 
-    bool public enabled = true;
+    AccessMode public override accessMode;
+    bool public override checksEnabled;
 
-    function serialize() external view override returns (bytes memory) {}
+    bool public isLiquidatableResult = true;
 
-    function isLiquidatable(address, address, bytes calldata) external view override returns (bool) {
-        return enabled;
+    function serialize() external pure override returns (bytes memory) {
+        return "";
     }
 
-    function enable() external override {
-        enabled = true;
+    function isLiquidatable(address, address, Params calldata) external view override returns (bool) {
+        return isLiquidatableResult;
     }
 
-    function disable() external override {
-        enabled = false;
+    function setAccessMode(AccessMode mode) external override {
+        accessMode = mode;
+    }
+
+    function setChecksEnabled(bool enabled) external override {
+        checksEnabled = enabled;
+    }
+
+    function setIsLiquidatableResult(bool result) external {
+        isLiquidatableResult = result;
     }
 }
