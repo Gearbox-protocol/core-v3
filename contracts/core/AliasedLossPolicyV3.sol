@@ -42,6 +42,12 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     using EnumerableSet for EnumerableSet.AddressSet;
     using MarketHelper for IPoolV3;
 
+    /// @dev Internal enum with possible price feed types
+    enum PriceFeedType {
+        Normal,
+        Aliased
+    }
+
     /// @dev Internal struct that contains shared info needed for collateral calculation
     struct SharedInfo {
         address creditManager;
@@ -114,7 +120,7 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
 
     /// @notice Returns whether `creditAccount` can be liquidated with loss by `caller`
     /// @custom:tests U:[ALP-4], U:[ALP-5]
-    function isLiquidatable(address creditAccount, address caller, Params calldata params)
+    function isLiquidatableWithLoss(address creditAccount, address caller, Params calldata params)
         external
         override
         returns (bool)
@@ -248,8 +254,8 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
             // no need to check other fields since `quotaUSD` is initialized only if all of them are non-zero
             if (tokenInfo.quotaUSD == 0) continue;
 
-            twvUSDAliased += _getWeightedValueUSD(tokenInfo, sharedInfo, true);
-            twvUSDAliased -= _getWeightedValueUSD(tokenInfo, sharedInfo, false);
+            twvUSDAliased += _getWeightedValueUSD(tokenInfo, sharedInfo, PriceFeedType.Aliased);
+            twvUSDAliased -= _getWeightedValueUSD(tokenInfo, sharedInfo, PriceFeedType.Normal);
         }
     }
 
@@ -284,12 +290,12 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
 
     /// @dev Returns the weighted value in USD (computed via either normal or alias price feed) for a single token
     /// @custom:tests U:[ALP-10]
-    function _getWeightedValueUSD(TokenInfo memory tokenInfo, SharedInfo memory sharedInfo, bool aliased)
+    function _getWeightedValueUSD(TokenInfo memory tokenInfo, SharedInfo memory sharedInfo, PriceFeedType priceFeedType)
         internal
         view
         returns (uint256)
     {
-        uint256 valueUSD = aliased
+        uint256 valueUSD = priceFeedType == PriceFeedType.Aliased
             ? _convertToUSDAlias(tokenInfo.aliasParams, tokenInfo.balance)
             : IPriceOracleV3(sharedInfo.priceOracle).convertToUSD(tokenInfo.balance, tokenInfo.token);
 

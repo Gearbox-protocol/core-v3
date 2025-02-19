@@ -202,8 +202,8 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         assertEq(serializedParams.length, 0, "Incorrect serialized params length");
     }
 
-    /// @notice U:[ALP-4]: `isLiquidatable` works correctly in different modes
-    function test_U_ALP_04_isLiquidatable_works_correctly_in_different_modes() public {
+    /// @notice U:[ALP-4]: `isLiquidatableWithLoss` works correctly in different modes
+    function test_U_ALP_04_isLiquidatableWithLoss_works_correctly_in_different_modes() public {
         address caller2 = makeAddr("CALLER2");
         addressProviderMock.grantRole("LOSS_LIQUIDATOR", caller2);
 
@@ -217,11 +217,11 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         lossPolicy.hackChecksEnabled(true);
 
         assertTrue(
-            lossPolicy.isLiquidatable(creditAccount, caller, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, liquidatableParams),
             "permissionless + checks, liquidatable account"
         );
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller, nonLiquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, nonLiquidatableParams),
             "permissionless + checks, non-liquidatable account"
         );
 
@@ -229,11 +229,11 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         lossPolicy.hackChecksEnabled(false);
 
         assertTrue(
-            lossPolicy.isLiquidatable(creditAccount, caller, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, liquidatableParams),
             "permissionless + no checks, liquidatable account"
         );
         assertTrue(
-            lossPolicy.isLiquidatable(creditAccount, caller, nonLiquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, nonLiquidatableParams),
             "permissionless + no checks, non-liquidatable account"
         );
 
@@ -242,15 +242,15 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         lossPolicy.hackChecksEnabled(true);
 
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, liquidatableParams),
             "permissioned + checks, non-whitelisted caller, liquidatable account"
         );
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller2, nonLiquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller2, nonLiquidatableParams),
             "permissioned + checks, whitelisted caller, non-liquidatable account"
         );
         assertTrue(
-            lossPolicy.isLiquidatable(creditAccount, caller2, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller2, liquidatableParams),
             "permissioned + checks, whitelisted caller, liquidatable account"
         );
 
@@ -258,11 +258,11 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         lossPolicy.hackChecksEnabled(false);
 
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, liquidatableParams),
             "permissioned + no checks, non-whitelisted caller"
         );
         assertTrue(
-            lossPolicy.isLiquidatable(creditAccount, caller2, liquidatableParams),
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller2, liquidatableParams),
             "permissioned + no checks, whitelisted caller"
         );
 
@@ -270,15 +270,17 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         lossPolicy.hackAccessMode(ILossPolicy.AccessMode.Forbidden);
 
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller, liquidatableParams), "forbidden, non-whitelisted caller"
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller, liquidatableParams),
+            "forbidden, non-whitelisted caller"
         );
         assertFalse(
-            lossPolicy.isLiquidatable(creditAccount, caller2, liquidatableParams), "forbidden, whitelisted caller"
+            lossPolicy.isLiquidatableWithLoss(creditAccount, caller2, liquidatableParams),
+            "forbidden, whitelisted caller"
         );
     }
 
-    /// @notice U:[ALP-5]: `isLiquidatable` calls `updatePrices` if needed
-    function test_U_ALP_05_isLiquidatable_calls_updatePrices_if_needed() public {
+    /// @notice U:[ALP-5]: `isLiquidatableWithLoss` calls `updatePrices` if needed
+    function test_U_ALP_05_isLiquidatableWithLoss_calls_updatePrices_if_needed() public {
         lossPolicy.hackAccessMode(ILossPolicy.AccessMode.Permissionless);
         lossPolicy.hackChecksEnabled(true);
 
@@ -287,12 +289,12 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
             ILossPolicy.Params({totalDebtUSD: 1e8, twvUSD: 0.99e8, extraData: abi.encode(updates)});
 
         vm.expectCall(address(priceFeedStoreMock), abi.encodeCall(IPriceFeedStore.updatePrices, (updates)), 1);
-        lossPolicy.isLiquidatable(creditAccount, caller, params);
+        lossPolicy.isLiquidatableWithLoss(creditAccount, caller, params);
 
         params.extraData = "";
 
         vm.expectCall(address(priceFeedStoreMock), abi.encodePacked(IPriceFeedStore.updatePrices.selector), 0);
-        lossPolicy.isLiquidatable(creditAccount, caller, params);
+        lossPolicy.isLiquidatableWithLoss(creditAccount, caller, params);
     }
 
     /// @notice U:[ALP-6]: `getRequiredAliasPriceFeeds` works correctly
@@ -334,6 +336,7 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
     /// @notice U:[ALP-7]: `_adjustForAliases` works correctly
     function test_U_ALP_07_adjustForAliases_works_correctly() public {
         ERC20Mock token2 = new ERC20Mock("Test Token 2", "TEST2", 18);
+        priceOracleMock.setPrice(address(token2), 0.8e8);
 
         // Setup mocks for two tokens
         vm.mockCall(
@@ -368,22 +371,6 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
             abi.encode(2e18, 0)
         );
 
-        vm.mockCall(
-            address(priceOracleMock),
-            abi.encodeCall(IPriceOracleV3.convertToUSD, (1e27, address(underlying))),
-            abi.encode(1e18)
-        );
-        vm.mockCall(
-            address(priceOracleMock),
-            abi.encodeCall(IPriceOracleV3.convertToUSD, (1e18, address(token))),
-            abi.encode(0.9e8)
-        );
-        vm.mockCall(
-            address(priceOracleMock),
-            abi.encodeCall(IPriceOracleV3.convertToUSD, (1e18, address(token2))),
-            abi.encode(0.8e8)
-        );
-
         // Add alias price feed for token1 only
         lossPolicy.hackAddTokenWithAlias(
             address(token),
@@ -410,12 +397,6 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
 
     /// @notice U:[ALP-8]: `_getSharedInfo` works correctly
     function test_U_ALP_08_getSharedInfo_works_correctly() public {
-        vm.mockCall(
-            address(priceOracleMock),
-            abi.encodeCall(IPriceOracleV3.convertToUSD, (1e27, address(underlying))),
-            abi.encode(1e18)
-        );
-
         AliasedLossPolicyV3.SharedInfo memory info = lossPolicy.exposed_getSharedInfo(creditAccount);
         assertEq(info.creditManager, creditManager, "Incorrect creditManager");
         assertEq(info.priceOracle, address(priceOracleMock), "Incorrect priceOracle");
@@ -498,12 +479,6 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
 
     /// @notice U:[ALP-10]: `_getWeightedValueUSD` works correctly
     function test_U_ALP_10_getWeightedValueUSD_works_correctly() public {
-        vm.mockCall(
-            address(priceOracleMock),
-            abi.encodeCall(IPriceOracleV3.convertToUSD, (1e18, address(token))),
-            abi.encode(0.9e8)
-        );
-
         AliasedLossPolicyV3.SharedInfo memory sharedInfo = AliasedLossPolicyV3.SharedInfo({
             creditManager: creditManager,
             priceOracle: address(priceOracleMock),
@@ -525,11 +500,13 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         });
 
         // Normal price
-        uint256 weightedValue = lossPolicy.exposed_getWeightedValueUSD(tokenInfo, sharedInfo, false);
+        uint256 weightedValue =
+            lossPolicy.exposed_getWeightedValueUSD(tokenInfo, sharedInfo, AliasedLossPolicyV3.PriceFeedType.Normal);
         assertEq(weightedValue, 0.81e8, "Incorrect weighted value"); // min(0.9e18 * 90%, 1e8)
 
         // Alias price
-        weightedValue = lossPolicy.exposed_getWeightedValueUSD(tokenInfo, sharedInfo, true);
+        weightedValue =
+            lossPolicy.exposed_getWeightedValueUSD(tokenInfo, sharedInfo, AliasedLossPolicyV3.PriceFeedType.Aliased);
         assertEq(weightedValue, 0.9e8, "Incorrect weighted value aliased"); // min(1e8 * 90%, 1e8)
     }
 

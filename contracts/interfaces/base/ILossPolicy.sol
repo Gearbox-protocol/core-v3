@@ -34,7 +34,9 @@ interface ILossPolicy is IVersion, IStateSerializer {
     event SetChecksEnabled(bool enabled);
 
     /// @notice Whether `creditAccount` can be liquidated with loss by `caller`
-    function isLiquidatable(address creditAccount, address caller, Params calldata params) external returns (bool);
+    function isLiquidatableWithLoss(address creditAccount, address caller, Params calldata params)
+        external
+        returns (bool);
 
     /// @notice Returns current access mode
     function accessMode() external view returns (AccessMode);

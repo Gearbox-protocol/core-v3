@@ -329,7 +329,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 twvUSD: collateralDebtData.twvUSD,
                 extraData: lossPolicyData
             });
-            if (!ILossPolicy(lossPolicy).isLiquidatable(creditAccount, msg.sender, params)) {
+            if (!ILossPolicy(lossPolicy).isLiquidatableWithLoss(creditAccount, msg.sender, params)) {
                 revert CreditAccountNotLiquidatableWithLossException(); // U:[FA-17]
             }
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]

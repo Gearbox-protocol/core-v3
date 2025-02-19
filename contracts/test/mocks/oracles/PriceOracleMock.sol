@@ -8,6 +8,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @title Disposable credit accounts factory
 contract PriceOracleMock is Test {
@@ -44,16 +45,14 @@ contract PriceOracleMock is Test {
     /// @param amount Amount to convert
     /// @param token Address of the token to be converted
     function convertToUSD(uint256 amount, address token) public view returns (uint256) {
-        // FIXME: wrong formula, must use 10 ** token.decimals()
-        return amount * getPrice(token) / 10 ** 8;
+        return amount * getPrice(token) / _scale(token);
     }
 
     /// @dev Converts a quantity of USD (decimals = 8) to an equivalent amount of an asset
     /// @param amount Amount to convert
     /// @param token Address of the token converted to
     function convertFromUSD(uint256 amount, address token) public view returns (uint256) {
-        // FIXME: wrong formula, must use 10 ** token.decimals()
-        return amount * 10 ** 8 / getPrice(token);
+        return amount * _scale(token) / getPrice(token);
     }
 
     /// @dev Converts one asset into another
@@ -62,7 +61,7 @@ contract PriceOracleMock is Test {
     /// @param tokenFrom Address of the token to convert from
     /// @param tokenTo Address of the token to convert to
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view returns (uint256) {
-        return convertFromUSD(convertToUSD(amount, tokenFrom), tokenTo);
+        return amount * getPrice(tokenFrom) * _scale(tokenTo) / (getPrice(tokenTo) * _scale(tokenFrom));
     }
 
     /// @dev Returns token's price in USD (8 decimals)
@@ -82,5 +81,9 @@ contract PriceOracleMock is Test {
     function priceFeedsOrRevert(address token) external view returns (address priceFeed) {
         priceFeed = priceFeedsInt[token][false];
         require(priceFeed != address(0), "Price feed is not set");
+    }
+
+    function _scale(address token) internal view returns (uint256) {
+        return 10 ** ERC20(token).decimals();
     }
 }

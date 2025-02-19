@@ -630,7 +630,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectCall(
             address(lossPolicyMock),
             abi.encodeCall(
-                ILossPolicy.isLiquidatable,
+                ILossPolicy.isLiquidatableWithLoss,
                 (creditAccount, LIQUIDATOR, ILossPolicy.Params({totalDebtUSD: 101, twvUSD: 100, extraData: ""}))
             )
         );
@@ -970,13 +970,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
         // reverts if loss policy is violated
-        lossPolicyMock.setIsLiquidatableResult(false);
+        lossPolicyMock.setisLiquidatableWithLossResult(false);
         vm.expectRevert(CreditAccountNotLiquidatableWithLossException.selector);
         vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
 
         // if loss policy is not violated, further borrowing is forbidden
-        lossPolicyMock.setIsLiquidatableResult(true);
+        lossPolicyMock.setisLiquidatableWithLossResult(true);
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
         assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "Borrowing not forbidden");

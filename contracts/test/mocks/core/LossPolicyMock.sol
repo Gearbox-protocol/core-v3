@@ -12,14 +12,14 @@ contract LossPolicyMock is ILossPolicy {
     AccessMode public override accessMode;
     bool public override checksEnabled;
 
-    bool public isLiquidatableResult = true;
+    bool public isLiquidatableWithLossResult = true;
 
     function serialize() external pure override returns (bytes memory) {
         return "";
     }
 
-    function isLiquidatable(address, address, Params calldata) external view override returns (bool) {
-        return isLiquidatableResult;
+    function isLiquidatableWithLoss(address, address, Params calldata) external view override returns (bool) {
+        return isLiquidatableWithLossResult;
     }
 
     function setAccessMode(AccessMode mode) external override {
@@ -30,7 +30,7 @@ contract LossPolicyMock is ILossPolicy {
         checksEnabled = enabled;
     }
 
-    function setIsLiquidatableResult(bool result) external {
-        isLiquidatableResult = result;
+    function setisLiquidatableWithLossResult(bool result) external {
+        isLiquidatableWithLossResult = result;
     }
 }

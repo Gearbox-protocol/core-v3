@@ -30,12 +30,12 @@ contract AliasedLossPolicyV3Harness is AliasedLossPolicyV3 {
         return _getTokenInfo(creditAccount, tokenMask, sharedInfo);
     }
 
-    function exposed_getWeightedValueUSD(TokenInfo memory tokenInfo, SharedInfo memory sharedInfo, bool aliased)
-        external
-        view
-        returns (uint256)
-    {
-        return _getWeightedValueUSD(tokenInfo, sharedInfo, aliased);
+    function exposed_getWeightedValueUSD(
+        TokenInfo memory tokenInfo,
+        SharedInfo memory sharedInfo,
+        PriceFeedType priceFeedType
+    ) external view returns (uint256) {
+        return _getWeightedValueUSD(tokenInfo, sharedInfo, priceFeedType);
     }
 
     function exposed_convertToUSDAlias(PriceFeedParams memory aliasParams, uint256 amount)
