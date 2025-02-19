@@ -1439,7 +1439,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 enabledTokensMask,
         uint8 numberOfTokens
     ) public withFeeTokenCase creditManagerTest {
-        amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
+        uint256 scale = 10 ** _decimals(underlying);
+        amount = bound(amount, scale, 1e10 * scale);
         numberOfTokens = uint8(bound(numberOfTokens, 1, DEFAULT_MAX_ENABLED_TOKENS));
         enabledTokensMask = bound(enabledTokensMask, 1, 2 ** numberOfTokens - 1);
 
@@ -1466,7 +1467,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.assume(cdd.twvUSD != 0);
 
         // makes account liquidatable
-        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD + 1));
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD * scale / 1e8) * 101 / 100);
 
         assertTrue(
             creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
@@ -1482,7 +1483,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         // makes account non-liquidatable
-        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD - 1));
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD * scale / 1e8));
 
         assertFalse(
             creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
@@ -1544,7 +1545,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 healthFactor,
         uint16 minHealthFactor
     ) public withFeeTokenCase creditManagerTest {
-        amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
+        uint256 scale = 10 ** _decimals(underlying);
+        amount = bound(amount, scale, 1e10 * scale);
         healthFactor = bound(healthFactor, 0.2 ether, 5 ether);
 
         // sets underlying price to 1 USD
@@ -1565,7 +1567,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
         CollateralDebtData memory cdd =
             creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD * 1 ether / healthFactor));
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD * scale * 1e10 / healthFactor));
 
         bool liquidatable = healthFactor / 1e14 < minHealthFactor;
         assertEq(creditManager.isLiquidatable(creditAccount, minHealthFactor), liquidatable, "Incorrect isLiquidatable");
@@ -1757,7 +1759,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         /// @notice Quotas are nominated in underlying token, so we use underlying price instead link one
-        vars.set("LINK_QUOTA_IN_USD", vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE"));
+        vars.set("LINK_QUOTA_IN_USD", vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / 1e10);
     }
 
     /// @dev U:[CM-22]: calcDebtAndCollateral works correctly for DEBT_COLLATERAL* task
@@ -1773,16 +1775,16 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 underlyingBalance: debt,
                 linkBalance: 0,
-                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * DEFAULT_UNDERLYING_LT / PERCENTAGE_FACTOR
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt / 1e10,
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * DEFAULT_UNDERLYING_LT / PERCENTAGE_FACTOR / 1e10
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
                 linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
-                expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
-                expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR
+                expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2 / 1e10,
+                expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR / 1e10
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance > quota",
@@ -1827,7 +1829,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 assertEq(
                     collateralDebtData.totalDebtUSD,
                     vars.get("UNDERLYING_PRICE")
-                        * (debt + collateralDebtData.accruedInterest + collateralDebtData.accruedFees),
+                        * (debt + collateralDebtData.accruedInterest + collateralDebtData.accruedFees) / 1e10,
                     _testCaseErr("Incorrect totalDebtUSD")
                 );
 
@@ -1841,8 +1843,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
                 assertEq(
                     collateralDebtData.totalValue,
-                    _case.expectedTotalValueUSD / vars.get("UNDERLYING_PRICE"),
-                    _testCaseErr("Incorrect totalValueUSD")
+                    _case.expectedTotalValueUSD / vars.get("UNDERLYING_PRICE") * 1e10,
+                    _testCaseErr("Incorrect totalValue")
                 );
                 vm.revertTo(snapshot);
             }

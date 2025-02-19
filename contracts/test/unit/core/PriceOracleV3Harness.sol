@@ -39,8 +39,4 @@ contract PriceOracleV3Harness is PriceOracleV3 {
     {
         return _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck);
     }
-
-    function exposed_isUpdatable(address priceFeed) external view returns (bool) {
-        return _isUpdatable(priceFeed);
-    }
 }

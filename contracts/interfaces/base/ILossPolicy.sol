@@ -7,19 +7,46 @@ import {IVersion} from "./IVersion.sol";
 import {IStateSerializer} from "./IStateSerializer.sol";
 
 /// @title Loss policy interface
-/// @notice Generic interface for a loss policy contract that dictates conditions under which a liquidation with bad debt
-///         can proceed. For example, it can restrict such liquidations to only be performed by whitelisted accounts that
-///         can return premium to the DAO to recover part of the losses, or prevent liquidations of an asset whose market
-///         price drops for a short period of time while its fundamental value doesn't change.
+/// @notice Generic interface for a loss policy that dictates conditions under which a bad debt liquidation can proceed.
 /// @dev Loss policies must have type `LOSS_POLICY::{POSTFIX}`
 interface ILossPolicy is IVersion, IStateSerializer {
-    /// @notice Whether `creditAccount` can be liquidated with loss by `caller`, `data` is an optional field
-    ///         that can be used to pass some off-chain data specific to the loss policy implementation
-    function isLiquidatable(address creditAccount, address caller, bytes calldata data) external returns (bool);
+    /// @notice Parameters passed to the loss policy
+    /// @param totalDebtUSD Account's total debt in USD
+    /// @param twvUSD Account's total weighted value in USD
+    /// @param extraData Optional field that can be used to pass some off-chain data specific to implementation
+    struct Params {
+        uint256 totalDebtUSD;
+        uint256 twvUSD;
+        bytes extraData;
+    }
 
-    /// @notice Emergency function which forces `isLiquidatable` to always return `false`
-    function disable() external;
+    /// @notice Access mode for loss liquidations
+    enum AccessMode {
+        Permissionless,
+        Permissioned,
+        Forbidden
+    }
 
-    /// @notice Emergency function which forces `isLiquidatable` to always return `true`
-    function enable() external;
+    /// @notice Emitted when the loss policy access mode is set
+    event SetAccessMode(AccessMode mode);
+
+    /// @notice Emitted when the loss policy checks are enabled or disabled
+    event SetChecksEnabled(bool enabled);
+
+    /// @notice Whether `creditAccount` can be liquidated with loss by `caller`
+    function isLiquidatableWithLoss(address creditAccount, address caller, Params calldata params)
+        external
+        returns (bool);
+
+    /// @notice Returns current access mode
+    function accessMode() external view returns (AccessMode);
+
+    /// @notice Returns whether policy checks are enabled
+    function checksEnabled() external view returns (bool);
+
+    /// @notice Sets access mode for loss liquidations
+    function setAccessMode(AccessMode mode) external;
+
+    /// @notice Enables or disables policy checks
+    function setChecksEnabled(bool enabled) external;
 }

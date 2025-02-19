@@ -25,18 +25,22 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
 import {ILossPolicy} from "../interfaces/base/ILossPolicy.sol";
 import {IPhantomToken, IPhantomTokenWithdrawer} from "../interfaces/base/IPhantomToken.sol";
+import {IPriceFeedStore, PriceUpdate} from "../interfaces/base/IPriceFeedStore.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
 // LIBRARIES
 import {Balance, BalanceDelta, BalanceWithMask, BalancesLogic, Comparison} from "../libraries/BalancesLogic.sol";
 import {BitMask} from "../libraries/BitMask.sol";
 import {
+    AP_PRICE_FEED_STORE,
     BOT_PERMISSIONS_SET_FLAG,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
+    NO_VERSION_CONTROL,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER
@@ -88,6 +92,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
     /// @notice Pool's treasury to pay fees to
     address public immutable override treasury;
+
+    /// @notice Price feed store to update price feeds on-demand
+    address public immutable override priceFeedStore;
 
     /// @notice Whether credit facade is expirable
     bool public immutable override expirable;
@@ -154,6 +161,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
+    /// @param _addressProvider Address provider contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _lossPolicy Loss policy address
     /// @param _botList Bot list address
@@ -162,6 +170,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, until the date is set via `setExpirationDate` in the configurator.
     constructor(
+        address _addressProvider,
         address _creditManager,
         address _lossPolicy,
         address _botList,
@@ -178,6 +187,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
         treasury = ICreditManagerV3(_creditManager).getTreasury(); // U:[FA-1]
+        priceFeedStore = IAddressProvider(_addressProvider).getAddressOrRevert(AP_PRICE_FEED_STORE, NO_VERSION_CONTROL); // U:[FA-1]
     }
 
     // ------------------ //
@@ -314,7 +324,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
         (CollateralDebtData memory collateralDebtData, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,14]
         if (isUnhealthy && _hasBadDebt(collateralDebtData)) {
-            if (!ILossPolicy(lossPolicy).isLiquidatable(creditAccount, msg.sender, lossPolicyData)) {
+            ILossPolicy.Params memory params = ILossPolicy.Params({
+                totalDebtUSD: collateralDebtData.totalDebtUSD,
+                twvUSD: collateralDebtData.twvUSD,
+                extraData: lossPolicyData
+            });
+            if (!ILossPolicy(lossPolicy).isLiquidatableWithLoss(creditAccount, msg.sender, params)) {
                 revert CreditAccountNotLiquidatableWithLossException(); // U:[FA-17]
             }
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
@@ -390,8 +405,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         nonReentrant // U:[FA-4]
         returns (uint256 seizedAmount)
     {
-        address priceOracle = _priceOracle();
-        if (priceUpdates.length != 0) _updatePrices(priceOracle, priceUpdates);
+        if (priceUpdates.length != 0) _updatePrices(priceUpdates);
 
         (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount); // U:[FA-13,16]
 
@@ -400,8 +414,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         repaidAmount = IERC20(underlying).safeBalanceOf(creditAccount) - balanceBefore;
 
         uint256 feeAmount;
-        (repaidAmount, feeAmount, seizedAmount) =
-            _calcPartialLiquidationPayments(repaidAmount, token, priceOracle, !isUnhealthy); // U:[FA-15]
+        (repaidAmount, feeAmount, seizedAmount) = _calcPartialLiquidationPayments(repaidAmount, token, !isUnhealthy); // U:[FA-15]
 
         uint256 flags;
         (token, seizedAmount, flags) = _tryWithdrawPhantomToken(creditAccount, token, seizedAmount, 0); // U:[FA-16A]
@@ -658,7 +671,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     function _onDemandPriceUpdates(bytes calldata callData) internal {
         PriceUpdate[] memory updates = abi.decode(callData, (PriceUpdate[])); // U:[FA-25]
 
-        _updatePrices(_priceOracle(), updates); // U:[FA-25]
+        _updatePrices(updates); // U:[FA-25]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
@@ -972,11 +985,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     ///      - amount of underlying that should go towards repaying debt
     ///      - amount of underlying that should go towards liquidation fees
     ///      - amount of collateral that should be sent to the liquidator
-    function _calcPartialLiquidationPayments(uint256 amount, address token, address priceOracle, bool isExpired)
+    function _calcPartialLiquidationPayments(uint256 amount, address token, bool isExpired)
         internal
         view
         returns (uint256 repaidAmount, uint256 feeAmount, uint256 seizedAmount)
     {
+        address priceOracle = ICreditManagerV3(creditManager).priceOracle();
         (
             ,
             uint16 feeLiquidation,
@@ -1016,14 +1030,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         return _expirationDate != 0 && block.timestamp >= _expirationDate; // U:[FA-46]
     }
 
-    /// @dev Internal wrapper for `creditManager.priceOracle` call to reduce contract size
-    function _priceOracle() internal view returns (address) {
-        return ICreditManagerV3(creditManager).priceOracle();
-    }
-
-    /// @dev Internal wrapper for `priceOracle.updatePrices` call to reduce contract size
-    function _updatePrices(address priceOracle, PriceUpdate[] memory updates) internal {
-        IPriceOracleV3(priceOracle).updatePrices(updates);
+    /// @dev Internal wrapper for `priceFeedStore.updatePrices` call to reduce contract size
+    function _updatePrices(PriceUpdate[] memory updates) internal {
+        IPriceFeedStore(priceFeedStore).updatePrices(updates);
     }
 
     /// @dev Internal wrapper for `creditManager.addCollateral` call to reduce contract size

@@ -14,6 +14,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 
 import {AccountFactoryMock} from "../core/AccountFactoryMock.sol";
 import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
+import {PriceFeedStoreMock} from "../oracles/PriceFeedStoreMock.sol";
 import {BotListMock} from "../core/BotListMock.sol";
 import {WETHMock} from "../token/WETHMock.sol";
 
@@ -31,6 +32,9 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
 
         PriceOracleMock priceOracleMock = new PriceOracleMock();
         _setAddress(AP_PRICE_ORACLE, address(priceOracleMock), priceOracleMock.version());
+
+        PriceFeedStoreMock priceFeedStoreMock = new PriceFeedStoreMock();
+        _setAddress(AP_PRICE_FEED_STORE, address(priceFeedStoreMock), 0);
 
         AccountFactoryMock accountFactoryMock = new AccountFactoryMock(3_10);
         _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), 3_10);

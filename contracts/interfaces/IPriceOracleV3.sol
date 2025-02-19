@@ -18,23 +18,12 @@ struct PriceFeedParams {
     uint8 tokenDecimals;
 }
 
-/// @notice On-demand price update params
-/// @param priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
-/// @param data Update data
-struct PriceUpdate {
-    address priceFeed;
-    bytes data;
-}
-
 interface IPriceOracleV3Events {
     /// @notice Emitted when new price feed is set for token
     event SetPriceFeed(address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck);
 
     /// @notice Emitted when new reserve price feed is set for token
     event SetReservePriceFeed(address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck);
-
-    /// @notice Emitted when new updatable price feed is added
-    event AddUpdatablePriceFeed(address indexed priceFeed);
 }
 
 /// @title Price oracle V3 interface
@@ -68,20 +57,10 @@ interface IPriceOracleV3 is IVersion, IACLTrait, IPriceOracleV3Events {
     function safeConvertToUSD(uint256 amount, address token) external view returns (uint256);
 
     // ------------- //
-    // PRICE UPDATES //
-    // ------------- //
-
-    function getUpdatablePriceFeeds() external view returns (address[] memory);
-
-    function updatePrices(PriceUpdate[] calldata updates) external;
-
-    // ------------- //
     // CONFIGURATION //
     // ------------- //
 
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
 
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
-
-    function addUpdatablePriceFeed(address priceFeed) external;
 }

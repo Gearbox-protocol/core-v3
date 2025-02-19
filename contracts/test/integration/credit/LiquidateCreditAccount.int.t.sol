@@ -10,7 +10,7 @@ import {
     ICreditManagerV3Events,
     ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceFeedStore, PriceUpdate} from "../../../interfaces/base/IPriceFeedStore.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
@@ -111,7 +111,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
             })
         );
 
-        vm.expectCall(address(priceOracle), abi.encodeCall(IPriceOracleV3.updatePrices, (priceUpdates)));
+        vm.expectCall(address(priceFeedStore), abi.encodeCall(IPriceFeedStore.updatePrices, (priceUpdates)));
 
         vm.expectCall(
             address(creditManager),

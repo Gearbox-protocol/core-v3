@@ -7,12 +7,11 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../../interfaces/IExceptions.sol";
-import {IPriceOracleV3Events, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
-import {IPriceFeed, IUpdatablePriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
+import {IPriceOracleV3Events, PriceFeedParams} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
-import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {PriceFeedFallbackMock} from "../../mocks/oracles/PriceFeedFallbackMock.sol";
 
@@ -213,45 +212,6 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.tokenDecimals, 18, "Incorrect decimals");
     }
 
-    /// @notice U:[PO-5]: `addUpdatablePriceFeed` works as expected
-    function test_U_PO_05_addUpdatablePriceFeed_works_as_expected() public {
-        UpdatablePriceFeedMock priceFeed = new UpdatablePriceFeedMock();
-        priceFeed.setUpdatable(UpdatablePriceFeedMock.FlagState.REVERT);
-        PriceUpdate[] memory updates = new PriceUpdate[](1);
-        updates[0] = PriceUpdate(address(priceFeed), "DUMMY DATA");
-
-        // revert cases
-        vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.addUpdatablePriceFeed(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        priceOracle.addUpdatablePriceFeed(address(priceFeed));
-
-        vm.expectRevert(PriceFeedIsNotUpdatableException.selector);
-        vm.prank(configurator);
-        priceOracle.addUpdatablePriceFeed(address(priceFeed));
-
-        vm.expectRevert(PriceFeedIsNotUpdatableException.selector);
-        priceOracle.updatePrices(updates);
-
-        // adding price feed
-        priceFeed.setUpdatable(UpdatablePriceFeedMock.FlagState.TRUE);
-
-        vm.expectEmit(true, true, true, true);
-        emit AddUpdatablePriceFeed(address(priceFeed));
-
-        vm.prank(configurator);
-        priceOracle.addUpdatablePriceFeed(address(priceFeed));
-
-        address[] memory feeds = priceOracle.getUpdatablePriceFeeds();
-        assertEq(feeds.length, 1, "Price feed not added to the set");
-        assertEq(feeds[0], address(priceFeed), "Wrong price feed added to the set");
-
-        //  updating price feed
-        vm.expectCall(address(priceFeed), abi.encodeCall(priceFeed.updatePrice, ("DUMMY DATA")));
-        priceOracle.updatePrices(updates);
-    }
-
     // ------------------ //
     // INTERNAL FUNCTIONS //
     // ------------------ //
@@ -397,14 +357,12 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, false), 123, "Incorrect price");
     }
 
-    /// @notice U:[PO-10]: `_validatePriceFeed` and `_isUpdatable` work correctly for price feeds with fallback
-    function test_U_PO_10_validatePriceFeed_and_isUpdatable_work_correctly_for_price_feeds_with_fallback() public {
+    /// @notice U:[PO-10]: `_validatePriceFeed` works correctly for price feeds with fallback
+    function test_U_PO_10_validatePriceFeed_works_correctly_for_price_feeds_with_fallback() public {
         address priceFeed = address(new PriceFeedFallbackMock(1e8, 8, false));
         assertFalse(priceOracle.exposed_validatePriceFeed(priceFeed, 1000));
-        assertFalse(priceOracle.exposed_isUpdatable(priceFeed));
 
         priceFeed = address(new PriceFeedFallbackMock(1e8, 8, true));
         assertFalse(priceOracle.exposed_validatePriceFeed(priceFeed, 1000));
-        assertFalse(priceOracle.exposed_isUpdatable(priceFeed));
     }
 }

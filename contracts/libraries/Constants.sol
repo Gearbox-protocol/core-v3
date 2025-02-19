@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 bytes32 constant AP_GEAR_TOKEN = "GEAR_TOKEN";
 bytes32 constant AP_INSTANCE_MANAGER_PROXY = "INSTANCE_MANAGER_PROXY";
 bytes32 constant AP_CROSS_CHAIN_GOVERNANCE_PROXY = "CROSS_CHAIN_GOVERNANCE_PROXY";
+bytes32 constant AP_PRICE_FEED_STORE = "PRICE_FEED_STORE";
 uint256 constant NO_VERSION_CONTROL = 0;
 
 uint256 constant WAD = 1e18;

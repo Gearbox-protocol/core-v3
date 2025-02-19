@@ -10,13 +10,14 @@ import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
     constructor(
+        address _addressProvider,
         address _creditManager,
         address _lossPolicy,
         address _botList,
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) CreditFacadeV3(_creditManager, _lossPolicy, _botList, _weth, _degenNFT, _expirable) {}
+    ) CreditFacadeV3(_addressProvider, _creditManager, _lossPolicy, _botList, _weth, _degenNFT, _expirable) {}
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
@@ -40,12 +41,12 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         return _revertIfNotLiquidatable(creditAccount);
     }
 
-    function calcPartialLiquidationPayments(uint256 amount, address token, address priceOracle, bool isExpired)
+    function calcPartialLiquidationPayments(uint256 amount, address token, bool isExpired)
         external
         view
         returns (uint256, uint256, uint256)
     {
-        return _calcPartialLiquidationPayments(amount, token, priceOracle, isExpired);
+        return _calcPartialLiquidationPayments(amount, token, isExpired);
     }
 
     function setLastBlockBorrowed(uint64 _lastBlockBorrowed) external {
