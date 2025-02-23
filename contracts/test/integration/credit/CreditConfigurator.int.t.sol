@@ -203,6 +203,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.makeAllTokensQuoted();
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addCollateralToken(DUMB_ADDRESS, 1);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);

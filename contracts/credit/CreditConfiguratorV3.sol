@@ -32,6 +32,10 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
+interface ICreditManagerLegacy {
+    function setQuotedMask(uint256 mask) external;
+}
+
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
 /// @dev Most of the functions can only be accessed by configurator
@@ -89,6 +93,17 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
     // ------ //
     // TOKENS //
     // ------ //
+
+    /// @notice Makes all tokens quoted (required for v3.0.x credit managers)
+    function makeAllTokensQuoted()
+        external
+        override
+        configuratorOnly // I:[CC-2]
+    {
+        if (CreditManagerV3(creditManager).version() < 3_10) {
+            ICreditManagerLegacy(creditManager).setQuotedMask(~UNDERLYING_TOKEN_MASK);
+        }
+    }
 
     /// @notice Makes token recognizable as collateral in the credit manager and sets its liquidation threshold
     /// @param token Token to add

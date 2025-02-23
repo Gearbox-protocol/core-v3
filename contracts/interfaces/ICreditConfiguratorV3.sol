@@ -98,6 +98,8 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
     // TOKENS //
     // ------ //
 
+    function makeAllTokensQuoted() external;
+
     function addCollateralToken(address token, uint16 liquidationThreshold) external;
 
     function setLiquidationThreshold(address token, uint16 liquidationThreshold) external;
