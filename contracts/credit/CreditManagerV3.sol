@@ -34,7 +34,12 @@ import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // LIBRARIES
-import {INACTIVE_CREDIT_ACCOUNT_ADDRESS, PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK} from "../libraries/Constants.sol";
+import {
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
+    MAX_SANE_ENABLED_TOKENS,
+    PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK
+} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -146,7 +151,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
     /// @param _liquidationPremiumExpired Percentage of liquidated expired account value that can be taken by liquidator
     /// @param _name Credit manager name
-    /// @dev Adds pool's underlying as collateral token with LT = 0
+    /// @dev Adds pool's underlying as collateral token with LT = 100% - liquidationPremium - feeLiquidation
     /// @dev Checks that `_priceOracle` has a price for underlying
     /// @dev Sets `msg.sender` as credit configurator, which MUST then pass the role to `CreditConfiguratorV3` contract
     ///      once it's deployed via `setCreditConfigurator`. The latter performs crucial sanity checks, and configuring
@@ -163,7 +168,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint16 _liquidationPremiumExpired,
         string memory _name
     ) {
-        if (bytes(_name).length == 0 || _maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
+        if (bytes(_name).length == 0 || _maxEnabledTokens == 0 || _maxEnabledTokens > MAX_SANE_ENABLED_TOKENS) {
+            revert IncorrectParameterException(); // U:[CM-1]
+        }
         if (
             _feeLiquidation > _liquidationPremium || _feeLiquidationExpired > _liquidationPremiumExpired
                 || _feeLiquidationExpired > _feeLiquidation || _liquidationPremiumExpired > _liquidationPremium

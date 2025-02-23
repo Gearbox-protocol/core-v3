@@ -13,6 +13,7 @@ import {
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
 import {ITumblerV3Events} from "../../../interfaces/ITumblerV3.sol";
+import {MAX_SANE_EPOCH_LENGTH} from "../../../libraries/Constants.sol";
 
 import {TumblerV3} from "../../../pool/TumblerV3.sol";
 
@@ -44,7 +45,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
-    function test_U_TU_01_constructor_works_as_expected() public view {
+    function test_U_TU_01_constructor_works_as_expected() public {
         assertEq(tumbler.pool(), address(pool), "Incorrect pool");
         assertEq(tumbler.underlying(), underlying, "Incorrect underlying");
         assertEq(tumbler.poolQuotaKeeper(), address(poolQuotaKeeper), "Incorrect poolQuotaKeeper");
@@ -53,6 +54,9 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         assertEq(
             tumbler.serialize(), abi.encode(1 days, new address[](0), new address[](0)), "Incorrect serialized state"
         );
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        new TumblerV3(address(pool), MAX_SANE_EPOCH_LENGTH + 1);
     }
 
     /// @notice U:[TU-2]: `addToken` works as expected

@@ -3,6 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {IContractsRegister} from "../interfaces/base/IContractsRegister.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 import {
@@ -15,6 +17,8 @@ import {
 /// @title Contracts register trait
 /// @notice Trait that simplifies validation of pools and credit managers
 abstract contract ContractsRegisterTrait is IContractsRegisterTrait {
+    using Address for address;
+
     /// @notice Contracts register contract address
     address public immutable override contractsRegister;
 
@@ -34,7 +38,7 @@ abstract contract ContractsRegisterTrait is IContractsRegisterTrait {
     /// @param _contractsRegister Contracts register address
     constructor(address _contractsRegister) {
         if (_contractsRegister == address(0)) revert ZeroAddressException();
-        if (_contractsRegister.code.length == 0) revert AddressIsNotContractException(_contractsRegister);
+        if (!_contractsRegister.isContract()) revert AddressIsNotContractException(_contractsRegister);
         contractsRegister = _contractsRegister;
     }
 

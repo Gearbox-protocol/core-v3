@@ -396,7 +396,7 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
     }
 
     /// @notice U:[ALP-8]: `_getSharedInfo` works correctly
-    function test_U_ALP_08_getSharedInfo_works_correctly() public {
+    function test_U_ALP_08_getSharedInfo_works_correctly() public view {
         AliasedLossPolicyV3.SharedInfo memory info = lossPolicy.exposed_getSharedInfo(creditAccount);
         assertEq(info.creditManager, creditManager, "Incorrect creditManager");
         assertEq(info.priceOracle, address(priceOracleMock), "Incorrect priceOracle");
@@ -478,7 +478,7 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
     }
 
     /// @notice U:[ALP-10]: `_getWeightedValueUSD` works correctly
-    function test_U_ALP_10_getWeightedValueUSD_works_correctly() public {
+    function test_U_ALP_10_getWeightedValueUSD_works_correctly() public view {
         AliasedLossPolicyV3.SharedInfo memory sharedInfo = AliasedLossPolicyV3.SharedInfo({
             creditManager: creditManager,
             priceOracle: address(priceOracleMock),

@@ -413,6 +413,21 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             isFeeToken
         );
 
+        vm.expectRevert(IncorrectParameterException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock),
+            MAX_SANE_ENABLED_TOKENS + 1,
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
+            name,
+            isFeeToken
+        );
+
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(TOKEN_DAI), _testCaseErr("Incorrect underlying"));

@@ -14,6 +14,7 @@ import {
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
+import {MAX_SANE_EPOCH_LENGTH} from "../libraries/Constants.sol";
 import {MarketHelper} from "../libraries/MarketHelper.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
@@ -59,6 +60,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait, SanityCheckTrait {
         pool = pool_;
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();
         underlying = IPoolQuotaKeeperV3(poolQuotaKeeper).underlying();
+        if (epochLength_ > MAX_SANE_EPOCH_LENGTH) revert IncorrectParameterException();
         epochLength = epochLength_;
     }
 

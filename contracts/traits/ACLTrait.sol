@@ -3,6 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {IACL} from "../interfaces/base/IACL.sol";
 import {IACLTrait} from "../interfaces/base/IACLTrait.sol";
 import {
@@ -16,6 +18,8 @@ import {
 /// @title ACL trait
 /// @notice Utility class for ACL (access-control list) consumers
 abstract contract ACLTrait is IACLTrait {
+    using Address for address;
+
     /// @notice ACL contract address
     address public immutable override acl;
 
@@ -41,7 +45,7 @@ abstract contract ACLTrait is IACLTrait {
     /// @param _acl ACL contract address
     constructor(address _acl) {
         if (_acl == address(0)) revert ZeroAddressException();
-        if (_acl.code.length == 0) revert AddressIsNotContractException(_acl);
+        if (!_acl.isContract()) revert AddressIsNotContractException(_acl);
         acl = _acl;
     }
 

@@ -632,7 +632,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, SanityCheckTra
         configuratorOnly // I:[CC-2]
         nonZeroAddress(newLossPolicy) // I:[CC-26]
     {
-        if (newLossPolicy.code.length == 0) revert AddressIsNotContractException(newLossPolicy); // I:[CC-26]
+        if (!newLossPolicy.isContract()) revert AddressIsNotContractException(newLossPolicy); // I:[CC-26]
 
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
