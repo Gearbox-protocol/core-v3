@@ -10,6 +10,7 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
 import {PhantomTokenMock, PhantomTokenWithdrawerMock} from "../../mocks/token/PhantomTokenMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {WETHMock} from "../../mocks/token/WETHMock.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -1916,6 +1917,36 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             enabledTokensMask: 0,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
+    }
+
+    /// @dev U:[FA-36B]: multicall `withdrawCollateral` with state-changing fallback works properly
+    function test_U_FA_36B_multicall_withdrawCollateral_with_state_changing_fallback_works_correctly()
+        public
+        notExpirableCase
+    {
+        address creditAccount = DUMB_ADDRESS;
+        WETHMock token = new WETHMock();
+        uint256 amount = 100;
+
+        for (uint256 i; i < 2; ++i) {
+            uint256 snapshot = vm.snapshot();
+
+            token.setDepositOnFallback(i == 0);
+
+            creditFacade.multicallInt{gas: 200_000}({
+                creditAccount: creditAccount,
+                calls: MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (address(token), amount, USER))
+                    })
+                ),
+                enabledTokensMask: 0,
+                flags: WITHDRAW_COLLATERAL_PERMISSION
+            });
+
+            vm.revertTo(snapshot);
+        }
     }
 
     /// @dev U:[FA-37]: multicall `setBotPermissions` works properly

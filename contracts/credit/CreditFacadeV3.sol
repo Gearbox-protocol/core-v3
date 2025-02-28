@@ -46,6 +46,7 @@ import {
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER
 } from "../libraries/Constants.sol";
 import {MarketHelper} from "../libraries/MarketHelper.sol";
+import {OptionalCall} from "../libraries/OptionalCall.sol";
 
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -786,24 +787,32 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         internal
         returns (address, uint256, uint256)
     {
-        try IPhantomToken(token).getPhantomTokenInfo() returns (address target, address depositedToken) {
-            // ensure that `token` is recognized by the credit manager
-            _getTokenMaskOrRevert(token); // U:[FA-36A]
+        // NOTE: Some external tokens without `getPhantomTokenInfo` may have a fallback function that changes state,
+        // which can cause a `THROW` that burns all gas, or does not change state and instead returns empty data.
+        // To handle these cases, we use a special call construction with a strict gas limit.
+        (bool success, bytes memory returnData) = OptionalCall.staticCallOptionalSafe({
+            target: token,
+            data: abi.encodeWithSelector(IPhantomToken.getPhantomTokenInfo.selector),
+            gasAllowance: 30_000
+        });
+        if (!success) return (token, amount, flags); // U:[FA-36B]
 
-            uint256 balanceBefore = IERC20(depositedToken).safeBalanceOf(creditAccount);
-            flags = _externalCall({
-                creditAccount: creditAccount,
-                target: target,
-                adapter: ICreditManagerV3(creditManager).contractToAdapter(target),
-                callData: abi.encodeCall(IPhantomTokenWithdrawer.withdrawPhantomToken, (token, amount)),
-                flags: flags
-            }); // U:[FA-36A]
+        (address target, address depositedToken) = abi.decode(returnData, (address, address));
 
-            emit WithdrawPhantomToken(creditAccount, token, amount); // U:[FA-36A]
-            return (depositedToken, IERC20(depositedToken).safeBalanceOf(creditAccount) - balanceBefore, flags);
-        } catch {
-            return (token, amount, flags);
-        }
+        // ensure that `token` is recognized by the credit manager
+        _getTokenMaskOrRevert(token); // U:[FA-36A]
+
+        uint256 balanceBefore = IERC20(depositedToken).safeBalanceOf(creditAccount);
+        flags = _externalCall({
+            creditAccount: creditAccount,
+            target: target,
+            adapter: ICreditManagerV3(creditManager).contractToAdapter(target),
+            callData: abi.encodeCall(IPhantomTokenWithdrawer.withdrawPhantomToken, (token, amount)),
+            flags: flags
+        }); // U:[FA-36A]
+
+        emit WithdrawPhantomToken(creditAccount, token, amount); // U:[FA-36A]
+        return (depositedToken, IERC20(depositedToken).safeBalanceOf(creditAccount) - balanceBefore, flags);
     }
 
     /// @dev Adapter call implementation

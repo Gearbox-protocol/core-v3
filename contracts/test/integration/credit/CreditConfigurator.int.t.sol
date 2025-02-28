@@ -34,7 +34,7 @@ import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
-import {WETHFallbackMock} from "../../mocks/token/WETHFallbackMock.sol";
+import {WETHMock} from "../../mocks/token/WETHMock.sol";
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 
 // SUITES
@@ -1105,25 +1105,24 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 2 days);
     }
 
-    function test_I_CC_31_addCollateralToken_works_with_fallback() public creditTest {
+    function test_I_CC_31_addCollateralToken_works_with_state_changing_fallback() public creditTest {
         PriceFeedMock pf = new PriceFeedMock(10 ** 8, 8);
-
-        WETHFallbackMock wethFallback = new WETHFallbackMock();
+        WETHMock token = new WETHMock();
 
         for (uint256 i = 0; i < 2; i++) {
             uint256 snapshot = vm.snapshot();
 
-            wethFallback.setDepositOnFallback(i == 0);
+            token.setDepositOnFallback(i == 0);
 
             vm.prank(CONFIGURATOR);
-            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(wethFallback), address(pf), 1 hours);
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(token), address(pf), 1 hours);
 
-            makeTokenQuoted(address(wethFallback), 1, uint96(type(int96).max));
+            makeTokenQuoted(address(token), 1, uint96(type(int96).max));
 
             vm.prank(CONFIGURATOR);
-            creditConfigurator.addCollateralToken(address(wethFallback), 8800);
+            creditConfigurator.addCollateralToken{gas: 100_000}(address(token), 8800);
 
-            assertTrue(creditManager.getTokenMaskOrRevert(address(wethFallback)) > 0, "Token wasn't added");
+            assertTrue(creditManager.getTokenMaskOrRevert(address(token)) > 0, "Token wasn't added");
 
             vm.revertTo(snapshot);
         }

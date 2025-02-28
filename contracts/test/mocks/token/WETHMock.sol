@@ -8,6 +8,8 @@ contract WETHMock is IERC20 {
     string public symbol = "WETH";
     uint8 public decimals = 18;
 
+    bool public depositOnFallback = true;
+
     // event Approval(address indexed src, address indexed guy, uint256 wad);
     // event Transfer(address indexed src, address indexed dst, uint256 wad);
     event Deposit(address indexed dst, uint256 wad);
@@ -20,8 +22,14 @@ contract WETHMock is IERC20 {
         balanceOf[to] += amount;
     }
 
-    receive() external payable {
-        deposit(); // T:[WM-1]
+    function setDepositOnFallback(bool _depositOnFallback) external {
+        depositOnFallback = _depositOnFallback;
+    }
+
+    fallback() external payable {
+        if (depositOnFallback) {
+            deposit(); // T:[WM-1]
+        }
     }
 
     function deposit() public payable {
