@@ -212,7 +212,7 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, SanityCheckTrait, 
     /// @dev Returns token's price, optionally performs sanity and staleness checks
     function _getPrice(PriceFeedParams memory params) internal view returns (uint256 price) {
         int256 answer = _getValidatedPrice(params.priceFeed, params.stalenessPeriod, params.skipCheck);
-        // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
+        // NOTE: `_getValidatedPrice` ensures that `answer` is non-negative
         price = uint256(answer);
     }
 

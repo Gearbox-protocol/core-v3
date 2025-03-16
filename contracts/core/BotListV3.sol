@@ -13,12 +13,13 @@ import {
     AddressIsNotContractException,
     CallerNotCreditFacadeException,
     IncorrectBotPermissionsException,
-    InvalidBotException
+    InvalidBotException,
+    TooManyActiveBotsException
 } from "../interfaces/IExceptions.sol";
 import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IBot} from "../interfaces/base/IBot.sol";
 
-import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
+import {AP_INSTANCE_MANAGER_PROXY, MAX_SANE_ACTIVE_BOTS, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
@@ -82,6 +83,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @dev Reverts if `creditAccount` is not opened in its credit manager or caller is not a facade connected to it
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
+    /// @dev Reverts if trying to set non-zero permissions for too many bots
     /// @custom:tests U:[BL-1]
     function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
@@ -102,6 +104,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
             accountBots.remove(bot);
         }
         activeBotsRemaining = accountBots.length();
+        if (activeBotsRemaining > MAX_SANE_ACTIVE_BOTS) revert TooManyActiveBotsException();
 
         if (info.permissions[creditManager][creditAccount] != permissions) {
             info.permissions[creditManager][creditAccount] = permissions;
