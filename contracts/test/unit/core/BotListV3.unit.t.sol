@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 import {BotListV3} from "../../../core/BotListV3.sol";
 import {IBotListV3Events} from "../../../interfaces/IBotListV3.sol";
+import {MAX_SANE_ACTIVE_BOTS} from "../../../libraries/Constants.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -161,5 +162,40 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
         address[] memory activeBots = botList.activeBots(creditAccount);
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
+    }
+
+    /// @notice U:[BL-3]: `setBotPermissions` cannot activate more bots than `MAX_SANE_ACTIVE_BOTS`
+    function test_U_BL_03_setBotPermissions_cannot_activate_more_bots_than_max() public {
+        uint256 activeBotsRemaining;
+
+        // Create MAX_SANE_ACTIVE_BOTS + 1 bots
+        address[] memory bots = new address[](MAX_SANE_ACTIVE_BOTS + 1);
+        for (uint256 i; i < bots.length; ++i) {
+            bots[i] = address(new BotMock());
+            BotMock(bots[i]).setRequiredPermissions(1);
+        }
+
+        // Add MAX_SANE_ACTIVE_BOTS bots successfully
+        for (uint256 i; i < MAX_SANE_ACTIVE_BOTS; ++i) {
+            vm.prank(creditFacade);
+            activeBotsRemaining =
+                botList.setBotPermissions({bot: bots[i], creditAccount: creditAccount, permissions: 1});
+            assertEq(activeBotsRemaining, i + 1, "Incorrect number of active bots");
+        }
+
+        // Try to add one more bot
+        vm.expectRevert(TooManyActiveBotsException.selector);
+        vm.prank(creditFacade);
+        botList.setBotPermissions({bot: bots[MAX_SANE_ACTIVE_BOTS], creditAccount: creditAccount, permissions: 1});
+
+        // Verify we can still remove and add bots as long as total stays under limit
+        vm.prank(creditFacade);
+        activeBotsRemaining = botList.setBotPermissions({bot: bots[0], creditAccount: creditAccount, permissions: 0});
+        assertEq(activeBotsRemaining, MAX_SANE_ACTIVE_BOTS - 1, "Incorrect number of active bots after removal");
+
+        vm.prank(creditFacade);
+        activeBotsRemaining =
+            botList.setBotPermissions({bot: bots[MAX_SANE_ACTIVE_BOTS], creditAccount: creditAccount, permissions: 1});
+        assertEq(activeBotsRemaining, MAX_SANE_ACTIVE_BOTS, "Incorrect number of active bots after replacement");
     }
 }

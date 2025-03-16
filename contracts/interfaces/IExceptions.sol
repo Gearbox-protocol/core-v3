@@ -291,6 +291,9 @@ error InvalidBotException();
 /// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
 error IncorrectBotPermissionsException();
 
+/// @notice Thrown when attempting to set non-zero permissions for too many bots
+error TooManyActiveBotsException();
+
 // --------------- //
 // ACCOUNT FACTORY //
 // --------------- //

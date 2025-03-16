@@ -20,6 +20,7 @@ uint256 constant EPOCHS_TO_WITHDRAW = 4;
 
 uint8 constant MAX_SANE_ENABLED_TOKENS = 20;
 uint256 constant MAX_SANE_EPOCH_LENGTH = 28 days;
+uint256 constant MAX_SANE_ACTIVE_BOTS = 5;
 
 uint8 constant MAX_WITHDRAW_FEE = 100;
 
