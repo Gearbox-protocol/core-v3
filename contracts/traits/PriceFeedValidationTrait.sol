@@ -20,16 +20,24 @@ import {IPriceFeed, IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol
 abstract contract PriceFeedValidationTrait {
     using Address for address;
 
-    /// @dev Ensures that price is positive and not stale
+    /// @dev Ensures that price feed's answer is positive and not stale.
+    ///      If `skipCheck` is true, only checks that price is non-negative to allow zero price feed to be used.
     /// @custom:tests U:[PO-9]
-    function _checkAnswer(int256 price, uint256 updatedAt, uint32 stalenessPeriod) internal view {
-        if (price <= 0) revert IncorrectPriceException();
-        if (block.timestamp >= updatedAt + stalenessPeriod) revert StalePriceException();
+    function _checkAnswer(int256 price, uint256 updatedAt, uint32 stalenessPeriod, bool skipCheck) internal view {
+        if (price < 0 || !skipCheck && price == 0) revert IncorrectPriceException();
+        if (!skipCheck && block.timestamp >= updatedAt + stalenessPeriod) revert StalePriceException();
     }
 
-    /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
+    /// @dev Validates that `priceFeed` is a contract that adheres to Chainlink interface
+    /// @dev Reverts if `priceFeed` does not have exactly 8 decimals
+    /// @dev Reverts if `stalenessPeriod` is inconsistent with `priceFeed`'s `skipPriceCheck()` flag
+    ///      (which is considered to be false if `priceFeed` does not have this function)
     /// @custom:tests U:[PO-8], U:[PO-10]
-    function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
+    function _validatePriceFeedMetadata(address priceFeed, uint32 stalenessPeriod)
+        internal
+        view
+        returns (bool skipCheck)
+    {
         if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed);
 
         try IPriceFeed(priceFeed).decimals() returns (uint8 _decimals) {
@@ -46,18 +54,20 @@ abstract contract PriceFeedValidationTrait {
             data: abi.encodeWithSelector(IPriceFeed.skipPriceCheck.selector),
             gasAllowance: 10_000
         });
-        if (success) {
-            skipCheck = abi.decode(returnData, (bool));
+        if (success) skipCheck = abi.decode(returnData, (bool));
+        if (skipCheck && stalenessPeriod != 0 || !skipCheck && stalenessPeriod == 0) {
+            revert IncorrectParameterException();
         }
+    }
+
+    /// @dev Validates that `priceFeed` is a contract that adheres to Chainlink interface and returns valid answer
+    /// @custom:tests U:[PO-8], U:[PO-10]
+    function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
+        skipCheck = _validatePriceFeedMetadata(priceFeed, stalenessPeriod);
 
         try IPriceFeed(priceFeed).latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80)
         {
-            if (skipCheck) {
-                if (stalenessPeriod != 0) revert IncorrectParameterException();
-            } else {
-                if (stalenessPeriod == 0) revert IncorrectParameterException();
-                _checkAnswer(answer, updatedAt, stalenessPeriod);
-            }
+            _checkAnswer(answer, updatedAt, stalenessPeriod, skipCheck);
         } catch {
             revert IncorrectPriceFeedException();
         }
@@ -72,6 +82,6 @@ abstract contract PriceFeedValidationTrait {
     {
         uint256 updatedAt;
         (, answer,, updatedAt,) = IPriceFeed(priceFeed).latestRoundData();
-        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod);
+        _checkAnswer(answer, updatedAt, stalenessPeriod, skipCheck);
     }
 }

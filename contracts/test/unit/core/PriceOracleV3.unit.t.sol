@@ -272,21 +272,22 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
 
         vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), abi.encode(uint8(8)));
 
-        // does not implement `latestRoundData()`
-        vm.mockCallRevert(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()), "");
-        vm.expectRevert(IncorrectPriceFeedException.selector);
-        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
-
-        // zero staleness period while shipCheck = false
-        vm.mockCall(
-            priceFeed,
-            abi.encodeCall(IPriceFeed.latestRoundData, ()),
-            abi.encode(uint80(0), int256(42), uint256(0), block.timestamp, uint80(0))
-        );
+        // zero staleness period while shipCheck is missing
         vm.expectRevert(IncorrectParameterException.selector);
         priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
+        // non-zero staleness period while skipCheck = false
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(false));
+        vm.expectRevert(IncorrectParameterException.selector);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
+
+        // non-zero staleness period while skipCheck = true
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(true));
+        vm.expectRevert(IncorrectParameterException.selector);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
+
         // negative price
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(false));
         vm.mockCall(
             priceFeed,
             abi.encodeCall(IPriceFeed.latestRoundData, ()),
@@ -304,57 +305,75 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectRevert(StalePriceException.selector);
         priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
-        // non-zero staleness period while skipCheck = true
-        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(true));
-        vm.expectRevert(IncorrectParameterException.selector);
-        priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
-
-        bool skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 0);
-        assertTrue(skipCheck, "skipCheck is unexpectedly false");
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), int256(42), uint256(0), block.timestamp - 1, uint80(0))
+        );
+        bool skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
+        assertFalse(skipCheck, "skipCheck is unexpectedly true");
     }
 
     /// @notice U:[PO-9]: `_getValidatedPrice` works as expected
     function test_U_PO_09_getValidatedPrice_works_as_expected() public {
         address priceFeed = makeAddr("PRICE_FEED");
-        uint256 stalenessPeriod = 20;
+        uint32 stalenessPeriod = 20;
 
-        // returns answer if `skipCheck` is true
-        vm.mockCall(
-            priceFeed,
-            abi.encodeCall(IPriceFeed.latestRoundData, ()),
-            abi.encode(uint80(0), -123, uint256(0), block.timestamp - stalenessPeriod - 1, uint80(0))
-        );
-        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
-        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, true), -123, "Incorrect price");
-
-        // reverts on negative price if `skipCheck` is false
+        // negative price
         vm.mockCall(
             priceFeed,
             abi.encodeCall(IPriceFeed.latestRoundData, ()),
             abi.encode(uint80(0), -123, uint256(0), block.timestamp - stalenessPeriod + 1, uint80(0))
         );
+
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
         vm.expectRevert(IncorrectPriceException.selector);
-        priceOracle.exposed_getValidatedPrice(priceFeed, 20, false);
+        priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, false);
 
-        // reverts on stale price if `skipCheck` is false
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        vm.expectRevert(IncorrectPriceException.selector);
+        priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, true);
+
+        // zero price
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), int256(0), uint256(0), block.timestamp - stalenessPeriod + 1, uint80(0))
+        );
+
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        vm.expectRevert(IncorrectPriceException.selector);
+        priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, false);
+
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, true), 0, "Incorrect price");
+
+        // stale price
         vm.mockCall(
             priceFeed,
             abi.encodeCall(IPriceFeed.latestRoundData, ()),
             abi.encode(uint80(0), 123, uint256(0), block.timestamp - stalenessPeriod - 1, uint80(0))
         );
+
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
         vm.expectRevert(StalePriceException.selector);
-        priceOracle.exposed_getValidatedPrice(priceFeed, 20, false);
+        priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, false);
 
-        // returns answer if `skipCheck` is false
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, true), 123, "Incorrect price");
+
+        // positive non-stale price
         vm.mockCall(
             priceFeed,
             abi.encodeCall(IPriceFeed.latestRoundData, ()),
             abi.encode(uint80(0), 123, uint256(0), block.timestamp - stalenessPeriod + 1, uint80(0))
         );
+
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
-        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, false), 123, "Incorrect price");
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, false), 123, "Incorrect price");
+
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, stalenessPeriod, true), 123, "Incorrect price");
     }
 
     /// @notice U:[PO-10]: `_validatePriceFeed` works correctly for price feeds with fallback
