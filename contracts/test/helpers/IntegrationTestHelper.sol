@@ -278,6 +278,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         accountFactory = DefaultAccountFactoryV3(CreditManagerV3(cm).accountFactory());
         priceOracle = IPriceOracleV3(CreditManagerV3(cm).priceOracle());
+        priceFeedStore = IPriceFeedStore(CreditFacadeV3(CreditManagerV3(cm).creditFacade()).priceFeedStore());
 
         address cf = CreditManagerV3(cm).creditFacade();
         lossPolicy = ILossPolicy(CreditFacadeV3(cf).lossPolicy());
