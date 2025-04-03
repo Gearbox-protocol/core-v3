@@ -243,7 +243,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         cr = gp.contractsRegister();
         priceFeedStore = gp.priceFeedStore();
         gearStaking = gp.gearStaking();
-        vm.warp(gearStaking.firstEpochTimestamp());
 
         vm.stopPrank();
     }

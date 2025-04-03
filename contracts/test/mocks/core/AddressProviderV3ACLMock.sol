@@ -46,8 +46,8 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
 
         _setAddress(AP_WETH_TOKEN, address(new WETHMock()), 0);
 
-        _setAddress(AP_INSTANCE_MANAGER_PROXY, makeAddr("INSTANCE_MANAGER_PROXY"), 0);
-        _setAddress(AP_CROSS_CHAIN_GOVERNANCE_PROXY, makeAddr("CROSS_CHAIN_GOVERNANCE_PROXY"), 0);
+        _setAddress(AP_INSTANCE_MANAGER_PROXY, address(4568), 0);
+        _setAddress(AP_CROSS_CHAIN_GOVERNANCE_PROXY, address(4569), 0);
     }
 
     function isConfigurator(address addr) external view returns (bool) {
@@ -67,7 +67,7 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         require(
             result != address(0),
             string.concat(
-                "Address not found, key: ", string(abi.encodePacked(key)), ", version: ", vm.toString(_version)
+                "Address not found, key: ", string(abi.encodePacked(key))
             )
         );
     }
