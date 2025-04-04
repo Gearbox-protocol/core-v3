@@ -213,12 +213,13 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         chainId = nd.chainId();
     }
 
-    function _setupCore() internal {
+    function _prepareTTS() internal {
         tokenTestSuite = new TokensTestSuite();
         vm.deal(address(this), 100 * WAD);
-        tokenTestSuite.topUpWETH{value: 100 * WAD}();
+    }
 
-        weth = tokenTestSuite.addressOf(TOKEN_WETH);
+    function _setupCore() internal {
+        _prepareTTS();
 
         vm.startPrank(CONFIGURATOR);
         GenesisFactory gp = new GenesisFactory();
@@ -248,7 +249,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _attachPool() internal {
-        tokenTestSuite = new TokensTestSuite();
         try vm.envAddress("ATTACH_POOL") returns (address val) {
             _attachPool(val);
         } catch {
@@ -258,11 +258,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _attachPool(address _pool) internal returns (bool success) {
+        _prepareTTS();
+
         pool = PoolV3(_pool);
 
         poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
         gauge = GaugeV3(poolQuotaKeeper.gauge());
-        gearStaking = GearStakingV3(gauge.voter());
+        try gauge.voter() returns (address _gearStaking) {
+            gearStaking = GearStakingV3(_gearStaking);
+        } catch {}
 
         underlying = pool.asset();
 
