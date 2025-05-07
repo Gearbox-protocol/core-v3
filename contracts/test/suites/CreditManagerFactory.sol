@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
@@ -19,11 +19,7 @@ contract CreditManagerFactory {
 
     constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
         creditManager = new CreditManagerV3(_ap, _pool, opts.name);
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            opts.degenNFT,
-            opts.expirable
-        );
+        creditFacade = new CreditFacadeV3(address(creditManager), opts.degenNFT, opts.expirable);
 
         bytes memory configuratorByteCode =
             abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));

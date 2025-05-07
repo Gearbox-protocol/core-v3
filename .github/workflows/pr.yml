@@ -44,6 +44,9 @@ jobs:
       - name: Run gas tests
         run: forge test --mt test_G -vv
 
+      - name: Run invariant tests
+        run: forge test --mt invariant
+
       - name: Perform checks
         run: |
           yarn prettier:ci
