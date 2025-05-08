@@ -49,6 +49,8 @@ contract PhantomTokenMock is IPhantomToken, ERC20 {
     function setExchangeRate(uint256 value) external {
         exchangeRate = value;
     }
+
+    function serialize() external view override returns (bytes memory) {}
 }
 
 contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {

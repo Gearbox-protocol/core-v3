@@ -216,6 +216,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _prepareTTS() internal {
         tokenTestSuite = new TokensTestSuite();
         vm.deal(address(this), 100 * WAD);
+
+        weth = tokenTestSuite.addressOf(TOKEN_WETH);
     }
 
     function _setupCore() internal {

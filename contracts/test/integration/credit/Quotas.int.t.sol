@@ -40,6 +40,10 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     using CreditLogic for CollateralDebtData;
 
     function _setQuotaParams(address token, uint16 rate, uint96 limit) internal {
+        uint256 firstEpochTimestamp = gearStaking.firstEpochTimestamp();
+
+        if (block.timestamp < firstEpochTimestamp) vm.warp(firstEpochTimestamp);
+
         vm.startPrank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, type(uint16).max);
         gauge.changeQuotaMinRate(token, rate);
@@ -60,6 +64,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     function test_I_CMQ_03_updateQuotas_works_correctly() public creditTest {
         _setQuotaParams(tokenTestSuite.addressOf(TOKEN_LINK), 10_00, uint96(1_000_000 * WAD));
         _setQuotaParams(tokenTestSuite.addressOf(TOKEN_USDT), 500, uint96(1_000_000 * WAD));
+
+        poolQuotaKeeper.getTokenQuotaParams(tokenTestSuite.addressOf(TOKEN_LINK));
 
         (address creditAccount,) = _openTestCreditAccount();
 
