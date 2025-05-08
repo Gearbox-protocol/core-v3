@@ -11,6 +11,9 @@ import {IPhantomToken, IPhantomTokenWithdrawer} from "../../../interfaces/base/I
 import {ERC20Mock} from "../token/ERC20Mock.sol";
 
 contract PhantomTokenMock is IPhantomToken, ERC20 {
+    uint256 public constant override version = 3_10;
+    bytes32 public constant override contractType = "PHANTOM_TOKEN::MOCK";
+
     address public immutable target;
     address public immutable depositedToken;
 
