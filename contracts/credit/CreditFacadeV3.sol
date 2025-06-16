@@ -29,7 +29,7 @@ import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
 import {ILossPolicy} from "../interfaces/base/ILossPolicy.sol";
-import {IPhantomToken, IPhantomTokenWithdrawer} from "../interfaces/base/IPhantomToken.sol";
+import {IPhantomToken, IPhantomTokenAdapter} from "../interfaces/base/IPhantomToken.sol";
 import {IPriceFeedStore, PriceUpdate} from "../interfaces/base/IPriceFeedStore.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
@@ -807,7 +807,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             creditAccount: creditAccount,
             target: target,
             adapter: ICreditManagerV3(creditManager).contractToAdapter(target),
-            callData: abi.encodeCall(IPhantomTokenWithdrawer.withdrawPhantomToken, (token, amount)),
+            callData: abi.encodeCall(IPhantomTokenAdapter.withdrawPhantomToken, (token, amount)),
             flags: flags
         }); // U:[FA-36A]
 

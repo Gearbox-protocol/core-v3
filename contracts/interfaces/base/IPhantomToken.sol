@@ -20,8 +20,13 @@ interface IPhantomToken is IVersion, IStateSerializer {
 ///         from its non-transferability, including liquidators or bots that don't have permissions for external calls.
 ///         To mitigate this, phantom token withdrawals from credit accounts automatically start with withdrawal of
 ///         deposited token from the integrated protocol via an adapter call defined by this interface.
+/// @notice The interface also provides a deposit function, to have a generic interface for deposits.
+///         This is useful for external integrations, e.g., when one needs to move an arbitrary phantom token between accounts.
 /// @dev While theoretically possible, we assume that phantom tokens can't be nested
-interface IPhantomTokenWithdrawer {
+interface IPhantomTokenAdapter {
     /// @notice Withdraws phantom token for its deposited token
     function withdrawPhantomToken(address token, uint256 amount) external returns (bool useSafePrices);
+
+    /// @notice Deposits into a phantom token
+    function depositPhantomToken(address token, uint256 amount) external returns (bool useSafePrice);
 }
