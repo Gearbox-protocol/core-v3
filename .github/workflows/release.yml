@@ -19,13 +19,13 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          cache: "yarn"
+          cache: "pnpm"
           node-version-file: ".nvmrc"
 
       # prepare script runs before publish, and it needs husky
       - name: Install dependencies
         run: |
-          yarn install --frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1

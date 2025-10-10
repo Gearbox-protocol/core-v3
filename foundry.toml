@@ -2,11 +2,11 @@
 src = 'contracts'
 libs = ['lib']
 out = 'out'
-solc_version = '0.8.17'
-evm_version = 'london'
+solc_version = '0.8.23'
+evm_version = 'shanghai'
 optimizer_runs = 1000
+bytecode_hash = 'none'
 
-# See more config options https://github.com/gakonst/foundry/tree/master/config
 block_number = 120000 
 block_timestamp = 16400000 
 gas_limit = 9223372036854775807 # the gas limit in tests
