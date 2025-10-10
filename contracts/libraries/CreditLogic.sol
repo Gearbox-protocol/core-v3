@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
-import {SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 import {BitMask} from "./BitMask.sol";
 
@@ -113,23 +113,12 @@ library CreditLogic {
         view
         returns (uint16)
     {
-        uint40 timestampRampEnd = timestampRampStart + rampDuration;
-        if (block.timestamp <= timestampRampStart) {
-            return ltInitial; // U:[CL-5]
-        } else if (block.timestamp < timestampRampEnd) {
-            return _getRampingLiquidationThreshold(ltInitial, ltFinal, timestampRampStart, timestampRampEnd); // U:[CL-5]
-        } else {
-            return ltFinal; // U:[CL-5]
-        }
-    }
+        if (block.timestamp <= timestampRampStart) return ltInitial; // U:[CL-5]
 
-    /// @dev Computes the LT during the ramping process
-    function _getRampingLiquidationThreshold(
-        uint16 ltInitial,
-        uint16 ltFinal,
-        uint40 timestampRampStart,
-        uint40 timestampRampEnd
-    ) internal view returns (uint16) {
+        uint40 timestampRampEnd = timestampRampStart + rampDuration;
+        if (block.timestamp >= timestampRampEnd) return ltFinal; // U:[CL-5]
+
+        // cast is safe since LT is between `ltInitial` and `ltFinal`, both of which are `uint16`
         return uint16(
             (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
                 / (timestampRampEnd - timestampRampStart)

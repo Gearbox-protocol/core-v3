@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
-
-uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
-address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
 ///         - `DECREASE_DEBT` repays debt components (quota interest and fees -> base interest and fees -> debt principal)
-///           and updates all corresponding state varibles (base interest index, quota interest and fees, debt).
+///           and updates all corresponding state variables (base interest index, quota interest and fees, debt).
 ///           When repaying all the debt, ensures that account has no enabled quotas.
 enum ManageDebtAction {
     INCREASE_DEBT,
@@ -74,11 +69,6 @@ struct CollateralTokenData {
     uint24 rampDuration;
 }
 
-struct RevocationPair {
-    address spender;
-    address token;
-}
-
 interface ICreditManagerV3Events {
     /// @notice Emitted when new credit configurator is set
     event SetCreditConfigurator(address indexed newConfigurator);
@@ -93,8 +83,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     function creditFacade() external view returns (address);
 
     function creditConfigurator() external view returns (address);
-
-    function addressProvider() external view returns (address);
 
     function accountFactory() external view returns (address);
 
@@ -117,23 +105,21 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable);
+        returns (uint256 newDebt, uint256, uint256);
 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        returns (uint256 tokensToEnable);
+        returns (uint256);
 
     function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
         external
-        returns (uint256 tokensToDisable);
+        returns (uint256);
 
     function externalCall(address creditAccount, address target, bytes calldata callData)
         external
         returns (bytes memory result);
 
     function approveToken(address creditAccount, address token, address spender, uint256 amount) external;
-
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     // -------- //
     // ADAPTERS //
@@ -163,7 +149,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         uint256[] calldata collateralHints,
         uint16 minHealthFactor,
         bool useSafePrices
-    ) external returns (uint256 enabledTokensMaskAfter);
+    ) external returns (uint256);
 
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
 
@@ -272,10 +258,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
     ) external;
-
-    function setQuotedMask(uint256 quotedTokensMask) external;
-
-    function setMaxEnabledTokens(uint8 maxEnabledTokens) external;
 
     function setContractAllowance(address adapter, address targetContract) external;
 

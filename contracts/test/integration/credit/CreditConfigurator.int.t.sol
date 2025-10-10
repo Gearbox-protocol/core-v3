@@ -3,23 +3,20 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {PriceOracleV3} from "../../../core/PriceOracleV3.sol";
 
-import {
-    CreditConfiguratorV3,
-    CreditManagerOpts,
-    AllowanceAction,
-    IVersion
-} from "../../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
+import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
+import {IPriceOracleV3} from "../../../interfaces/IPriceOracleV3.sol";
 
 //
-import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "../../../libraries/Constants.sol";
 import {AddressList} from "../../lib/AddressList.sol";
 
 // EXCEPTIONS
@@ -30,59 +27,32 @@ import "../../../interfaces/IExceptions.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {LossPolicyMock} from "../../mocks/core/LossPolicyMock.sol";
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
+import {FlagState, PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
+import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
+import {WETHMock} from "../../mocks/token/WETHMock.sol";
+import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
-import {MockCreditConfig, CollateralTokenHuman} from "../../config/MockCreditConfig.sol";
+import {CollateralTokenHuman} from "../../interfaces/ICreditConfig.sol";
 
 import "forge-std/console.sol";
 
 contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorV3Events {
     using AddressList for address[];
 
-    // function setUp() public creditTest {
-    //     _setUp(false, false, false);
-    // }
-
-    // function _setUp(bool withDegenNFT, bool expirable, bool supportQuotas) public creditTest {
-    //     tokenTestSuite = new TokensTestSuite();
-    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
-
-    //     MockCreditConfig creditConfig = new MockCreditConfig(
-    //         tokenTestSuite,
-    //         Tokens.DAI
-    //     );
-
-    //     // cct = new CreditFacadeTestSuite(creditConfig,  withDegenNFT,  expirable,  supportQuotas, 1);
-
-    //     // underlying = cct.underlying();
-    //     // creditManager = cct.creditManager();
-    //     // creditFacade = cct.creditFacade();
-    //     // creditConfigurator = cct.creditConfigurator();
-    //     // withdrawalManager = cct.withdrawalManager();
-
-    //     address(targetMock) = address(new TargetContractMock());
-
-    //     adapterMock = new AdapterMock(address(creditManager), address(targetMock));
-
-    //     // adapterDifferentCM = new AdapterMock(
-    //     //     address(new CreditFacadeTestSuite(creditConfig, withDegenNFT,  expirable,  supportQuotas,1).creditManager()), address(targetMock)
-    //     // );
-
-    //     address(adapterMock) = address(adapterMock);
-    // }
-
     function getAdapterDifferentCM() internal returns (AdapterMock) {
         address CM = makeAddr("Different CM");
 
         vm.mockCall(CM, abi.encodeCall(IAdapter.creditManager, ()), abi.encode(CM));
-        vm.mockCall(CM, abi.encodeCall(ICreditManagerV3.addressProvider, ()), abi.encode((address(addressProvider))));
+        // vm.mockCall(CM, abi.encodeCall(ICreditManagerV3.addressProvider, ()), abi.encode((address(addressProvider))));
 
         address TARGET_CONTRACT = makeAddr("Target Contract");
 
@@ -93,21 +63,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // HELPERS
     //
     function _compareParams(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
-    ) internal {
+    ) internal view {
         (
-            uint16 feeInterest2,
+            ,
             uint16 feeLiquidation2,
             uint16 liquidationDiscount2,
             uint16 feeLiquidationExpired2,
             uint16 liquidationDiscountExpired2
         ) = creditManager.fees();
 
-        assertEq(feeInterest2, feeInterest, "Incorrect feeInterest");
         assertEq(feeLiquidation2, feeLiquidation, "Incorrect feeLiquidation");
         assertEq(liquidationDiscount2, liquidationDiscount, "Incorrect liquidationDiscount");
         assertEq(feeLiquidationExpired2, feeLiquidationExpired, "Incorrect feeLiquidationExpired");
@@ -161,8 +129,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         assertEq(address(creditConfigurator.underlying()), address(creditManager.underlying()), "Incorrect underlying");
 
-        assertEq(address(creditConfigurator.addressProvider()), address(addressProvider), "Incorrect addressProvider");
-
         // CREDIT MANAGER PARAMS
 
         (
@@ -186,8 +152,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
             "Incorrect liquidationDiscountExpired"
         );
-
-        assertEq(address(creditConfigurator.addressProvider()), address(addressProvider), "Incorrect address provider");
 
         CollateralTokenHuman[8] memory collateralTokenOpts = [
             CollateralTokenHuman({token: TOKEN_DAI, lt: DEFAULT_UNDERLYING_LT}),
@@ -234,61 +198,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(expirationDate, 0, "Incorrect expiration date");
     }
 
-    /// @dev I:[CC-1A]: constructor emits all events
-    function test_I_CC_01A_constructor_emits_all_events() public creditTest {
-        CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minDebt: uint128(50 * WAD),
-            maxDebt: uint128(150000 * WAD),
-            degenNFT: address(0),
-            expirable: false,
-            name: "Test Credit Manager"
-        });
-
-        creditManager = new CreditManagerV3(address(addressProvider), address(pool), "Test Credit Manager");
-        creditFacade = new CreditFacadeV3(address(creditManager), creditOpts.degenNFT, creditOpts.expirable);
-
-        address priceOracleAddress = address(creditManager.priceOracle());
-        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
-
-        bytes memory configuratorByteCode = abi.encodePacked(
-            type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, creditOpts)
-        );
-
-        address creditConfiguratorAddr = _getAddress(configuratorByteCode, 0);
-
-        creditManager.setCreditConfigurator(creditConfiguratorAddr);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(underlying, DEFAULT_UNDERLYING_LT);
-
-        vm.expectEmit(false, false, false, false);
-        emit UpdateFees(
-            DEFAULT_FEE_INTEREST,
-            DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
-
-        vm.expectEmit(true, false, false, false);
-        emit SetCreditFacade(address(creditFacade));
-
-        vm.expectEmit(true, false, false, false);
-        emit SetPriceOracle(priceOracleAddress);
-
-        /// todo: change
-        // vm.expectEmit(false, false, false, true);
-        // emit SetMaxDebtPerBlockMultiplier(uint128(150000 * WAD * DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER));
-
-        vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(uint128(50 * WAD), uint128(150000 * WAD));
-
-        _deploy(configuratorByteCode, 0);
-    }
-
     /// @dev I:[CC-2]: configuratorOnly functions revert on non-configurator
     function test_I_CC_02_configuratorOnly_functions_revert_on_non_configurator() public creditTest {
         vm.startPrank(USER);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.makeAllTokensQuoted();
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addCollateralToken(DUMB_ADDRESS, 1);
@@ -297,16 +212,22 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.allowToken(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.allowAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setFees(0, 0, 0, 0, 0);
+        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setPriceOracle(0);
+        creditConfigurator.setFees(0, 0, 0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setPriceOracle(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setCreditFacade(DUMB_ADDRESS, false);
@@ -315,25 +236,16 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotList(0);
+        creditConfigurator.setDebtLimits(0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setMaxEnabledTokens(1);
+        creditConfigurator.setMaxDebtPerBlockMultiplier(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setMaxCumulativeLoss(0);
+        creditConfigurator.setLossPolicy(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.resetCumulativeLoss();
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.addEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.removeEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.makeTokenQuoted(address(0));
+        creditConfigurator.setExpirationDate(0);
 
         vm.stopPrank();
     }
@@ -347,37 +259,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidToken(DUMB_ADDRESS);
     }
 
-    /// @dev I:[CC-2B]: controllerOnly functions revert on non-pausable admin
-    function test_I_CC_02B_controllerOnly_functions_revert_on_non_controller() public creditTest {
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMinDebtLimit(0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMaxDebtLimit(0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMaxDebtPerBlockMultiplier(0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setExpirationDate(0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
-    }
-
     //
     // TOKEN MANAGEMENT
     //
 
-    /// @dev I:[CC-3]: addCollateralToken reverts for zero address or in priceFeed
-    function test_I_CC_03_addCollateralToken_reverts_for_zero_address_or_in_priceFeed() public creditTest {
+    /// @dev I:[CC-3]: addCollateralToken reverts as expected
+    function test_I_CC_03_addCollateralToken_reverts_as_expected() public creditTest {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.addCollateralToken(address(0), 9300);
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditConfigurator.addCollateralToken(underlying, 9300);
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         creditConfigurator.addCollateralToken(DUMB_ADDRESS, 9300);
@@ -390,6 +284,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
         creditConfigurator.addCollateralToken(unknownPricefeedToken, 9300);
 
+        address nonQuotedToken = tokenTestSuite.addressOf(TOKEN_wstETH);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        creditConfigurator.addCollateralToken(nonQuotedToken, 9300);
+
+        address phantomToken = address(new PhantomTokenMock(address(0), address(0), "Test Token", "TEST"));
+        priceOracle.setPriceFeed(phantomToken, address(new PriceFeedMock(1e8, 8)), 1);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditConfigurator.addCollateralToken(phantomToken, 9300);
+
         vm.stopPrank();
     }
 
@@ -398,6 +301,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
         address newToken = tokenTestSuite.addressOf(TOKEN_wstETH);
+        makeTokenQuoted(newToken, 1, uint96(type(int96).max));
 
         vm.expectEmit(true, false, false, false);
         emit AddCollateralToken(newToken);
@@ -689,139 +593,132 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // CREDIT MANAGER MGMT
     //
 
-    /// @dev I:[CC-15]: setMinDebtLimit and setMaxDebtLimit revert if minAmount > maxAmount
-    function test_I_CC_15_setMinDebtLimit_setMaxDebtLimit_revert_if_minAmount_gt_maxAmount() public creditTest {
+    /// @dev I:[CC-15]: setDebtLimits reverts if limits are incorrect
+    function test_I_CC_15_setDebtLimits_reverts_if_limits_are_incorrect() public creditTest {
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
+        // min debt greater than max debt
         vm.expectRevert(IncorrectLimitsException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(maxDebt + 1);
+        creditConfigurator.setDebtLimits(maxDebt, minDebt);
 
+        // ratio max / min greater than safety threshold
         vm.expectRevert(IncorrectLimitsException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(minDebt - 1);
+        creditConfigurator.setDebtLimits(minDebt, minDebt * 50);
+
+        // min debt evaluated at 0 USD
+        uint8 decimals = ERC20(underlying).decimals();
+        if (decimals > 8) {
+            vm.expectRevert(IncorrectLimitsException.selector);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setDebtLimits(uint128(10 ** (decimals - 8) - 1), uint128(10 ** (decimals - 8) + 1));
+        }
     }
 
-    /// @dev I:[CC-16]: setMinDebtLimit and setMaxDebtLimit set limits
-    function test_I_CC_16_setLimits_sets_limits() public creditTest {
+    /// @dev I:[CC-16]: setDebtLimits works as expected
+    function test_I_CC_16_setDebtLimits_works_as_expected() public creditTest {
         (uint128 minDebtOld, uint128 maxDebtOld) = creditFacade.debtLimits();
-        uint128 newminDebt = minDebtOld + 1000;
-        uint128 newmaxDebt = maxDebtOld + 1000;
+        uint128 newMinDebt = minDebtOld + 1000;
+        uint128 newMaxDebt = maxDebtOld + 1000;
 
         vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, maxDebtOld);
+        emit SetBorrowingLimits(newMinDebt, newMaxDebt);
+
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMinDebtLimit(newminDebt);
+        creditConfigurator.setDebtLimits(newMinDebt, newMaxDebt);
+
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-        assertEq(minDebt, newminDebt, "Incorrect minDebt");
-        assertEq(maxDebt, maxDebtOld, "Incorrect maxDebt");
-
-        vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, newmaxDebt);
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtLimit(newmaxDebt);
-        (minDebt, maxDebt) = creditFacade.debtLimits();
-        assertEq(minDebt, newminDebt, "Incorrect minDebt");
-        assertEq(maxDebt, newmaxDebt, "Incorrect maxDebt");
+        assertEq(minDebt, newMinDebt, "Incorrect minDebt");
+        assertEq(maxDebt, newMaxDebt, "Incorrect maxDebt");
     }
 
     /// @dev I:[CC-17]: setFees reverts for incorrect fees
-    function test_I_CC_17_setFees_reverts_for_incorrect_fees() public creditTest {
-        (, uint16 feeLiquidation,, uint16 feeLiquidationExpired,) = creditManager.fees();
-
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(PERCENTAGE_FACTOR, feeLiquidation, 0, 0, 0);
-
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(PERCENTAGE_FACTOR - 1, feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, 0, 0);
-
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(
-            PERCENTAGE_FACTOR - 1,
-            feeLiquidation,
-            PERCENTAGE_FACTOR - feeLiquidation - 1,
-            feeLiquidationExpired,
-            PERCENTAGE_FACTOR - feeLiquidationExpired
-        );
-    }
-
-    /// @dev I:[CC-18]: setFees updates LT for underlying and for all tokens which have LTs larger than new LT
-    function test_I_CC_18_setFees_updates_LT_for_underlying_and_align_LTs_for_other_tokens() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-
-        (uint16 feeInterest,,,,) = creditManager.fees();
-
-        address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
-        address wethToken = tokenTestSuite.addressOf(TOKEN_WETH);
-        creditConfigurator.setLiquidationThreshold(usdcToken, creditManager.liquidationThresholds(underlying));
-
-        uint256 expectedLT = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - 2 * DEFAULT_FEE_LIQUIDATION;
-
-        uint256 wethLTBefore = creditManager.liquidationThresholds(wethToken);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(usdcToken, uint16(expectedLT));
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
-
-        creditConfigurator.setFees(
-            feeInterest,
-            2 * DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
-
-        assertEq(creditManager.liquidationThresholds(underlying), expectedLT, "Incorrect LT for underlying token");
-
-        assertEq(creditManager.liquidationThresholds(usdcToken), expectedLT, "Incorrect USDC for underlying token");
-
-        assertEq(creditManager.liquidationThresholds(wethToken), wethLTBefore, "Incorrect WETH for underlying token");
-    }
-
-    /// @dev I:[CC-19]: setFees sets fees and doesn't change others
-    function test_I_CC_19_setFees_sets_fees_and_doesnt_change_others() public creditTest {
+    function test_I_CC_17_setFees_reverts_for_incorrect_fees() public allExpirableCases creditTest {
         (
-            uint16 feeInterest,
+            ,
             uint16 feeLiquidation,
             uint16 liquidationDiscount,
             uint16 feeLiquidationExpired,
             uint16 liquidationDiscountExpired
         ) = creditManager.fees();
 
-        uint16 newFeeInterest = (feeInterest * 3) / 2;
-        uint16 newFeeLiquidation = feeLiquidation * 2;
-        uint16 newLiquidationPremium = (PERCENTAGE_FACTOR - liquidationDiscount) * 2;
-        uint16 newFeeLiquidationExpired = feeLiquidationExpired * 2;
-        uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 2;
+        uint16 liquidationPremium = PERCENTAGE_FACTOR - liquidationDiscount;
+        uint16 liquidationPremiumExpired = PERCENTAGE_FACTOR - liquidationDiscountExpired;
+
+        // fee > premium
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(liquidationPremium, feeLiquidation, feeLiquidationExpired, liquidationPremiumExpired);
+
+        // fee (expired) > premium (expired)
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, liquidationPremiumExpired, feeLiquidationExpired);
+
+        // premium (expired) > premium
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, feeLiquidationExpired, liquidationPremium + 1);
+
+        // fee (expired) > fee
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(feeLiquidation, liquidationPremium, feeLiquidation + 1, liquidationPremiumExpired);
+
+        // fee + premium >= 100%
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(
+            feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, feeLiquidation, liquidationPremiumExpired
+        );
+
+        // fee + premium changes
+        vm.expectRevert(InconsistentLiquidationFeesException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(
+            feeLiquidation, liquidationPremium + 1, feeLiquidationExpired, liquidationPremiumExpired
+        );
+
+        if (!expirable) return;
+
+        assertEq(creditFacade.expirationDate(), block.timestamp + 3 weeks, "Incorrect setup");
+        vm.warp(block.timestamp + 2 weeks);
+
+        // fee (expired) + premium (expired) changes less than 2 weeks before expiration
+        vm.expectRevert(InconsistentExpiredLiquidationFeesException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setFees(
+            feeLiquidation, liquidationPremium, feeLiquidationExpired, liquidationPremiumExpired + 1
+        );
+    }
+
+    /// @dev I:[CC-19]: setFees sets fees and doesn't change others
+    function test_I_CC_19_setFees_sets_fees_and_doesnt_change_others() public creditTest {
+        (
+            ,
+            uint16 feeLiquidation,
+            uint16 liquidationDiscount,
+            uint16 feeLiquidationExpired,
+            uint16 liquidationDiscountExpired
+        ) = creditManager.fees();
+
+        uint16 newFeeLiquidation = feeLiquidation - 50;
+        uint16 newLiquidationPremium = PERCENTAGE_FACTOR - liquidationDiscount + 50;
+        uint16 newFeeLiquidationExpired = feeLiquidationExpired - 50;
+        uint16 newLiquidationPremiumExpired = PERCENTAGE_FACTOR - liquidationDiscountExpired + 50;
 
         vm.expectEmit(false, false, false, true);
         emit UpdateFees(
-            newFeeInterest,
-            newFeeLiquidation,
-            newLiquidationPremium,
-            newFeeLiquidationExpired,
-            newLiquidationPremiumExpired
+            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
         );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            newFeeInterest,
-            newFeeLiquidation,
-            newLiquidationPremium,
-            newFeeLiquidationExpired,
-            newLiquidationPremiumExpired
+            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
         );
 
         _compareParams(
-            newFeeInterest,
             newFeeLiquidation,
             PERCENTAGE_FACTOR - newLiquidationPremium,
             newFeeLiquidationExpired,
@@ -862,17 +759,35 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-21]: setPriceOracle upgrades priceOracle correctly
     function test_I_CC_21_setPriceOracle_upgrades_priceOracle_correctly() public creditTest {
-        vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(1));
-
+        PriceOracleV3 newPriceOracle = new PriceOracleV3(address(acl));
         vm.startPrank(CONFIGURATOR);
-        addressProvider.setAddress(AP_PRICE_ORACLE, DUMB_ADDRESS, true);
 
-        vm.expectEmit(true, false, false, false);
-        emit SetPriceOracle(DUMB_ADDRESS);
+        // minDebt evaluates at 0
+        PriceFeedMock priceFeed = new PriceFeedMock(0, 8);
+        priceFeed.setSkipPriceCheck(FlagState.TRUE);
+        newPriceOracle.setPriceFeed(underlying, address(priceFeed), 0);
 
-        creditConfigurator.setPriceOracle(1);
+        vm.expectRevert(IncorrectPriceException.selector);
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
 
-        assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
+        // missing feeds for collateral tokens
+        newPriceOracle.setPriceFeed(underlying, priceOracle.priceFeeds(underlying), 1);
+
+        vm.expectRevert(IncorrectPriceException.selector);
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
+
+        uint256 num = creditManager.collateralTokensCount();
+        for (uint256 i = 1; i < num; ++i) {
+            address token = creditManager.getTokenByMask(1 << i);
+            newPriceOracle.setPriceFeed(token, priceOracle.priceFeeds(token), 1);
+        }
+
+        vm.expectEmit(true, true, true, true);
+        emit SetPriceOracle(address(newPriceOracle));
+
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
+
+        assertEq(address(creditManager.priceOracle()), address(newPriceOracle));
         vm.stopPrank();
     }
 
@@ -888,36 +803,48 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             if (expirable) {
-                CreditFacadeV3 initialCf = new CreditFacadeV3(address(creditManager), address(0), true);
+                CreditFacadeV3 initialCf = new CreditFacadeV3(
+                    address(acl),
+                    address(creditManager),
+                    address(lossPolicy),
+                    address(botList),
+                    address(0),
+                    address(0),
+                    true
+                );
 
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
 
                 vm.prank(CONFIGURATOR);
-                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1 + ms));
+                creditConfigurator.setExpirationDate(uint40(block.timestamp + 4 weeks + ms));
 
                 creditFacade = initialCf;
             }
 
             vm.prank(CONFIGURATOR);
-            creditConfigurator.setMaxCumulativeLoss(1e18);
+            creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
 
-            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), expirable);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                expirable
+            );
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
             uint40 expirationDate = creditFacade.expirationDate();
             (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
-            (, uint128 maxCumulativeLoss) = creditFacade.lossParams();
-
             vm.expectEmit(true, false, false, false);
             emit SetCreditFacade(address(cf));
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
-
-            assertEq(address(creditManager.priceOracle()), addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
             assertEq(address(creditManager.creditFacade()), address(cf));
             assertEq(address(creditConfigurator.creditFacade()), address(cf));
@@ -928,53 +855,43 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             (uint128 minDebt2, uint128 maxDebt2) = cf.debtLimits();
 
-            (, uint128 maxCumulativeLoss2) = cf.lossParams();
-
             assertEq(
-                maxDebtPerBlockMultiplier2, migrateSettings ? maxDebtPerBlockMultiplier : 0, "Incorrwect limitPerBlock"
+                maxDebtPerBlockMultiplier2,
+                migrateSettings ? maxDebtPerBlockMultiplier : DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+                "Incorrwect limitPerBlock"
             );
             assertEq(minDebt2, migrateSettings ? minDebt : 0, "Incorrwect minDebt");
             assertEq(maxDebt2, migrateSettings ? maxDebt : 0, "Incorrwect maxDebt");
 
             assertEq(expirationDate2, migrateSettings ? expirationDate : 0, "Incorrect expirationDate");
 
-            assertEq(maxCumulativeLoss2, migrateSettings ? maxCumulativeLoss : 0, "Incorrect maxCumulativeLoss");
-
             vm.revertTo(snapshot);
         }
     }
 
-    /// @dev I:[CC-22A]: setCreditFacade migrates bot list
-    function test_I_CC_22A_botList_is_transferred_on_CreditFacade_upgrade() public creditTest {
-        for (uint256 ms = 0; ms < 2; ms++) {
-            uint256 snapshot = vm.snapshot();
+    /// @dev I:[CC-22B]: setCreditFacade reverts if new facade is adapter or target contract
+    function test_I_CC_22B_setCreditFacade_reverts_if_new_facade_is_adapter() public creditTest {
+        vm.startPrank(CONFIGURATOR);
 
-            bool migrateSettings = ms != 0;
+        CreditFacadeV3 cf = new CreditFacadeV3(
+            address(acl), address(creditManager), address(lossPolicy), address(botList), address(0), address(0), false
+        );
+        AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
+        TargetContractMock target = new TargetContractMock();
 
-            vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(301));
+        vm.mockCall(address(cf), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(target)));
+        creditConfigurator.allowAdapter(address(cf));
 
-            vm.startPrank(CONFIGURATOR);
-            addressProvider.setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
-            creditConfigurator.setBotList(301);
-            vm.stopPrank();
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditConfigurator.setCreditFacade(address(cf), false);
 
-            address botList = creditFacade.botList();
+        creditConfigurator.forbidAdapter(address(cf));
+        creditConfigurator.allowAdapter(address(adapter));
 
-            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), false);
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditConfigurator.setCreditFacade(address(cf), false);
 
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setCreditFacade(address(cf), migrateSettings);
-
-            address botList2 = cf.botList();
-
-            assertEq(
-                botList2,
-                migrateSettings ? botList : addressProvider.getAddressOrRevert(AP_BOT_LIST, 300),
-                "Bot list was not transferred"
-            );
-
-            vm.revertTo(snapshot);
-        }
+        vm.stopPrank();
     }
 
     /// @dev I:[CC-22C]: setCreditFacade correctly migrates array parameters
@@ -985,10 +902,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             vm.startPrank(CONFIGURATOR);
-
-            creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-            creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
-
             address crvToken = tokenTestSuite.addressOf(TOKEN_CRV);
             uint256 crvMask = creditManager.getTokenMaskOrRevert(crvToken);
             address cvxToken = tokenTestSuite.addressOf(TOKEN_CVX);
@@ -999,7 +912,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             vm.stopPrank();
 
-            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), false);
+            CreditFacadeV3 cf = new CreditFacadeV3(
+                address(acl),
+                address(creditManager),
+                address(lossPolicy),
+                address(botList),
+                address(0),
+                address(0),
+                false
+            );
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
@@ -1008,23 +929,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
                 cf.forbiddenTokenMask(), migrateSettings ? crvMask | cvxMask : 0, "Incorrect forbidden mask migration"
             );
 
-            assertEq(
-                cf.canLiquidateWhilePaused(DUMB_ADDRESS),
-                migrateSettings,
-                "Emergency liquidator 1 was not migrated correctly"
-            );
-
-            assertEq(
-                cf.canLiquidateWhilePaused(DUMB_ADDRESS2),
-                migrateSettings,
-                "Emergency liquidator 2 was not migrated correctly"
-            );
-
             if (!migrateSettings) {
-                address[] memory el = creditConfigurator.emergencyLiquidators();
-
-                assertEq(el.length, 0, "Emergency liquidator array was not deleted");
-
                 assertEq(cf.forbiddenTokenMask(), 0, "Incorrect forbidden token mask");
             }
 
@@ -1033,14 +938,33 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-23]: uupgradeCreditConfigurator upgrades creditConfigurator
-    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public withAdapterMock creditTest {
-        vm.expectEmit(true, false, false, false);
-        emit CreditConfiguratorUpgraded(address(adapterMock));
+    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public creditTest {
+        TargetContractMock target1 = new TargetContractMock();
+        TargetContractMock target2 = new TargetContractMock();
+        AdapterMock adapter1 = new AdapterMock(address(creditManager), address(target1));
+        AdapterMock adapter2 = new AdapterMock(address(creditManager), address(target2));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.upgradeCreditConfigurator(address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapter1));
 
-        assertEq(address(creditManager.creditConfigurator()), address(adapterMock));
+        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(creditManager));
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.allowAdapter(address(adapter2));
+
+        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(creditManager));
+
+        vm.expectRevert(IncorrectAdaptersSetException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.upgradeCreditConfigurator(address(cc1));
+
+        vm.expectEmit(true, true, true, true);
+        emit CreditConfiguratorUpgraded(address(cc2));
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.upgradeCreditConfigurator(address(cc2));
+
+        assertEq(address(creditManager.creditConfigurator()), address(cc2));
     }
 
     /// @dev I:[CC-24]: setMaxDebtPerBlockMultiplier and forbidBorrowing work correctly
@@ -1065,148 +989,71 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-25]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
     function test_I_CC_25_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets()
         public
-        expirableCase
+        allExpirableCases
         creditTest
     {
+        if (!expirable) {
+            vm.expectRevert(NotAllowedWhenNotExpirableException.selector);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setExpirationDate(uint40(block.timestamp + 2 weeks));
+            return;
+        }
+
+        vm.expectRevert(IncorrectExpirationDateException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setExpirationDate(uint40(block.timestamp - 1));
+
         uint40 expirationDate = creditFacade.expirationDate();
-
-        vm.prank(CONFIGURATOR);
         vm.expectRevert(IncorrectExpirationDateException.selector);
-        creditConfigurator.setExpirationDate(expirationDate);
-
-        vm.warp(block.timestamp + 10);
-
         vm.prank(CONFIGURATOR);
-        vm.expectRevert(IncorrectExpirationDateException.selector);
-        creditConfigurator.setExpirationDate(expirationDate + 1);
+        creditConfigurator.setExpirationDate(expirationDate - 1);
+
+        vm.warp(block.timestamp + 2 weeks);
 
         uint40 newExpirationDate = uint40(block.timestamp + 1);
+        uint40 expectedExpirationDate = uint40(block.timestamp + 2 weeks);
 
         vm.expectEmit(false, false, false, true);
-        emit SetExpirationDate(newExpirationDate);
+        emit SetExpirationDate(expectedExpirationDate);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setExpirationDate(newExpirationDate);
 
-        expirationDate = creditFacade.expirationDate();
-
-        assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
+        assertEq(creditFacade.expirationDate(), expectedExpirationDate, "Incorrect new expirationDate");
     }
 
-    /// @dev I:[CC-26]: setMaxEnabledTokens works correctly and emits event
-    function test_I_CC_26_setMaxEnabledTokens_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit SetMaxEnabledTokens(255);
+    /// @dev I:[CC-26]: setLossPolicy works correctly
+    function test_I_CC_26_setLossPolicy_works_correctly() public creditTest {
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setLossPolicy(address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, address(0xdead)));
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setLossPolicy(address(0xdead));
+
+        address lossPolicy = address(new LossPolicyMock());
+
+        vm.expectEmit(true, true, true, true);
+        emit SetLossPolicy(lossPolicy);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxEnabledTokens(255);
+        creditConfigurator.setLossPolicy(lossPolicy);
 
-        assertEq(creditManager.maxEnabledTokens(), 255, "Credit manager max enabled tokens incorrect");
-
-        vm.expectRevert(IncorrectParameterException.selector);
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxEnabledTokens(0);
-    }
-
-    /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
-    function test_I_CC_27_addEmergencyLiquidator_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit AddEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(
-            creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
-        );
-
-        address[] memory el = creditConfigurator.emergencyLiquidators();
-
-        assertEq(el.length, 1, "Emergency liquidator was not added to array");
-
-        assertEq(el[0], DUMB_ADDRESS, "Emergency liquidator address is incorrect");
-    }
-
-    /// @dev I:[CC-28]: removeEmergencyLiquidator works correctly and emits event
-    function test_I_CC_28_removeEmergencyLiquidator_works_correctly() public creditTest {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.expectEmit(false, false, false, true);
-        emit RemoveEmergencyLiquidator(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(
-            !creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
-        );
-
-        address[] memory el = creditConfigurator.emergencyLiquidators();
-
-        assertEq(el.length, 0, "Emergency liquidator was not removed from array");
+        assertEq(creditFacade.lossPolicy(), lossPolicy, "Loss policy not set");
     }
 
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC
     function test_I_CC_29_arrays_are_migrated_correctly_for_new_CC() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
-        vm.stopPrank();
 
-        CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minDebt: uint128(50 * WAD),
-            maxDebt: uint128(150000 * WAD),
-            degenNFT: address(0),
-            expirable: false,
-            name: "Test Credit Manager"
-        });
+        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(creditManager));
 
-        CreditConfiguratorV3 newCC = new CreditConfiguratorV3(creditManager, creditFacade, creditOpts);
+        address[] memory newAllowedAdapters = newConfigurator.allowedAdapters();
 
-        assertEq(
-            creditConfigurator.allowedAdapters().length,
-            newCC.allowedAdapters().length,
-            "Incorrect new allowed contracts array"
-        );
-
-        assertEq(
-            creditConfigurator.emergencyLiquidators().length,
-            newCC.emergencyLiquidators().length,
-            "Incorrect new emergency liquidators array"
-        );
-
-        uint256 len = newCC.allowedAdapters().length;
-
-        for (uint256 i = 0; i < len;) {
-            assertEq(
-                creditConfigurator.allowedAdapters()[i],
-                newCC.allowedAdapters()[i],
-                "Allowed contracts migrated incorrectly"
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        len = newCC.emergencyLiquidators().length;
-
-        for (uint256 i = 0; i < len;) {
-            assertEq(
-                creditConfigurator.emergencyLiquidators()[i],
-                newCC.emergencyLiquidators()[i],
-                "Emergency liquidators migrated incorrectly"
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
+        assertEq(newAllowedAdapters.length, 1, "Incorrect new allowedAdapters array length");
+        assertEq(newAllowedAdapters[0], address(adapterMock), "Incorrect new allowedAdapters array");
     }
 
     /// @dev I:[CC-30] rampLiquidationThreshold works correctly
@@ -1216,86 +1063,68 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(TokenNotAllowedException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 2 days);
 
         vm.expectRevert(IncorrectLiquidationThresholdException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 2 days);
+
+        vm.expectRevert(RampDurationTooShortException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp), 1 days);
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, type(uint40).max - 1 days, 2 days);
 
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp + 1), 1000)
+                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp + 1), 2 days)
             )
         );
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(
-            usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1001)
+            usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1 + 2 days)
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 1), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 1), 2 days);
 
-        vm.warp(block.timestamp + 1006);
+        vm.warp(block.timestamp + 2 days + 6);
 
         vm.expectCall(
             address(creditManager),
-            abi.encodeCall(CreditManagerV3.setCollateralTokenData, (usdc, 8900, 9000, uint40(block.timestamp), 1000))
+            abi.encodeCall(CreditManagerV3.setCollateralTokenData, (usdc, 8900, 9000, uint40(block.timestamp), 2 days))
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 2 days);
     }
 
-    /// @dev I:[CC-31] setMaxCumulativeLoss works correctly
-    function test_I_CC_31_setMaxCumulativeLoss_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit SetMaxCumulativeLoss(100);
+    function test_I_CC_31_addCollateralToken_works_with_state_changing_fallback() public creditTest {
+        PriceFeedMock pf = new PriceFeedMock(10 ** 8, 8);
+        WETHMock token = new WETHMock();
 
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxCumulativeLoss(100);
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 snapshot = vm.snapshot();
 
-        (, uint128 maxCumulativeLoss) = creditFacade.lossParams();
+            token.setDepositOnFallback(i == 0);
 
-        assertEq(maxCumulativeLoss, 100, "Max cumulative loss set incorrectly");
-    }
+            vm.prank(CONFIGURATOR);
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(token), address(pf), 1 hours);
 
-    /// @dev I:[CC-32] resetCumulativeLoss works correctly
-    function test_I_CC_32_resetCumulativeLoss_works_correctly() public creditTest {
-        CreditFacadeV3Harness cf = new CreditFacadeV3Harness(address(creditManager), address(0), false);
+            makeTokenQuoted(address(token), 1, uint96(type(int96).max));
 
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setCreditFacade(address(cf), true);
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.addCollateralToken{gas: 100_000}(address(token), 8800);
 
-        cf.setCumulativeLoss(1000);
+            assertTrue(creditManager.getTokenMaskOrRevert(address(token)) > 0, "Token wasn't added");
 
-        vm.expectEmit(false, false, false, false);
-        emit ResetCumulativeLoss();
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.resetCumulativeLoss();
-
-        (uint256 loss,) = cf.lossParams();
-
-        assertEq(loss, 0, "Cumulative loss was not reset");
-    }
-
-    /// @dev I:[CC-33]: setBotList upgrades the bot list correctly
-    function test_I_CC_33_setBotList_upgrades_priceOracle_correctly() public creditTest {
-        vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(301));
-
-        vm.startPrank(CONFIGURATOR);
-        addressProvider.setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
-
-        vm.expectEmit(true, false, false, false);
-        emit SetBotList(DUMB_ADDRESS);
-
-        creditConfigurator.setBotList(301);
-
-        assertEq(creditFacade.botList(), DUMB_ADDRESS);
-        vm.stopPrank();
+            vm.revertTo(snapshot);
+        }
     }
 }

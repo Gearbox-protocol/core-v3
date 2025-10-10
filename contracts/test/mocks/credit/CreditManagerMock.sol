@@ -3,22 +3,25 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {
     ICreditManagerV3,
     CollateralDebtData,
     CollateralCalcTask,
-    ManageDebtAction,
-    RevocationPair
+    ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import "../../../interfaces/IExceptions.sol";
 
+import "../../../libraries/Constants.sol";
 import "../../lib/constants.sol";
 
 contract CreditManagerMock {
+    using SafeERC20 for IERC20;
+
     /// @dev Factory contract for Credit Accounts
     address public addressProvider;
 
@@ -28,9 +31,6 @@ contract CreditManagerMock {
     /// @dev Address of the connected pool
     address public poolService;
     address public pool;
-
-    /// @dev Address of withdrawal manager
-    address public withdrawalManager;
 
     mapping(address => uint256) public tokenMasksMap;
     mapping(uint256 => address) public getTokenByMask;
@@ -44,11 +44,9 @@ contract CreditManagerMock {
     CollateralDebtData return_collateralDebtData;
 
     CollateralDebtData _liquidateCollateralDebtData;
-    bool _liquidateIsExpired;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
-    uint256 cw_return_tokensToEnable;
 
     address activeCreditAccount;
     bool revertOnSetActiveAccount;
@@ -67,10 +65,6 @@ contract CreditManagerMock {
     uint256 return_loss;
 
     uint256 return_newDebt;
-    uint256 md_return_tokensToEnable;
-    uint256 md_return_tokensToDisable;
-
-    uint256 ad_tokenMask;
 
     int96 qu_change;
     uint256 qu_tokensToEnable;
@@ -78,10 +72,13 @@ contract CreditManagerMock {
 
     uint256 sw_tokensToDisable;
 
+    bool _transfersActivated;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
+        underlying = IPoolV3(_pool).underlyingToken();
     }
 
     function setPriceOracle(address _priceOracle) external {
@@ -155,12 +152,11 @@ contract CreditManagerMock {
 
     function closeCreditAccount(address) external {}
 
-    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, bool isExpired)
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, bool)
         external
         returns (uint256 remainingFunds, uint256 loss)
     {
         _liquidateCollateralDebtData = collateralDebtData;
-        _liquidateIsExpired = isExpired;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
@@ -181,6 +177,11 @@ contract CreditManagerMock {
         activeCreditAccount = creditAccount;
     }
 
+    function getActiveCreditAccountOrRevert() external view returns (address) {
+        if (revertOnSetActiveAccount) revert ActiveCreditAccountNotSetException();
+        return activeCreditAccount;
+    }
+
     function setQuotedTokensMask(uint256 _quotedTokensMask) external {
         quotedTokensMask = _quotedTokensMask;
     }
@@ -195,10 +196,6 @@ contract CreditManagerMock {
 
     function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
         return _liquidateCollateralDebtData;
-    }
-
-    function liquidateIsExpired() external view returns (bool) {
-        return _liquidateIsExpired;
     }
 
     function enabledTokensMaskOf(address) external view returns (uint256) {
@@ -247,37 +244,49 @@ contract CreditManagerMock {
         flags &= ~flag; // U:[CM-36]
     }
 
-    function setAddCollateral(uint256 tokenMask) external {
-        ad_tokenMask = tokenMask;
-    }
-
-    function addCollateral(address, address, address, uint256) external view returns (uint256 tokenMask) {
-        tokenMask = ad_tokenMask;
-    }
-
-    function setManageDebt(uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) external {
+    function setManageDebt(uint256 newDebt) external {
         return_newDebt = newDebt;
-        md_return_tokensToEnable = tokensToEnable;
-        md_return_tokensToDisable = tokensToDisable;
     }
 
     function manageDebt(address, uint256, uint256, ManageDebtAction)
         external
         view
-        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256, uint256, uint256)
     {
-        newDebt = return_newDebt;
-        tokensToEnable = md_return_tokensToEnable;
-        tokensToDisable = md_return_tokensToDisable;
+        return (return_newDebt, 0, 0);
     }
 
-    function setWithdrawCollateral(uint256 tokensToDisable) external {
-        sw_tokensToDisable = tokensToDisable;
+    function activateTransfers() external {
+        _transfersActivated = true;
     }
 
-    function withdrawCollateral(address, address, uint256, address) external view returns (uint256 tokensToDisable) {
-        tokensToDisable = sw_tokensToDisable;
+    function deactivateTransfers() external {
+        _transfersActivated = false;
     }
 
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external {}
+    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256)
+    {
+        if (_transfersActivated) IERC20(token).safeTransferFrom(payer, creditAccount, amount);
+        return 0;
+    }
+
+    function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
+        external
+        returns (uint256)
+    {
+        if (_transfersActivated) IERC20(token).safeTransferFrom(creditAccount, to, amount);
+        return 0;
+    }
+
+    function fees() external pure returns (uint16, uint16, uint16, uint16, uint16) {
+        return (
+            DEFAULT_FEE_INTEREST,
+            DEFAULT_FEE_LIQUIDATION,
+            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+        );
+    }
 }

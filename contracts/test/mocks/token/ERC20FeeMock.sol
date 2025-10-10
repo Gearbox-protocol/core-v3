@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 contract ERC20FeeMock is ERC20Mock {
     uint256 public basisPointsRate;

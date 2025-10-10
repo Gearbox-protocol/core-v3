@@ -3,11 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {ICreditFacadeV3Multicall} from "../../../interfaces/ICreditFacadeV3.sol";
+import {ICreditFacadeV3Multicall, MultiCall} from "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
-
-// DATA
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -20,17 +17,6 @@ import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 contract CreditFacadeGasTest is IntegrationTestHelper {
-    function _zeroAllLTs() internal {
-        uint256 collateralTokensCount = creditManager.collateralTokensCount();
-
-        for (uint256 i = 0; i < collateralTokensCount; ++i) {
-            (address token,) = creditManager.collateralTokenByMask(1 << i);
-
-            vm.prank(address(creditConfigurator));
-            creditManager.setCollateralTokenData(token, 0, 0, type(uint40).max, 0);
-        }
-    }
-
     ///
     ///
     ///  TESTS
@@ -80,13 +66,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_USDC), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -117,20 +97,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_USDC), "", false)
-                )
-            }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_USDC), tokenTestSuite.addressOf(TOKEN_LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -148,23 +116,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-5]: openCreditAccount with adding quoted collateral and updating quota
     function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_LINK));
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_USDC), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_USDC), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_USDC));
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_WETH), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_WETH), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_WETH));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-
-        vm.stopPrank();
 
         tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
@@ -216,13 +170,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-6]: openCreditAccount with swapping and updating quota
     function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_LINK), type(uint96).max);
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_LINK));
-        vm.stopPrank();
 
         tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
@@ -245,13 +195,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -349,14 +293,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-9]: multicall with decreaseDebt and active quota interest
     function test_G_FA_09_decreaseDebt_gas_estimate_2() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_LINK));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
@@ -412,86 +351,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         emit log_uint(gasSpent);
     }
 
-    /// @dev G:[FA-10]: multicall with enableToken
-    function test_G_FA_10_enableToken_gas_estimate_1() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
-                )
-            })
-        );
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(TOKEN_LINK)))
-            })
-        );
-
-        uint256 gasBefore = gasleft();
-
-        vm.prank(USER);
-        creditFacade.multicall(creditAccount, calls);
-
-        uint256 gasSpent = gasBefore - gasleft();
-
-        emit log_string(string(abi.encodePacked("Gas spent - multicall with enableToken: ")));
-        emit log_uint(gasSpent);
-    }
-
-    /// @dev G:[FA-11]: multicall with disableToken
-    function test_G_FA_11_disableToken_gas_estimate_1() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
-                )
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(TOKEN_LINK)))
-            })
-        );
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (tokenTestSuite.addressOf(TOKEN_LINK)))
-            })
-        );
-
-        uint256 gasBefore = gasleft();
-
-        vm.prank(USER);
-        creditFacade.multicall(creditAccount, calls);
-
-        uint256 gasSpent = gasBefore - gasleft();
-
-        emit log_string(string(abi.encodePacked("Gas spent - multicall with disableToken: ")));
-        emit log_uint(gasSpent);
-    }
-
     /// @dev G:[FA-12]: multicall with a single swap
     function test_G_FA_12_multicall_gas_estimate_1() public withAdapterMock creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
@@ -513,13 +372,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -554,20 +407,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_LINK), "", false)
-                )
-            }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_LINK), tokenTestSuite.addressOf(TOKEN_USDC), "", true)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -583,14 +424,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-13]: multicall with a single swap into quoted token
     function test_G_FA_13_multicall_gas_estimate_2() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_LINK));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
@@ -614,13 +450,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         tokenTestSuite.mint(TOKEN_LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_DAI), tokenTestSuite.addressOf(TOKEN_LINK), "", true)
-                )
-            }),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
@@ -818,23 +648,11 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
         vm.roll(block.number + 1);
 
-        address linkToken = tokenTestSuite.addressOf(TOKEN_LINK);
-
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(TOKEN_LINK), tokenTestSuite.addressOf(TOKEN_DAI), "", true)
-                )
-            }),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (type(uint256).max))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (linkToken, type(uint256).max, USER))
             }),
             MultiCall({
                 target: address(creditFacade),
@@ -854,153 +672,194 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
     }
 
     /// @dev G:[FA-18]: liquidateCreditAccount with underlying only
-    function test_G_FA_18_liquidateCreditAccount_gas_estimate_1() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+    function test_G_FA_18_liquidateCreditAccount_gas_esimate_1() public creditTest {
+        uint256 debtAmount = DAI_ACCOUNT_AMOUNT;
+        uint256 collateralAmount =
+            debtAmount * PERCENTAGE_FACTOR / creditManager.liquidationThresholds(underlying) - debtAmount + 0.01e18;
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
+        tokenTestSuite.mint(underlying, USER, collateralAmount);
+        tokenTestSuite.approve(underlying, USER, address(creditManager), collateralAmount);
+
+        MultiCall[] memory openCalls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debtAmount))
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, collateralAmount))
             })
         );
 
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
+        address creditAccount = creditFacade.openCreditAccount(USER, openCalls, 0);
         vm.roll(block.number + 1);
-
-        _zeroAllLTs();
+        vm.warp(block.timestamp + 30 days);
 
         uint256 gasBefore = gasleft();
-
-        vm.prank(FRIEND);
+        vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
-
         uint256 gasSpent = gasBefore - gasleft();
 
         emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying only: ")));
         emit log_uint(gasSpent);
     }
 
-    /// @dev G:[FA-19]: liquidateCreditAccount with two tokens
+    /// @dev G:[FA-19]: liquidateCreditAccount with one collateral token
     function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
+        gauge.updateEpoch();
 
-        tokenTestSuite.mint(TOKEN_DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-        tokenTestSuite.approve(TOKEN_DAI, FRIEND, address(creditManager));
+        uint256 debtAmount = DAI_ACCOUNT_AMOUNT;
+        uint256 bufferedDebtAmount = 11 * debtAmount / 10;
+        uint256 collateralAmount = priceOracle.convert(bufferedDebtAmount, weth, underlying) * PERCENTAGE_FACTOR
+            / creditManager.liquidationThresholds(weth);
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
+        tokenTestSuite.mint(weth, USER, collateralAmount);
+        tokenTestSuite.approve(weth, USER, address(creditManager), collateralAmount);
+
+        MultiCall[] memory openCalls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debtAmount))
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (underlying, debtAmount, FRIEND))
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, collateralAmount))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (weth, int96(uint96(bufferedDebtAmount)), 0))
             })
         );
 
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
+        address creditAccount = creditFacade.openCreditAccount(USER, openCalls, 0);
         vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 30 days);
 
-        _zeroAllLTs();
+        _makeAccountsLiquidatable();
+
+        (,, uint16 discount,,) = creditManager.fees();
+        uint256 repaidAmount = priceOracle.convert(collateralAmount, weth, underlying) * discount / PERCENTAGE_FACTOR;
+
+        tokenTestSuite.mint(underlying, LIQUIDATOR, repaidAmount);
+        tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager), repaidAmount);
+
+        MultiCall[] memory liquidateCalls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (weth, collateralAmount, FRIEND))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, repaidAmount))
+            })
+        );
 
         uint256 gasBefore = gasleft();
-
-        vm.prank(FRIEND);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
-
+        vm.prank(LIQUIDATOR);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, liquidateCalls);
         uint256 gasSpent = gasBefore - gasleft();
 
-        emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with 2 tokens: ")));
+        emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with one collateral token: ")));
         emit log_uint(gasSpent);
     }
 
-    /// @dev G:[FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
-    function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(TOKEN_LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(TOKEN_LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(TOKEN_LINK));
-
+    /// @dev G:[FA-20]: liquidateCreditAccount with two collateral tokens
+    function test_G_FA_20_liquidateCreditAccount_gas_esimate_2() public creditTest {
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
-        tokenTestSuite.mint(TOKEN_LINK, USER, LINK_ACCOUNT_AMOUNT);
-        tokenTestSuite.approve(TOKEN_LINK, USER, address(creditManager));
+        address link = tokenTestSuite.addressOf(TOKEN_LINK);
 
-        tokenTestSuite.mint(TOKEN_DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-        tokenTestSuite.approve(TOKEN_DAI, FRIEND, address(creditManager));
+        uint256 debtAmount = DAI_ACCOUNT_AMOUNT;
+        uint256 bufferedDebtAmount = 11 * debtAmount / 10;
+        uint256 wethCollateralAmount = priceOracle.convert(bufferedDebtAmount / 2, weth, underlying) * PERCENTAGE_FACTOR
+            / creditManager.liquidationThresholds(weth);
+        uint256 linkCollateralAmount = priceOracle.convert(bufferedDebtAmount / 2, link, underlying) * PERCENTAGE_FACTOR
+            / creditManager.liquidationThresholds(link);
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
+        tokenTestSuite.mint(weth, USER, wethCollateralAmount);
+        tokenTestSuite.approve(weth, USER, address(creditManager), wethCollateralAmount);
+
+        tokenTestSuite.mint(link, USER, linkCollateralAmount);
+        tokenTestSuite.approve(link, USER, address(creditManager), linkCollateralAmount);
+
+        MultiCall[] memory openCalls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debtAmount))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (underlying, debtAmount, FRIEND))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, wethCollateralAmount))
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(TOKEN_LINK), LINK_ACCOUNT_AMOUNT)
+                    ICreditFacadeV3Multicall.updateQuota, (weth, int96(uint96(bufferedDebtAmount / 2)), 0)
                 )
             }),
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (link, linkCollateralAmount))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(TOKEN_LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
+                    ICreditFacadeV3Multicall.updateQuota, (link, int96(uint96(bufferedDebtAmount / 2)), 0)
                 )
             })
         );
 
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        _zeroAllLTs();
-
+        address creditAccount = creditFacade.openCreditAccount(USER, openCalls, 0);
         vm.roll(block.number + 1);
-
         vm.warp(block.timestamp + 30 days);
 
-        uint256 gasBefore = gasleft();
+        _makeAccountsLiquidatable();
 
-        vm.startPrank(FRIEND);
-        creditFacade.liquidateCreditAccount(
-            creditAccount,
-            FRIEND,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT * 2))
-                })
-            )
+        (,, uint16 discount,,) = creditManager.fees();
+        uint256 repaidAmount = (
+            priceOracle.convert(wethCollateralAmount, weth, underlying)
+                + priceOracle.convert(linkCollateralAmount, link, underlying)
+        ) * discount / PERCENTAGE_FACTOR;
+
+        tokenTestSuite.mint(underlying, LIQUIDATOR, repaidAmount);
+        tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager), repaidAmount);
+
+        MultiCall[] memory liquidateCalls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (weth, wethCollateralAmount, FRIEND))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, linkCollateralAmount, FRIEND))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, repaidAmount))
+            })
         );
 
-        vm.stopPrank();
-
+        uint256 gasBefore = gasleft();
+        vm.prank(LIQUIDATOR);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, liquidateCalls);
         uint256 gasSpent = gasBefore - gasleft();
 
-        emit log_string(
-            string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying and quoted token: "))
-        );
+        emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with two collateral tokens: ")));
         emit log_uint(gasSpent);
     }
 }

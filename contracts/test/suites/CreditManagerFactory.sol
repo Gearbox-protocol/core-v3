@@ -3,11 +3,9 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
-
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfiguratorV3, CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -17,23 +15,52 @@ contract CreditManagerFactory {
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
 
-    constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        creditManager = new CreditManagerV3(_ap, _pool, opts.name);
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            opts.degenNFT,
-            opts.expirable
+    struct ManagerParams {
+        address accountFactory;
+        address priceOracle;
+        uint8 maxEnabledTokens;
+        uint16 feeInterest;
+        uint16 feeLiquidation;
+        uint16 liquidationPremium;
+        uint16 feeLiquidationExpired;
+        uint16 liquidationPremiumExpired;
+        string name;
+    }
+
+    struct FacadeParams {
+        address lossPolicy;
+        address botList;
+        address weth;
+        address degenNFT;
+        bool expirable;
+    }
+
+    constructor(address addressProvider, address pool, ManagerParams memory cmParams, FacadeParams memory cfParams) {
+        creditManager = new CreditManagerV3(
+            pool,
+            cmParams.accountFactory,
+            cmParams.priceOracle,
+            cmParams.maxEnabledTokens,
+            cmParams.feeInterest,
+            cmParams.feeLiquidation,
+            cmParams.liquidationPremium,
+            cmParams.feeLiquidationExpired,
+            cmParams.liquidationPremiumExpired,
+            cmParams.name
         );
 
-        bytes memory configuratorByteCode =
-            abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));
+        creditFacade = new CreditFacadeV3(
+            addressProvider,
+            address(creditManager),
+            cfParams.lossPolicy,
+            cfParams.botList,
+            cfParams.weth,
+            cfParams.degenNFT,
+            cfParams.expirable
+        );
+        creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = CreditConfiguratorV3(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
-
+        creditConfigurator = new CreditConfiguratorV3(address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
-
-        Create2.deploy(0, salt, configuratorByteCode);
-
-        require(address(creditConfigurator.creditManager()) == address(creditManager), "Incorrect CM");
     }
 }

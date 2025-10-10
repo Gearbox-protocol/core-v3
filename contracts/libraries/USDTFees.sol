@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 /// @title USDT fees library
 /// @notice Helps to calculate USDT amounts adjusted for fees

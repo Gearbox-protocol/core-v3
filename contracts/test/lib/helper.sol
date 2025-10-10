@@ -134,17 +134,20 @@ contract TestHelper is Test {
         array[3] = v4;
     }
 
-    function assertEq(uint16[] memory a1, uint16[] memory a2, string memory reason) internal {
+    function assertEq(uint16[] memory a1, uint16[] memory a2, string memory reason) internal pure {
         assertEq(a1.length, a2.length, string.concat(reason, "Arrays has different length"));
 
         assertEq(_copyU16toU256(a1), _copyU16toU256(a2), reason);
     }
 
-    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2) internal {
+    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2) internal pure {
         assertEq(cdd1, cdd2, "");
     }
 
-    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2, string memory reason) internal {
+    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2, string memory reason)
+        internal
+        pure
+    {
         assertEq(cdd1.debt, cdd2.debt, string.concat(reason, "\nIncorrect debt"));
         assertEq(
             cdd1.cumulativeIndexNow, cdd2.cumulativeIndexNow, string.concat(reason, "\nIncorrect cumulativeIndexNow")

@@ -5,16 +5,16 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PoolV3} from "../../../pool/PoolV3.sol";
-import {GaugeV3} from "../../../governance/GaugeV3.sol";
-import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../governance/GearStakingV3.sol";
+import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../core/GearStakingV3.sol";
+import {GaugeV3} from "../../../pool/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {CallerNotGaugeException} from "../../../interfaces/IExceptions.sol";
+import {AP_GEAR_TOKEN, FIRST_EPOCH_TIMESTAMP} from "../../../libraries/Constants.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
-import {AP_GEAR_TOKEN, AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 /// @title Gauge migration integration test
 /// @notice I:[GAM]: Tests that ensure that gauges can be migrated properly
@@ -50,7 +50,8 @@ contract GaugeMigrationIntegrationTest is Test {
         // deploy address provider, staking and pool
         addressProvider = new AddressProviderV3ACLMock();
         addressProvider.setAddress(AP_GEAR_TOKEN, address(gear), false);
-        staking = new GearStakingV3(address(addressProvider), block.timestamp);
+
+        staking = new GearStakingV3(address(addressProvider));
         pool = new PoolMock(address(addressProvider), address(underlying));
 
         // deploy quota keeper and connect it to the pool
@@ -59,13 +60,16 @@ contract GaugeMigrationIntegrationTest is Test {
 
         // deploy gauge and connect it to the quota keeper and staking
         gauge = new GaugeV3(address(pool), address(staking));
-        staking.setVotingContractStatus(address(gauge), VotingContractStatus.ALLOWED);
         quotaKeeper.setGauge(address(gauge));
 
         // add tokens to the gauge
         gauge.addQuotaToken({token: address(token1), minRate: 600, maxRate: 3000});
         gauge.addQuotaToken({token: address(token2), minRate: 400, maxRate: 2000});
         vm.stopPrank();
+
+        vm.prank(staking.owner());
+        staking.setVotingContractStatus(address(gauge), VotingContractStatus.ALLOWED);
+        vm.warp(FIRST_EPOCH_TIMESTAMP);
 
         // do some voting
         deal({token: address(gear), to: user1, give: 1_000_000e18});
@@ -103,15 +107,17 @@ contract GaugeMigrationIntegrationTest is Test {
     /// @notice I:[GAM-1]: Gauge migration works as expected
     function test_I_GAM_01_gauge_migration_works_as_expected() public {
         // prepare a new gauge and disable an old one
-        vm.startPrank(configurator);
         GaugeV3 newGauge = new GaugeV3(address(pool), address(staking));
 
+        vm.startPrank(staking.owner());
         staking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
+        vm.stopPrank();
 
-        quotaKeeper.setGauge(address(newGauge));
+        vm.startPrank(configurator);
         newGauge.addQuotaToken({token: address(token1), minRate: 600, maxRate: 3000});
         newGauge.addQuotaToken({token: address(token2), minRate: 400, maxRate: 2000});
+        quotaKeeper.setGauge(address(newGauge));
         vm.stopPrank();
 
         // users move their votes to the new gauge
@@ -167,19 +173,21 @@ contract GaugeMigrationIntegrationTest is Test {
     /// @notice I:[GAM-2]: Gauge and staking migration works as expected
     function test_I_GAM_02_gaude_and_staking_migration_works_as_expected() public {
         // prepare new staking and gauge contracts
-        vm.startPrank(configurator);
-        GearStakingV3 newStaking = new GearStakingV3(address(addressProvider), block.timestamp);
+        GearStakingV3 newStaking = new GearStakingV3(address(addressProvider));
         GaugeV3 newGauge = new GaugeV3(address(pool), address(newStaking));
 
+        vm.startPrank(staking.owner());
         newStaking.setMigrator(address(staking));
         staking.setSuccessor(address(newStaking));
 
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
         newStaking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
+        vm.stopPrank();
 
-        quotaKeeper.setGauge(address(newGauge));
+        vm.startPrank(configurator);
         newGauge.addQuotaToken({token: address(token1), minRate: 600, maxRate: 3000});
         newGauge.addQuotaToken({token: address(token2), minRate: 400, maxRate: 2000});
+        quotaKeeper.setGauge(address(newGauge));
         vm.stopPrank();
 
         // users move their votes to the new gauge
