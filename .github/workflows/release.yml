@@ -15,17 +15,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
-      - uses: actions/setup-node@v3
+      - name: Use Latest Corepack
+        run: |
+          echo "Before: corepack version => $(corepack --version || echo 'not installed')"
+          npm install -g corepack@latest
+          echo "After : corepack version => $(corepack --version)"
+          corepack enable
+          pnpm --version
+
+      - name: Setup node.js
+        uses: actions/setup-node@v4
         with:
           cache: "pnpm"
           node-version-file: ".nvmrc"
 
-      # prepare script runs before publish, and it needs husky
-      - name: Install dependencies
-        run: |
-          pnpm install --frozen-lockfile
+      - name: Install node dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
