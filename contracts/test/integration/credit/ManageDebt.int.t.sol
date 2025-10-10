@@ -10,7 +10,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
 import "../../lib/constants.sol";
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
@@ -252,7 +252,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         // (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
         // assertEq(debt, newBorrowedAmount, "Incorrect debt");
 
-        // expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
+        // expectBalance(TOKEN_DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
 
         // assertEq(pool.lendAmount(), amount, "Incorrect lend amount");
 
@@ -261,7 +261,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
     /// @dev I:[MD-9]: manageDebt correctly decreases debt
     function test_I_MD_09_manageDebt_correctly_decreases_debt(uint128 amount) public creditTest {
-        // tokenTestSuite.mint(Tokens.DAI, address(pool), (uint256(type(uint128).max) * 14) / 10);
+        // tokenTestSuite.mint(TOKEN_DAI, address(pool), (uint256(type(uint128).max) * 14) / 10);
 
         // (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cft.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
@@ -304,7 +304,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         //     assertEq(debt, newBorrowedAmount, "Incorrect debt");
         // }
 
-        // expectBalance(Tokens.DAI, creditAccount, debt - amount, "Incorrect balance on credit account");
+        // expectBalance(TOKEN_DAI, creditAccount, debt - amount, "Incorrect balance on credit account");
 
         // if (amount >= totalDebt - debt) {
         //     assertEq(cumulativeIndexLastUpdateAfter, cumulativeIndexNow, "Incorrect cumulativeIndexLastUpdate");
