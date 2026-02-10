@@ -185,7 +185,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
                 params.interestRateModel,
                 params.priceOracle,
                 params.maturityTimestamp,
-                params.interestRateParams,
                 params.collateralTokens
             );
 

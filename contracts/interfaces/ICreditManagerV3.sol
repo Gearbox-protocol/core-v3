@@ -47,7 +47,6 @@ struct CreditAccountInfo {
     uint40 maturityTimestamp;
     uint40 forcedClosureTimestamp;
     address interestRateModel;
-    bytes interestRateParams;
     address borrower;
     CollateralTokenData[] collateralTokens;
     address priceOracle;
@@ -94,7 +93,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         address interestRateModel,
         address priceOracle,
         uint40 maturityTimestamp,
-        bytes calldata interestRateParams,
         CollateralTokenData[] calldata collateralTokens
     ) external returns (address creditAccount);
 

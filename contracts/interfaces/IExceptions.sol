@@ -60,9 +60,9 @@ error RegisteredPoolOnlyException();
 /// @notice Reverts if address key isn't found in address provider
 error AddressNotFoundException();
 
-// --------------- //
-// MATCHING ENGINE //
-// --------------- //
+// ---------------------- //
+// MATCHING ENGINE / IRM //
+// ---------------------- //
 
 /// @notice Thrown by pool-adjacent contracts when a credit manager being connected has a wrong pool address
 error IncompatibleCreditManagerException();
@@ -75,6 +75,9 @@ error CreditManagerCantBorrowException();
 
 /// @notice Thrown on attempting to call an access restricted function not as credit account's lender
 error CallerNotLenderException();
+
+/// @notice Thrown when attempting to compare two IRMs that have mismatching types or other crucial parameters
+error IRMNotComparableException();
 
 // -------------- //
 // CREDIT MANAGER //

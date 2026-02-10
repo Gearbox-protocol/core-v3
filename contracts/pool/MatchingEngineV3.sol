@@ -82,11 +82,11 @@ contract MatchingEngineV3 is
     );
 
     bytes32 private constant BORROWER_ORDER_TYPEHASH = keccak256(
-        "BorrowerOrder(GeneralOrderParams generalParams,address borrower,bytes32 rateParamsHash,uint256 principal,bytes32 collateralTokensHash,bytes32 collateralLTsHash,bytes32 initialCollateralsHash,bytes32 openingCallsHash)"
+        "BorrowerOrder(GeneralOrderParams generalParams,address borrower,uint256 principal,bytes32 collateralTokensHash,bytes32 collateralLTsHash,bytes32 initialCollateralsHash,bytes32 openingCallsHash)"
     );
 
     bytes32 private constant LENDER_ORDER_TYPEHASH = keccak256(
-        "LenderOrder(GeneralOrderParams generalParams,address lender,bytes32 rateParamsHash,uint256 maxPrincipal,bytes32 collateralTokensHash,bytes32 collateralLTsHash,address fundingVault)"
+        "LenderOrder(GeneralOrderParams generalParams,address lender,uint256 maxPrincipal,bytes32 collateralTokensHash,bytes32 collateralLTsHash,address fundingVault)"
     );
 
     /// @notice Protocol treasury address
@@ -152,7 +152,6 @@ contract MatchingEngineV3 is
 
     function getLenderOrderHash(LenderOrder calldata order) public view override returns (bytes32) {
         bytes32 generalOrderHash = getGeneralOrderHash(order.generalParams);
-        bytes32 rateParamsHash = keccak256(order.minRateParams);
         bytes32 tokensHash = keccak256(abi.encode(order.permittedCollaterals));
         bytes32 ltsHash = keccak256(abi.encode(order.collateralLTs));
 
@@ -161,7 +160,6 @@ contract MatchingEngineV3 is
                 LENDER_ORDER_TYPEHASH,
                 generalOrderHash,
                 order.lender,
-                rateParamsHash,
                 order.maxPrincipal,
                 tokensHash,
                 ltsHash,
@@ -172,7 +170,6 @@ contract MatchingEngineV3 is
     }
 
     function getBorrowerOrderHash(BorrowerOrder calldata order) public view override returns (bytes32) {
-        bytes32 rateParamsHash = keccak256(order.maxRateParams);
         bytes32 tokensHash = keccak256(abi.encode(order.requiredCollaterals));
         bytes32 ltsHash = keccak256(abi.encode(order.collateralLTs));
         bytes32 initialCollateralsHash = keccak256(abi.encode(order.initialCollaterals));
@@ -185,7 +182,6 @@ contract MatchingEngineV3 is
                 BORROWER_ORDER_TYPEHASH,
                 generalOrderHash,
                 order.borrower,
-                rateParamsHash,
                 order.principal,
                 tokensHash,
                 ltsHash,
@@ -237,7 +233,6 @@ contract MatchingEngineV3 is
                 priceOracle: borrower.generalParams.priceOracle,
                 debt: params.principal,
                 maturityTimestamp: maturity,
-                interestRateParams: borrower.maxRateParams,
                 collateralTokens: collateralTokens,
                 inititalCollaterals: borrower.initialCollaterals,
                 calls: borrower.openingCalls
@@ -335,7 +330,7 @@ contract MatchingEngineV3 is
         );
 
         if (!IInterestRateModel(lender.generalParams.interestRateModel)
-                .isGreaterRate(lender.minRateParams, borrower.maxRateParams)) {
+                .isGreaterOrEqualRate(borrower.generalParams.interestRateModel)) {
             revert IncorrectParameterException();
         }
 

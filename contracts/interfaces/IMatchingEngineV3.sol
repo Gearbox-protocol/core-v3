@@ -23,7 +23,6 @@ struct GeneralOrderParams {
 struct LenderOrder {
     GeneralOrderParams generalParams;
     address lender;
-    bytes minRateParams;
     uint256 maxPrincipal;
     address[] permittedCollaterals;
     uint16[] collateralLTs;
@@ -33,7 +32,6 @@ struct LenderOrder {
 struct BorrowerOrder {
     GeneralOrderParams generalParams;
     address borrower;
-    bytes maxRateParams;
     uint256 principal;
     address[] requiredCollaterals;
     uint16[] collateralLTs;

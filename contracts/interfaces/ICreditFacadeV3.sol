@@ -39,7 +39,6 @@ struct AccountOpeningParams {
     address priceOracle;
     uint256 debt;
     uint40 maturityTimestamp;
-    bytes interestRateParams;
     CollateralTokenData[] collateralTokens;
     Balance[] inititalCollaterals;
     MultiCall[] calls;
