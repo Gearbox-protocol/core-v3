@@ -44,11 +44,29 @@ struct MatchParams {
     uint40 duration;
 }
 
+struct SellerOrder {
+    address seller;
+    address creditAccount;
+    address receiveToken;
+    uint256 receiveAmount;
+    uint256 nonce;
+    uint40 expiry;
+}
+
+struct BuyerOrder {
+    address buyer;
+    address creditAccount;
+    uint256 nonce;
+    uint40 expiry;
+    address validationStrategy;
+}
+
 struct CreditAccountData {
     address lender;
     address borrower;
     address creditManager;
     address lenderFundingVault;
+    address borrowerValidationStrategy;
 }
 
 interface IMatchingEngineV3Events {
@@ -69,18 +87,33 @@ interface IMatchingEngineV3Events {
     event Repay(address indexed creditManager, uint256 repaidAmount, uint256 profit, uint256 loss);
 
     event IncurUncoveredLoss(address indexed creditManager, uint256 loss);
+
+    event CreditAccountSold(
+        address indexed creditAccount,
+        address indexed seller,
+        address indexed buyer,
+        address receiveToken,
+        uint256 receiveAmount
+    );
 }
 
 interface IMatchingEngineV3 is IVersion, IACLTrait, IContractsRegisterTrait, IMatchingEngineV3Events {
     function treasury() external view returns (address);
 
-    function matchOrders(
+    function matchCreditOrders(
         LenderOrder calldata lender,
         BorrowerOrder calldata borrower,
         bytes calldata lenderSig,
         bytes calldata borrowerSig,
         MatchParams calldata params
     ) external returns (address creditAccount);
+
+    function matchSellOrders(
+        SellerOrder calldata sellerOrder,
+        BuyerOrder calldata buyerOrder,
+        bytes calldata sellerSig,
+        bytes calldata buyerSig
+    ) external;
 
     function sellCreditAccount(address creditAccount) external;
 
@@ -97,6 +130,10 @@ interface IMatchingEngineV3 is IVersion, IACLTrait, IContractsRegisterTrait, IMa
     function getBorrowerOrderHash(BorrowerOrder calldata borrower) external view returns (bytes32);
 
     function getLenderOrderHash(LenderOrder calldata lender) external view returns (bytes32);
+
+    function getSellerOrderHash(SellerOrder calldata sellerOrder) external view returns (bytes32);
+
+    function getBuyerOrderHash(BuyerOrder calldata buyerOrder) external view returns (bytes32);
 
     function isCancelled(bytes32 orderHash) external view returns (bool);
 

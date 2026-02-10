@@ -6,5 +6,5 @@ pragma solidity ^0.8.17;
 import {BorrowerOrder, LenderOrder} from "../IMatchingEngineV3.sol";
 
 interface IValidationStrategy {
-    function validate(LenderOrder calldata lender, BorrowerOrder calldata borrower) external view returns (bool);
+    function validate(address lender, address borrower, address creditAccount) external view returns (bool);
 }

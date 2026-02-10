@@ -29,7 +29,9 @@ import {
     BorrowerOrder,
     GeneralOrderParams,
     MatchParams,
-    CreditAccountData
+    CreditAccountData,
+    SellerOrder,
+    BuyerOrder
 } from "../interfaces/IMatchingEngineV3.sol";
 import {IValidationStrategy} from "../interfaces/base/IValidationStrategy.sol";
 import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
@@ -89,6 +91,14 @@ contract MatchingEngineV3 is
         "LenderOrder(GeneralOrderParams generalParams,address lender,uint256 maxPrincipal,bytes32 collateralTokensHash,bytes32 collateralLTsHash,address fundingVault)"
     );
 
+    bytes32 private constant SELLER_ORDER_TYPEHASH = keccak256(
+        "SellerOrder(address seller,address creditAccount,address receiveToken,uint256 receiveAmount,uint256 nonce,uint40 expiry)"
+    );
+
+    bytes32 private constant BUYER_ORDER_TYPEHASH = keccak256(
+        "BuyerOrder(address buyer,address creditAccount,uint256 nonce,uint40 expiry,address validationStrategy)"
+    );
+
     /// @notice Protocol treasury address
     address public immutable override treasury;
 
@@ -98,7 +108,7 @@ contract MatchingEngineV3 is
 
     mapping(bytes32 => bool) internal _cancelled;
 
-    mapping(address => uint256) internal _minNonce;
+    mapping(address => mapping(uint256 => bool)) internal _spentNonce;
 
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
@@ -192,6 +202,35 @@ contract MatchingEngineV3 is
         return _hashTypedDataV4(structHash);
     }
 
+    function getSellerOrderHash(SellerOrder calldata order) public view override returns (bytes32) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                SELLER_ORDER_TYPEHASH,
+                order.seller,
+                order.creditAccount,
+                order.receiveToken,
+                order.receiveAmount,
+                order.nonce,
+                order.expiry
+            )
+        );
+        return _hashTypedDataV4(structHash);
+    }
+
+    function getBuyerOrderHash(BuyerOrder calldata order) public view override returns (bytes32) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                BUYER_ORDER_TYPEHASH,
+                order.buyer,
+                order.creditAccount,
+                order.nonce,
+                order.expiry,
+                order.validationStrategy
+            )
+        );
+        return _hashTypedDataV4(structHash);
+    }
+
     /// @notice Addresses of all connected credit managers
     function creditManagers() external view override returns (address[] memory) {
         return _creditManagerSet.values();
@@ -201,7 +240,7 @@ contract MatchingEngineV3 is
     // MATCHING //
     // -------- //
 
-    function matchOrders(
+    function matchCreditOrders(
         LenderOrder calldata lender,
         BorrowerOrder calldata borrower,
         bytes calldata lenderSig,
@@ -211,8 +250,8 @@ contract MatchingEngineV3 is
         bytes32 lenderHash = _validateOrderMatch(lender, borrower, lenderSig, borrowerSig, params);
 
         _alreadyFilled[lenderHash] += params.principal;
-        _minNonce[lender.lender] = lender.generalParams.nonce + 1;
-        _minNonce[borrower.borrower] = borrower.generalParams.nonce + 1;
+        _spentNonce[lender.lender][lender.generalParams.nonce] = true;
+        _spentNonce[borrower.borrower][borrower.generalParams.nonce] = true;
 
         _drawInitialCollaterals(borrower.borrower, borrower.initialCollaterals);
 
@@ -240,13 +279,21 @@ contract MatchingEngineV3 is
 
             address creditFacade = ICreditManagerV3(borrower.generalParams.creditManager).creditFacade();
             creditAccount = ICreditFacadeV3(creditFacade).openCreditAccount(accountOpeningParams);
+
+            _validateEligibility(
+                lender.generalParams.validationStrategy, lender.lender, borrower.borrower, creditAccount
+            );
+            _validateEligibility(
+                borrower.generalParams.validationStrategy, lender.lender, borrower.borrower, creditAccount
+            );
         }
 
         caData[creditAccount] = CreditAccountData({
             lender: lender.lender,
             borrower: borrower.borrower,
             creditManager: borrower.generalParams.creditManager,
-            lenderFundingVault: lender.fundingVault
+            lenderFundingVault: lender.fundingVault,
+            borrowerValidationStrategy: borrower.generalParams.validationStrategy
         });
 
         emit OrderMatched(
@@ -257,6 +304,35 @@ contract MatchingEngineV3 is
             maturity,
             borrower.generalParams.interestRateModel,
             borrower.generalParams.priceOracle
+        );
+    }
+
+    /// @notice Matches a seller order (current lender selling their position) with a buyer order.
+    /// @param sellerOrder Signed order from the current lender specifying credit account, receive token/amount, nonce, expiry
+    /// @param buyerOrder Signed order from the buyer specifying the credit account they wish to buy, nonce, expiry
+    /// @param sellerSig EIP-712 signature of the seller over the seller order hash
+    /// @param buyerSig EIP-712 signature of the buyer over the buyer order hash
+    function matchSellOrders(
+        SellerOrder calldata sellerOrder,
+        BuyerOrder calldata buyerOrder,
+        bytes calldata sellerSig,
+        bytes calldata buyerSig
+    ) external override matcherOnly nonReentrant {
+        _validateSellOrderMatch(sellerOrder, buyerOrder, sellerSig, buyerSig);
+
+        address creditAccount = sellerOrder.creditAccount;
+        CreditAccountData storage data = caData[creditAccount];
+
+        _spentNonce[data.lender][sellerOrder.nonce] = true;
+        _spentNonce[buyerOrder.buyer][buyerOrder.nonce] = true;
+
+        IERC20(sellerOrder.receiveToken).safeTransferFrom(buyerOrder.buyer, data.lender, sellerOrder.receiveAmount);
+
+        data.lender = buyerOrder.buyer;
+        data.lenderFundingVault = address(0);
+
+        emit CreditAccountSold(
+            creditAccount, sellerOrder.seller, buyerOrder.buyer, sellerOrder.receiveToken, sellerOrder.receiveAmount
         );
     }
 
@@ -315,9 +391,6 @@ contract MatchingEngineV3 is
         }
         if (params.principal != borrower.principal) revert IncorrectParameterException();
 
-        _validateNonce(lender.lender, lender.generalParams.nonce);
-        _validateNonce(borrower.borrower, borrower.generalParams.nonce);
-
         _validateExpiry(lender.generalParams.expiry);
         _validateExpiry(borrower.generalParams.expiry);
 
@@ -345,15 +418,15 @@ contract MatchingEngineV3 is
         lenderHash = getLenderOrderHash(lender);
         bytes32 borrowerHash = getBorrowerOrderHash(borrower);
 
+        _validateNonce(lender.lender, lender.generalParams.nonce, lenderHash);
+        _validateNonce(borrower.borrower, borrower.generalParams.nonce, borrowerHash);
+
         if (_cancelled[lenderHash] || _cancelled[borrowerHash]) revert IncorrectParameterException();
         _verifySignature(lender.lender, lenderHash, lenderSig);
         _verifySignature(borrower.borrower, borrowerHash, borrowerSig);
 
         uint256 filled = _alreadyFilled[lenderHash];
         if (filled + params.principal > lender.maxPrincipal) revert IncorrectParameterException();
-
-        _validateEligibility(lender.generalParams.validationStrategy, lender, borrower);
-        _validateEligibility(borrower.generalParams.validationStrategy, lender, borrower);
     }
 
     // TODO: maybe enforce collateral sorting to avoid mishaps
@@ -383,8 +456,8 @@ contract MatchingEngineV3 is
         if (recovered != signer) revert IncorrectParameterException();
     }
 
-    function _validateNonce(address signer, uint256 nonce) internal view {
-        if (nonce < _minNonce[signer]) revert IncorrectParameterException();
+    function _validateNonce(address signer, uint256 nonce, bytes32 orderHash) internal view {
+        if (_spentNonce[signer][nonce] && _alreadyFilled[orderHash] == 0) revert IncorrectParameterException();
     }
 
     function _validateExpiry(uint40 expiry) internal view {
@@ -397,14 +470,55 @@ contract MatchingEngineV3 is
         }
     }
 
-    function _validateEligibility(address strategy, LenderOrder calldata lender, BorrowerOrder calldata borrower)
+    function _validateEligibility(address strategy, address lender, address borrower, address creditAccount)
         internal
         view
     {
         if (strategy == address(0)) return;
-        if (!IValidationStrategy(strategy).validate(lender, borrower)) {
+        if (!IValidationStrategy(strategy).validate(lender, borrower, creditAccount)) {
             revert IncorrectParameterException();
         }
+    }
+
+    function _validateSellOrderMatch(
+        SellerOrder calldata sellerOrder,
+        BuyerOrder calldata buyerOrder,
+        bytes calldata sellerSig,
+        bytes calldata buyerSig
+    ) internal view {
+        if (sellerOrder.seller == address(0) || sellerOrder.creditAccount == address(0)) {
+            revert ZeroAddressException();
+        }
+        if (buyerOrder.buyer == address(0) || buyerOrder.creditAccount == address(0)) {
+            revert ZeroAddressException();
+        }
+        if (sellerOrder.creditAccount != buyerOrder.creditAccount) {
+            revert IncorrectParameterException();
+        }
+
+        address creditAccount = sellerOrder.creditAccount;
+        CreditAccountData storage data = caData[creditAccount];
+        if (data.lender != sellerOrder.seller) revert CallerNotLenderException();
+
+        if (sellerOrder.receiveAmount == 0 || sellerOrder.receiveToken == address(0)) {
+            revert ZeroAddressException();
+        }
+
+        _validateExpiry(sellerOrder.expiry);
+        _validateExpiry(buyerOrder.expiry);
+
+        bytes32 sellerHash = getSellerOrderHash(sellerOrder);
+        bytes32 buyerHash = getBuyerOrderHash(buyerOrder);
+
+        _validateNonce(sellerOrder.seller, sellerOrder.nonce, sellerHash);
+        _validateNonce(buyerOrder.buyer, buyerOrder.nonce, buyerHash);
+
+        if (_cancelled[sellerHash] || _cancelled[buyerHash]) revert IncorrectParameterException();
+        _verifySignature(sellerOrder.seller, sellerHash, sellerSig);
+        _verifySignature(buyerOrder.buyer, buyerHash, buyerSig);
+
+        _validateEligibility(buyerOrder.validationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
+        _validateEligibility(data.borrowerValidationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
     }
 
     /// -------------- ///
