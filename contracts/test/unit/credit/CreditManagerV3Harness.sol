@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -152,3 +153,4 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         return _enableTransferFee ? _amountUSDTMinusFee(amount) : amount;
     }
 }
+*/

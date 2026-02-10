@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -13,6 +14,7 @@ struct PriceFeedConfig {
     address priceFeed;
     uint32 stalenessPeriod;
 }
+
 
 struct LinearIRMV3DeployParams {
     uint16 U_1;
@@ -150,3 +152,4 @@ interface IPoolV3DeployConfig {
 
     function creditManagers() external view returns (CreditManagerV3DeployParams[] memory);
 }
+*/

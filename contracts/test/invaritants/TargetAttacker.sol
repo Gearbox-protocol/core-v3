@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -114,3 +115,4 @@ pragma solidity ^0.8.17;
 //         pool.withdraw(amount, address(this), address(this));
 //     }
 // }
+*/

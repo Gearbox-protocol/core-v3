@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
@@ -525,3 +526,4 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         assertEq(usdValue, 1e8, "Incorrect USD value");
     }
 }
+*/

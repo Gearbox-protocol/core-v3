@@ -52,9 +52,7 @@ interface ICreditConfiguratorV3Events {
     // -------------- //
 
     /// @notice Emitted when new fee parameters are set in the credit manager
-    event UpdateFees(
-        uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
-    );
+    event UpdateFees(uint16 feeLiquidation, uint16 liquidationPremium, uint16 maxEarlyClosurePenalty);
 
     // -------- //
     // UPGRADES //
@@ -98,22 +96,7 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
     // TOKENS //
     // ------ //
 
-    function makeAllTokensQuoted() external;
-
-    function addCollateralToken(address token, uint16 liquidationThreshold) external;
-
-    function setLiquidationThreshold(address token, uint16 liquidationThreshold) external;
-
-    function rampLiquidationThreshold(
-        address token,
-        uint16 liquidationThresholdFinal,
-        uint40 rampStart,
-        uint24 rampDuration
-    ) external;
-
-    function forbidToken(address token) external;
-
-    function allowToken(address token) external;
+    function addCollateralToken(address token) external;
 
     // -------- //
     // ADAPTERS //
@@ -129,18 +112,11 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
     // CREDIT MANAGER //
     // -------------- //
 
-    function setFees(
-        uint16 feeLiquidation,
-        uint16 liquidationPremium,
-        uint16 feeLiquidationExpired,
-        uint16 liquidationPremiumExpired
-    ) external;
+    function setFees(uint16 feeLiquidation, uint16 liquidationPremium, uint16 maxEarlyClosurePenalty) external;
 
     // -------- //
     // UPGRADES //
     // -------- //
-
-    function setPriceOracle(address newPriceOracle) external;
 
     function setCreditFacade(address newCreditFacade, bool migrateParams) external;
 
@@ -152,11 +128,5 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
-    function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
-
-    function forbidBorrowing() external;
-
     function setLossPolicy(address newLossPolicy) external;
-
-    function setExpirationDate(uint40 newExpirationDate) external;
 }

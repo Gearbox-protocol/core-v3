@@ -68,12 +68,16 @@ library CreditLogic {
         CollateralDebtData memory collateralDebtData,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
-        function (uint256) view returns (uint256) amountWithFeeFn,
-        function (uint256) view returns (uint256) amountMinusFeeFn
+        function(uint256) view returns (uint256) amountWithFeeFn,
+        function(uint256) view returns (uint256) amountMinusFeeFn
     ) internal view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
         amountToPool = calcTotalDebt(collateralDebtData); // U:[CL-4]
 
         uint256 debtWithInterest = collateralDebtData.debt + collateralDebtData.accruedInterest;
+
+        amountToPool += collateralDebtData.earlyClosurePenalty * amountToPool / PERCENTAGE_FACTOR;
+
+        debtWithInterest += collateralDebtData.earlyClosurePenalty * debtWithInterest / PERCENTAGE_FACTOR;
 
         uint256 totalValue = collateralDebtData.totalValue;
 
@@ -100,31 +104,6 @@ library CreditLogic {
         amountToPool = amountToPoolWithFee; // U:[CL-4]
     }
 
-    // --------------------- //
-    // LIQUIDATION THRESHOLD //
-    // --------------------- //
-
-    /// @dev Returns the current liquidation threshold based on token data
-    /// @dev GearboxV3 supports liquidation threshold ramping, which means that the LT can be set to change dynamically
-    ///      from one value to another over time. LT changes linearly, starting at `ltInitial` and ending at `ltFinal`.
-    ///      To make LT static, the value can be written to `ltInitial` with ramp start set far in the future.
-    function getLiquidationThreshold(uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration)
-        internal
-        view
-        returns (uint16)
-    {
-        if (block.timestamp <= timestampRampStart) return ltInitial; // U:[CL-5]
-
-        uint40 timestampRampEnd = timestampRampStart + rampDuration;
-        if (block.timestamp >= timestampRampEnd) return ltFinal; // U:[CL-5]
-
-        // cast is safe since LT is between `ltInitial` and `ltFinal`, both of which are `uint16`
-        return uint16(
-            (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
-                / (timestampRampEnd - timestampRampStart)
-        ); // U:[CL-5]
-    }
-
     // ----------- //
     // MANAGE DEBT //
     // ----------- //
@@ -147,18 +126,17 @@ library CreditLogic {
     {
         if (debt == 0) return (amount, cumulativeIndexNow);
         newDebt = debt + amount; // U:[CL-2]
-        newCumulativeIndex = (
-            (cumulativeIndexNow * newDebt * INDEX_PRECISION)
-                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)
-        ); // U:[CL-2]
+        newCumulativeIndex =
+        ((cumulativeIndexNow * newDebt * INDEX_PRECISION)
+                / ((INDEX_PRECISION * cumulativeIndexNow * debt)
+                    / cumulativeIndexLastUpdate
+                    + INDEX_PRECISION
+                    * amount)); // U:[CL-2]
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt
-    ///      - Debt comprises of multiple components which are repaid in the following order:
-    ///        quota update fees => quota interest => base interest => debt principal.
-    ///        New values for all these components depend on what portion of each was repaid.
-    ///      - Debt principal, for example, only decreases if all previous components were fully repaid
-    ///      - The new credit account's interest index stays the same if base interest was not repaid at all,
+    ///      - Bast interest is repaid first, then debt principal.
+    ///      - The new credit account's interest index
     ///        is set to the current interest index if base interest was repaid fully, and is a solution to
     ///        the equation `debt * (indexNow / indexLastUpdate - 1) - delta = debt * (indexNow / indexNew - 1)`
     ///        when only `delta` of accrued interest was repaid
@@ -166,100 +144,75 @@ library CreditLogic {
     /// @param debt Debt principal before repayment
     /// @param cumulativeIndexNow The current interest index
     /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
-    /// @param cumulativeQuotaInterest Credit account's quota interest before repayment
-    /// @param quotaFees Accrued quota fees
     /// @param feeInterest Fee on accrued interest (both base and quota) charged by the DAO
     /// @return newDebt Debt principal after repayment
     /// @return newCumulativeIndex Credit account's quota interest after repayment
     /// @return profit Amount of underlying tokens received as fees by the DAO
-    /// @return newCumulativeQuotaInterest Credit account's accrued quota interest after repayment
-    /// @return newQuotaFees Amount of unpaid quota fees left after repayment
     function calcDecrease(
         uint256 amount,
         uint256 debt,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate,
-        uint128 cumulativeQuotaInterest,
-        uint128 quotaFees,
         uint16 feeInterest
-    )
-        internal
-        pure
-        returns (
-            uint256 newDebt,
-            uint256 newCumulativeIndex,
-            uint256 profit,
-            uint128 newCumulativeQuotaInterest,
-            uint128 newQuotaFees
-        )
-    {
+    ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit) {
         uint256 amountToRepay = amount;
-
-        unchecked {
-            if (quotaFees != 0) {
-                if (amountToRepay > quotaFees) {
-                    newQuotaFees = 0; // U:[CL-3]
-                    amountToRepay -= quotaFees;
-                    profit = quotaFees; // U:[CL-3]
-                } else {
-                    newQuotaFees = quotaFees - uint128(amountToRepay); // U:[CL-3]
-                    profit = amountToRepay; // U:[CL-3]
-                    amountToRepay = 0;
-                }
-            }
-        }
-
-        if (cumulativeQuotaInterest != 0 && amountToRepay != 0) {
-            uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
-
-            if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
-                amountToRepay -= cumulativeQuotaInterest + quotaProfit; // U:[CL-3]
-                profit += quotaProfit; // U:[CL-3]
-
-                newCumulativeQuotaInterest = 0; // U:[CL-3]
-            } else {
-                // If amount is not enough to repay quota interest + DAO fee, then it is split pro-rata between them
-                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
-
-                profit += amountToRepay - amountToPool; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
-
-                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-3]
-            }
-        } else {
-            newCumulativeQuotaInterest = cumulativeQuotaInterest;
-        }
 
         if (amountToRepay != 0) {
             uint256 interestAccrued = calcAccruedInterest({
                 amount: debt,
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
-            }); // U:[CL-3]
-            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3]
+            });
+
+            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= interestAccrued + profitFromInterest) {
                 amountToRepay -= interestAccrued + profitFromInterest;
 
-                profit += profitFromInterest; // U:[CL-3]
+                profit += profitFromInterest;
 
-                newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
+                newCumulativeIndex = cumulativeIndexNow;
             } else {
                 // If amount is not enough to repay base interest + DAO fee, then it is split pro-rata between them
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                profit += amountToRepay - amountToPool; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
+                profit += amountToRepay - amountToPool;
+                amountToRepay = 0;
 
                 newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
-                    / (
-                        INDEX_PRECISION * cumulativeIndexNow
-                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
-                    ); // U:[CL-3]
+                    / (INDEX_PRECISION
+                        * cumulativeIndexNow
+                        - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate)
+                        / debt); // U:[CL-3]
             }
         } else {
-            newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3]
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
-        newDebt = debt - amountToRepay; // U:[CL-3]
+        newDebt = debt - amountToRepay;
+    }
+
+    /// @dev Computes new debt principal and interest index after decreasing debt by subtracting from principal
+    ///      The new cumulative index is a solution to the equation
+    ///      `debt * (indexNow / indexLastUpdate - 1) - amount = (debt - amount) * (indexNow / indexNew - 1)`
+    /// @param amount Amount of debt to subtract
+    /// @param debt Debt principal before repayment
+    /// @param cumulativeIndexNow The current interest index
+    /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
+    function calcDecreaseNoFees(
+        uint256 amount,
+        uint256 debt,
+        uint256 cumulativeIndexNow,
+        uint256 cumulativeIndexLastUpdate
+    ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex) {
+        newDebt = debt - amount;
+        newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
+            / (INDEX_PRECISION
+                * cumulativeIndexNow
+                * debt
+                / newDebt
+                + INDEX_PRECISION
+                * amount
+                * cumulativeIndexLastUpdate
+                / newDebt);
     }
 }

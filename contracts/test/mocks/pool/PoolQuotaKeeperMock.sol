@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -170,3 +171,4 @@ contract PoolQuotaKeeperMock {
 
     function setTokenQuotaIncreaseFee(address token, uint16 fee) external {}
 }
+*/

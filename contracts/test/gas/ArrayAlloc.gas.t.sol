@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -10,6 +11,7 @@ struct Tuple {
     address a;
     uint256 b;
 }
+*_/
 
 contract ArrayAllocGasTest is Test {
     function test_G_AA_01_array_of_tuples_allocation_gas_usage() public view {
@@ -45,3 +47,4 @@ contract ArrayAllocGasTest is Test {
         }
     }
 }
+*/

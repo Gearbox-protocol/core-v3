@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -87,3 +88,4 @@ contract PriceOracleMock is Test {
         return 10 ** ERC20(token).decimals();
     }
 }
+*/

@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -15,7 +16,7 @@ import "../../../interfaces/IExceptions.sol";
  * @title Mock of pool service for CreditManagerV3 constracts testing
  * @notice Used for testing purposes only.
  * @author Gearbox
- */
+ * /
 contract PoolMock {
     using SafeERC20 for IERC20;
 
@@ -147,7 +148,7 @@ contract PoolMock {
      *
      * @param amount Amount of tokens to be transfer
      * @param to Address to transfer liquidity
-     */
+     * /
     function removeLiquidity(uint256 amount, address to) external returns (uint256) {}
 
     function expectedLiquidity() public pure returns (uint256) {
@@ -170,28 +171,28 @@ contract PoolMock {
      * @dev Connects new Credit Manager to pool
      *
      * @param _creditManager Address of credit Manager
-     */
+     * /
     function connectCreditManager(address _creditManager) external {}
 
     /**
      * @dev Forbid to borrow for particulat credit Manager
      *
      * @param _creditManager Address of credit Manager
-     */
+     * /
     function forbidCreditManagerToBorrow(address _creditManager) external {}
 
     /**
      * @dev Set the new interest rate model for pool
      *
      * @param _interestRateModel Address of new interest rate model contract
-     */
+     * /
     function newInterestRateModel(address _interestRateModel) external {}
 
     /**
      * @dev Returns quantity of connected credit accounts managers
      *
      * @return Quantity of connected credit Manager
-     */
+     * /
     function creditManagersCount() external pure returns (uint256) {
         return 1; // T:[MPS-1]
     }
@@ -201,7 +202,7 @@ contract PoolMock {
      *
      * @param amount Amount in underlyingToken tokens to be converted to diesel tokens
      * @return Amount in diesel tokens
-     */
+     * /
     function toDiesel(uint256 amount) public pure returns (uint256) {
         return (amount * RAY) / getDieselRate_RAY(); // T:[PS-24]
     }
@@ -211,7 +212,7 @@ contract PoolMock {
      *
      * @param amount Amount in diesel tokens to be converted to diesel tokens
      * @return Amount in underlyingToken tokens
-     */
+     * /
     function fromDiesel(uint256 amount) public pure returns (uint256) {
         return (amount * getDieselRate_RAY()) / RAY; // T:[PS-24]
     }
@@ -228,3 +229,5 @@ contract PoolMock {
 
     function setWithdrawFee(uint256 num) external {}
 }
+* /
+*/

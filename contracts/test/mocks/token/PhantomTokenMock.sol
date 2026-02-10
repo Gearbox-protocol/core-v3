@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
@@ -53,6 +54,7 @@ contract PhantomTokenMock is IPhantomToken, ERC20 {
     function serialize() external view override returns (bytes memory) {}
 }
 
+
 contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {
     uint256 public constant override version = 3_10;
     bytes32 public constant override contractType = "ADAPTER::PT_WITHDRAWER_MOCK";
@@ -78,3 +80,4 @@ contract PhantomTokenWithdrawerMock is IAdapter, IPhantomTokenWithdrawer {
         return false;
     }
 }
+*/

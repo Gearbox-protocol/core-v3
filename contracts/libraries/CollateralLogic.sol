@@ -3,6 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
@@ -19,8 +21,6 @@ library CollateralLogic {
     ///      If finite TWV target is specified, the function will stop processing tokens after cumulative TWV reaches
     ///      the target, in which case the returned values might be smaller than actual collateral.
     ///      This is useful to check whether account is sufficiently collateralized.
-    /// @param quotedTokens Array of quoted tokens on the credit account
-    /// @param quotasPacked Array of packed values (quota, LT), in the same order as `quotedTokens`
     /// @param creditAccount Credit account to compute collateral for
     /// @param underlying The underlying token of the corresponding credit manager
     /// @param ltUnderlying The underlying token's LT
@@ -34,30 +34,25 @@ library CollateralLogic {
     /// @return twvUSD Total LT-weighted value of credit account's assets
     /// @custom:tests U:[CLL-2]
     function calcCollateral(
-        address[] memory quotedTokens,
-        uint256[] memory quotasPacked,
+        CollateralTokenData[] memory collateralTokens,
         address creditAccount,
         address underlying,
         uint16 ltUnderlying,
         uint256 twvUSDTarget,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        function(address, uint256, address) view returns (uint256) convertToUSDFn,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
-        uint256 underlyingPriceRAY = convertToUSDFn(priceOracle, RAY, underlying);
-
-        uint256 len = quotedTokens.length;
+        uint256 len = collateralTokens.length;
         for (uint256 i; i < len;) {
-            (uint256 quota, uint16 liquidationThreshold) = unpackQuota(quotasPacked[i]);
-
             // puts variables on top of the stack to avoid the "stack too deep" error
-            address _quotedToken = quotedTokens[i];
+            address _quotedToken = collateralTokens[i].token;
+            uint16 _liquidationThreshold = collateralTokens[i].lt;
             address _creditAccount = creditAccount;
 
             (uint256 valueUSD, uint256 weightedValueUSD) = calcOneTokenCollateral({
                 token: _quotedToken,
                 creditAccount: _creditAccount,
-                liquidationThreshold: liquidationThreshold,
-                quotaUSD: quota * underlyingPriceRAY / RAY,
+                liquidationThreshold: _liquidationThreshold,
                 priceOracle: priceOracle,
                 convertToUSDFn: convertToUSDFn
             });
@@ -74,7 +69,6 @@ library CollateralLogic {
             token: underlying,
             creditAccount: creditAccount,
             liquidationThreshold: ltUnderlying,
-            quotaUSD: type(uint256).max,
             priceOracle: priceOracle,
             convertToUSDFn: convertToUSDFn
         });
@@ -88,34 +82,20 @@ library CollateralLogic {
     /// @param priceOracle Address of the price oracle
     /// @param token Address of the token
     /// @param liquidationThreshold LT of the token
-    /// @param quotaUSD Quota of the token converted to USD
     /// @return valueUSD Value of the token
     /// @return weightedValueUSD LT-weighted value of the token
-    /// @custom:tests U:[CLL-1]
     function calcOneTokenCollateral(
         address creditAccount,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        function(address, uint256, address) view returns (uint256) convertToUSDFn,
         address priceOracle,
         address token,
-        uint16 liquidationThreshold,
-        uint256 quotaUSD
+        uint16 liquidationThreshold
     ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD) {
         uint256 balance = IERC20(token).safeBalanceOf(creditAccount);
 
         if (balance != 0) {
             valueUSD = convertToUSDFn(priceOracle, balance, token);
-            weightedValueUSD = Math.min(valueUSD * liquidationThreshold / PERCENTAGE_FACTOR, quotaUSD);
+            weightedValueUSD = valueUSD * liquidationThreshold / PERCENTAGE_FACTOR;
         }
-    }
-
-    /// @dev Packs quota and LT into one word
-    function packQuota(uint96 quota, uint16 lt) internal pure returns (uint256) {
-        return (uint256(lt) << 96) | quota;
-    }
-
-    /// @dev Unpacks one word into quota and LT
-    function unpackQuota(uint256 packedQuota) internal pure returns (uint256 quota, uint16 lt) {
-        lt = uint16(packedQuota >> 96);
-        quota = uint96(packedQuota);
     }
 }

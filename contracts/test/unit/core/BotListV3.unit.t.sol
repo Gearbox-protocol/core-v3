@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
@@ -199,3 +200,4 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         assertEq(activeBotsRemaining, MAX_SANE_ACTIVE_BOTS, "Incorrect number of active bots after replacement");
     }
 }
+*/

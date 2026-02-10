@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -44,3 +45,4 @@ contract ERC20Mock is ERC20, Ownable {
         minter = _minter;
     }
 }
+*/

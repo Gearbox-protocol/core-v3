@@ -1,0 +1,20 @@
+{
+  "lib/@1inch/solidity-utils": {
+    "rev": "5fdd4c2c02525855e9f64d9a43d779013c6444ea"
+  },
+  "lib/@gearbox-protocol/sdk-gov": {
+    "rev": "7c13707d584b3e7f394f732bdf5bdbe020283c59"
+  },
+  "lib/@openzeppelin": {
+    "rev": "dc44c9f1a4c3b10af99492eed84f83ed244203f6"
+  },
+  "lib/@solady": {
+    "tag": {
+      "name": "v0.1.26",
+      "rev": "acd959aa4bd04720d640bf4e6a5c71037510cc4b"
+    }
+  },
+  "lib/forge-std": {
+    "rev": "ee93fdc45d1e5e4dee883afe0103109881a83549"
+  }
+}

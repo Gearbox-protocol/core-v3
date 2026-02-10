@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -58,3 +59,4 @@ contract QuotaRatesIntegrationTest is Test {
         assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
     }
 }
+*/

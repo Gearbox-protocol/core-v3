@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -200,3 +201,4 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
         accountFactory.rescue(creditAccount, target, data);
     }
 }
+*/

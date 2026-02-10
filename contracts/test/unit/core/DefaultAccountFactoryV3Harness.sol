@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -26,3 +27,4 @@ contract DefaultAccountFactoryV3Harness is DefaultAccountFactoryV3 {
         _factoryParams[creditManager] = FactoryParams(masterCreditAccount, head, tail);
     }
 }
+*/

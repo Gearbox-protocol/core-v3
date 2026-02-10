@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -101,3 +102,4 @@ contract PoolV3Harness is PoolV3 {
         return amount * (PERCENTAGE_FACTOR - _transferFee) / PERCENTAGE_FACTOR;
     }
 }
+*/

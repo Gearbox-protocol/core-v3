@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -40,3 +41,4 @@ contract PriceOracleV3Harness is PriceOracleV3 {
         return _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck);
     }
 }
+*/

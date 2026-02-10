@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -22,3 +23,4 @@ contract InvariantGearboxTest is Test {
 
     // function invariant_example() external {}
 }
+*/

@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -96,3 +97,4 @@ contract PriceFeedMock is IPriceFeed {
         revertOnLatestRound = value;
     }
 }
+*/

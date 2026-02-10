@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -25,3 +26,4 @@ interface IAddressProviderV3 {
 
     function setAddress(bytes32 key, address value, bool saveVersion) external;
 }
+*/

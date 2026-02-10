@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -29,3 +30,4 @@ contract ERC20PermitMock is ERC20Permit {
         permitHash = _hashTypedDataV4(structHash);
     }
 }
+*/

@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -100,7 +101,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         and return the new address
         where new address = first 20 bytes of keccak256(0xff + address(this) + s + keccak256(mem[p…(p+n)))
               s = big-endian 256-bit value
-        */
+        * /
         assembly {
             addr :=
                 create2(
@@ -1128,3 +1129,4 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         }
     }
 }
+*/

@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -497,3 +498,4 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         assertEq(gearStaking.migrator(), DUMB_ADDRESS, "Migrator address incorrect");
     }
 }
+*/

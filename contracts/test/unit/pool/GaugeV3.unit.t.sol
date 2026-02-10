@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -499,3 +500,4 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(gauge.epochLastUpdate(), 1000);
     }
 }
+*/

@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -19,6 +20,7 @@ struct B {
     uint256 t;
     uint256 balance;
 }
+
 
 struct Q {
     uint256 t;
@@ -352,3 +354,4 @@ contract OrderToken {
         returnBalance = balance;
     }
 }
+*/

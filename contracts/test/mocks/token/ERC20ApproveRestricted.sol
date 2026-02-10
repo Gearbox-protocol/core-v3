@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -18,6 +19,7 @@ contract ERC20ApproveRestrictedRevert is ERC20, Ownable {
     }
 }
 
+
 contract ERC20ApproveRestrictedFalse is ERC20, Ownable {
     constructor() ERC20("", "") {}
 
@@ -29,3 +31,4 @@ contract ERC20ApproveRestrictedFalse is ERC20, Ownable {
         return true;
     }
 }
+*/

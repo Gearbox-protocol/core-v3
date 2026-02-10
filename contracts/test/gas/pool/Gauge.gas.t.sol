@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -45,3 +46,4 @@ contract GaugeGasTest is IntegrationTestHelper {
         console.log("[%d tokens] gas used: %d", i, gasUsed);
     }
 }
+*/

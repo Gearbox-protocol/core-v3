@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
-import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IDefaultAccountFactoryV3} from "../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
@@ -142,10 +142,11 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
         external
         override
         onlyOwner // U:[AF-1]
+
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
 
-        (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
+        address borrower = ICreditManagerV3(creditManager).borrowerOf(creditAccount);
         if (borrower != address(0)) {
             revert CreditAccountIsInUseException(); // U:[AF-5A]
         }

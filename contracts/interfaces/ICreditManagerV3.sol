@@ -7,8 +7,8 @@ import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
-///         - `DECREASE_DEBT` repays debt components (quota interest and fees -> base interest and fees -> debt principal)
-///           and updates all corresponding state variables (base interest index, quota interest and fees, debt).
+///         - `DECREASE_DEBT` repays debt components (base interest and fees -> debt principal)
+///           and updates all corresponding state variables (base interest index, debt).
 ///           When repaying all the debt, ensures that account has no enabled quotas.
 enum ManageDebtAction {
     INCREASE_DEBT,
@@ -33,40 +33,37 @@ enum CollateralCalcTask {
     DEBT_COLLATERAL_SAFE_PRICES
 }
 
+struct CollateralTokenData {
+    address token;
+    uint16 lt;
+}
+
 struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;
-    uint128 cumulativeQuotaInterest;
-    uint128 quotaFees;
-    uint256 enabledTokensMask;
     uint16 flags;
     uint64 lastDebtUpdate;
+    uint40 openingTimestamp;
+    uint40 maturityTimestamp;
+    uint40 forcedClosureTimestamp;
+    address interestRateModel;
+    bytes interestRateParams;
     address borrower;
+    CollateralTokenData[] collateralTokens;
+    address priceOracle;
 }
 
 struct CollateralDebtData {
     uint256 debt;
     uint256 cumulativeIndexNow;
     uint256 cumulativeIndexLastUpdate;
-    uint128 cumulativeQuotaInterest;
+    uint16 earlyClosurePenalty;
     uint256 accruedInterest;
     uint256 accruedFees;
     uint256 totalDebtUSD;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
-    uint256 enabledTokensMask;
-    uint256 quotedTokensMask;
-    address[] quotedTokens;
-    address _poolQuotaKeeper;
-}
-
-struct CollateralTokenData {
-    address token;
-    uint16 ltInitial;
-    uint16 ltFinal;
-    uint40 timestampRampStart;
-    uint24 rampDuration;
 }
 
 interface ICreditManagerV3Events {
@@ -76,7 +73,7 @@ interface ICreditManagerV3Events {
 
 /// @title Credit manager V3 interface
 interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
-    function pool() external view returns (address);
+    function matchingEngine() external view returns (address);
 
     function underlying() external view returns (address);
 
@@ -92,18 +89,24 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    function openCreditAccount(address onBehalfOf) external returns (address);
+    function openCreditAccount(
+        address onBehalfOf,
+        address interestRateModel,
+        address priceOracle,
+        uint40 maturityTimestamp,
+        bytes calldata interestRateParams,
+        CollateralTokenData[] calldata collateralTokens
+    ) external returns (address creditAccount);
 
     function closeCreditAccount(address creditAccount) external;
 
-    function liquidateCreditAccount(
-        address creditAccount,
-        CollateralDebtData calldata collateralDebtData,
-        address to,
-        bool isExpired
-    ) external returns (uint256 remainingFunds, uint256 loss);
+    function forceClosure(address creditAccount) external;
 
-    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
+    function liquidateCreditAccount(address creditAccount, CollateralDebtData calldata collateralDebtData, address to)
+        external
+        returns (uint256 remainingFunds, uint256 loss);
+
+    function manageDebt(address creditAccount, uint256 amount, ManageDebtAction action)
         external
         returns (uint256 newDebt, uint256, uint256);
 
@@ -141,15 +144,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     // COLLATERAL CHECKS //
     // ----------------- //
 
-    function priceOracle() external view returns (address);
-
-    function fullCollateralCheck(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256[] calldata collateralHints,
-        uint16 minHealthFactor,
-        bool useSafePrices
-    ) external returns (uint256);
+    function fullCollateralCheck(address creditAccount, uint16 minHealthFactor, bool useSafePrices) external;
 
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
 
@@ -158,78 +153,50 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         view
         returns (CollateralDebtData memory cdd);
 
-    // ------ //
-    // QUOTAS //
-    // ------ //
+    function revertIfNotAllowedCollateral(address token) external view;
 
-    function poolQuotaKeeper() external view returns (address);
+    function isAllowedCollateral(address token) external view returns (bool);
 
-    function quotedTokensMask() external view returns (uint256);
-
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
-        external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable);
+    function getTokenMaskOrRevert(address token) external view returns (uint256);
 
     // --------------------- //
     // CREDIT MANAGER PARAMS //
     // --------------------- //
+
+    function ltUnderlying() external view returns (uint16);
 
     function maxEnabledTokens() external view returns (uint8);
 
     function fees()
         external
         view
-        returns (
-            uint16 feeInterest,
-            uint16 feeLiquidation,
-            uint16 liquidationDiscount,
-            uint16 feeLiquidationExpired,
-            uint16 liquidationDiscountExpired
-        );
+        returns (uint16 feeInterest, uint16 feeLiquidation, uint16 liquidationDiscount, uint16 maxEarlyClosurePenalty);
 
     function collateralTokensCount() external view returns (uint8);
-
-    function getTokenMaskOrRevert(address token) external view returns (uint256 tokenMask);
-
-    function getTokenByMask(uint256 tokenMask) external view returns (address token);
-
-    function liquidationThresholds(address token) external view returns (uint16 lt);
-
-    function ltParams(address token)
-        external
-        view
-        returns (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration);
-
-    function collateralTokenByMask(uint256 tokenMask)
-        external
-        view
-        returns (address token, uint16 liquidationThreshold);
 
     // ------------ //
     // ACCOUNT INFO //
     // ------------ //
 
-    function creditAccountInfo(address creditAccount)
-        external
-        view
-        returns (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        );
-
     function getBorrowerOrRevert(address creditAccount) external view returns (address borrower);
+
+    function borrowerOf(address creditAccount) external view returns (address borrower);
+
+    function collateralTokensOf(address creditAccount) external view returns (CollateralTokenData[] memory);
+
+    function priceOracleOf(address creditAccount) external view returns (address priceOracle);
+
+    function earlyClosurePenaltyOf(address creditAccount) external view returns (uint16 earlyExitPenalty);
+
+    function isAccountForceClosable(address creditAccount) external view returns (bool);
+
+    function isAccountMature(address creditAccount) external view returns (bool);
+
+    function liquidationThresholds(address creditAccount, address token) external view returns (uint16 lt);
 
     function flagsOf(address creditAccount) external view returns (uint16);
 
     function setFlagFor(address creditAccount, uint16 flag, bool value) external;
-
-    function enabledTokensMaskOf(address creditAccount) external view returns (uint256);
 
     function creditAccounts() external view returns (address[] memory);
 
@@ -243,27 +210,16 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function addToken(address token) external;
 
-    function setCollateralTokenData(
-        address token,
-        uint16 ltInitial,
-        uint16 ltFinal,
-        uint40 timestampRampStart,
-        uint24 rampDuration
-    ) external;
-
     function setFees(
         uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
-        uint16 feeLiquidationExpired,
-        uint16 liquidationDiscountExpired
+        uint16 maxEarlyClosurePenalty
     ) external;
 
     function setContractAllowance(address adapter, address targetContract) external;
 
     function setCreditFacade(address creditFacade) external;
-
-    function setPriceOracle(address priceOracle) external;
 
     function setCreditConfigurator(address creditConfigurator) external;
 }

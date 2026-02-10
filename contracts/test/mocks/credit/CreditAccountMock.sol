@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -54,3 +55,4 @@ contract CreditAccountMock is ICreditAccountV3, CreditAccountMockEvents {
 
     function rescue(address, bytes calldata) external pure override {}
 }
+*/

@@ -9,9 +9,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAliasedLossPolicyV3} from "../interfaces/IAliasedLossPolicyV3.sol";
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
-import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
-import {IPoolV3} from "../interfaces/IPoolV3.sol";
+import {ICreditManagerV3, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
+import {IMatchingEngineV3} from "../interfaces/IMatchingEngineV3.sol";
 import {IPriceOracleV3, PriceFeedParams} from "../interfaces/IPriceOracleV3.sol";
 import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 import {IPriceFeedStore, PriceUpdate} from "../interfaces/base/IPriceFeedStore.sol";
@@ -40,7 +39,7 @@ import {TokenIsNotQuotedException} from "../interfaces/IExceptions.sol";
 contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLossPolicyV3 {
     using BitMask for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
-    using MarketHelper for IPoolV3;
+    using MarketHelper for IMatchingEngineV3;
 
     /// @dev Internal enum with possible price feed types
     enum PriceFeedType {
@@ -52,8 +51,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     struct SharedInfo {
         address creditManager;
         address priceOracle;
-        address quotaKeeper;
-        uint256 underlyingPriceRAY;
     }
 
     /// @dev Internal struct that contains token info needed for collateral calculation
@@ -61,7 +58,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
         address token;
         uint16 lt;
         uint256 balance;
-        uint256 quotaUSD;
         PriceFeedParams aliasParams;
     }
 
@@ -70,12 +66,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
 
     /// @notice Contract type
     bytes32 public constant override contractType = "LOSS_POLICY::ALIASED";
-
-    /// @notice Pool for which the loss policy is applied
-    address public immutable override pool;
-
-    /// @notice Pool's underlying token
-    address public immutable override underlying;
 
     /// @notice Price feed store
     address public immutable override priceFeedStore;
@@ -93,12 +83,12 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     mapping(address => PriceFeedParams) internal _aliasPriceFeedParams;
 
     /// @notice Constructor
-    /// @param pool_ Pool address
+    /// @param matchingEngine_ Matching engine address
     /// @param addressProvider_ Address provider contract address
     /// @custom:tests U:[ALP-1]
-    constructor(address pool_, address addressProvider_) ACLTrait(IPoolV3(pool_).getACL()) {
-        pool = pool_;
-        underlying = IPoolV3(pool_).asset();
+    constructor(address matchingEngine_, address addressProvider_)
+        ACLTrait(IMatchingEngineV3(matchingEngine_).getACL())
+    {
         priceFeedStore = IAddressProvider(addressProvider_).getAddressOrRevert(AP_PRICE_FEED_STORE, NO_VERSION_CONTROL);
     }
 
@@ -146,7 +136,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     }
 
     /// @notice Returns the list of alias price feeds that need to return a valid price to liquidate `creditAccount`
-    /// @custom:tests U:[ALP-6]
     function getRequiredAliasPriceFeeds(address creditAccount)
         external
         view
@@ -154,15 +143,12 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
         returns (address[] memory priceFeeds)
     {
         address creditManager = ICreditAccountV3(creditAccount).creditManager();
-        uint256 remainingTokensMask =
-            ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount).disable(UNDERLYING_TOKEN_MASK);
-        priceFeeds = new address[](remainingTokensMask.calcEnabledTokens());
+        CollateralTokenData[] memory collateralTokens =
+            ICreditManagerV3(creditManager).collateralTokensOf(creditAccount);
+        priceFeeds = new address[](collateralTokens.length);
         uint256 numAliases;
-        while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask.lsbMask();
-            remainingTokensMask ^= tokenMask;
-
-            address token = ICreditManagerV3(creditManager).getTokenByMask(tokenMask);
+        for (uint256 i = 0; i < collateralTokens.length; ++i) {
+            address token = collateralTokens[i].token;
             address aliasPriceFeed = _aliasPriceFeedParams[token].priceFeed;
             if (aliasPriceFeed != address(0)) priceFeeds[numAliases++] = aliasPriceFeed;
         }
@@ -200,10 +186,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     /// @custom:tests U:[ALP-3]
     function setAliasPriceFeed(address token, address priceFeed) external override configuratorOnly {
         if (_aliasPriceFeedParams[token].priceFeed == priceFeed) return;
-
-        if (!IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper()).isQuotedToken(token)) {
-            revert TokenIsNotQuotedException();
-        }
 
         if (priceFeed == address(0)) {
             if (_tokensWithAliasSet.remove(token)) {
@@ -244,15 +226,12 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
         SharedInfo memory sharedInfo = _getSharedInfo(creditAccount);
         twvUSDAliased = twvUSD;
 
-        uint256 remainingTokensMask =
-            ICreditManagerV3(sharedInfo.creditManager).enabledTokensMaskOf(creditAccount).disable(UNDERLYING_TOKEN_MASK);
-        while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask.lsbMask();
-            remainingTokensMask ^= tokenMask;
+        CollateralTokenData[] memory collateralTokens =
+            ICreditManagerV3(sharedInfo.creditManager).collateralTokensOf(creditAccount);
 
-            TokenInfo memory tokenInfo = _getTokenInfo(creditAccount, tokenMask, sharedInfo);
-            // no need to check other fields since `quotaUSD` is initialized only if all of them are non-zero
-            if (tokenInfo.quotaUSD == 0) continue;
+        for (uint256 i = 0; i < collateralTokens.length; ++i) {
+            TokenInfo memory tokenInfo = _getTokenInfo(creditAccount, collateralTokens[i].token, collateralTokens[i].lt);
+            if (tokenInfo.balance == 0) continue;
 
             twvUSDAliased += _getWeightedValueUSD(tokenInfo, sharedInfo, PriceFeedType.Aliased);
             twvUSDAliased -= _getWeightedValueUSD(tokenInfo, sharedInfo, PriceFeedType.Normal);
@@ -263,19 +242,17 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     /// @custom:tests U:[ALP-8]
     function _getSharedInfo(address creditAccount) internal view returns (SharedInfo memory sharedInfo) {
         sharedInfo.creditManager = ICreditAccountV3(creditAccount).creditManager();
-        sharedInfo.priceOracle = ICreditManagerV3(sharedInfo.creditManager).priceOracle();
-        sharedInfo.quotaKeeper = IPoolV3(pool).poolQuotaKeeper();
-        sharedInfo.underlyingPriceRAY = IPriceOracleV3(sharedInfo.priceOracle).convertToUSD(RAY, underlying);
+        sharedInfo.priceOracle = ICreditManagerV3(sharedInfo.creditManager).priceOracleOf(creditAccount);
     }
 
     /// @dev Returns the token info needed for `creditAccount` collateral value calculation
     /// @custom:tests U:[ALP-9]
-    function _getTokenInfo(address creditAccount, uint256 tokenMask, SharedInfo memory sharedInfo)
+    function _getTokenInfo(address creditAccount, address token, uint16 lt)
         internal
         view
         returns (TokenInfo memory info)
     {
-        (info.token, info.lt) = ICreditManagerV3(sharedInfo.creditManager).collateralTokenByMask(tokenMask);
+        (info.token, info.lt) = (token, lt);
         if (info.lt == 0) return info;
 
         info.aliasParams = _aliasPriceFeedParams[info.token];
@@ -283,9 +260,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
 
         info.balance = ERC20(info.token).balanceOf(creditAccount);
         if (info.balance == 0) return info;
-
-        (uint256 quota,) = IPoolQuotaKeeperV3(sharedInfo.quotaKeeper).getQuota(creditAccount, info.token);
-        info.quotaUSD = quota * sharedInfo.underlyingPriceRAY / RAY;
     }
 
     /// @dev Returns the weighted value in USD (computed via either normal or alias price feed) for a single token
@@ -299,7 +273,7 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
             ? _convertToUSDAlias(tokenInfo.aliasParams, tokenInfo.balance)
             : IPriceOracleV3(sharedInfo.priceOracle).convertToUSD(tokenInfo.balance, tokenInfo.token);
 
-        return Math.min(valueUSD * tokenInfo.lt / PERCENTAGE_FACTOR, tokenInfo.quotaUSD);
+        return valueUSD * tokenInfo.lt / PERCENTAGE_FACTOR;
     }
 
     /// @dev Converts token amount to USD using its alias price feed

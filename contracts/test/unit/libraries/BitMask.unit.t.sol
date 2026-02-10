@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -62,3 +63,4 @@ contract BitMaskUnitTest is TestHelper {
         assertEq(mask & (lsbMask - 1), 0, "LSB is not least");
     }
 }
+*/

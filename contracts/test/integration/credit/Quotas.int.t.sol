@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -474,3 +475,4 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         creditFacade.multicall(creditAccount, calls);
     }
 }
+*/

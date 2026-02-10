@@ -60,21 +60,12 @@ error RegisteredPoolOnlyException();
 /// @notice Reverts if address key isn't found in address provider
 error AddressNotFoundException();
 
-// ----------------- //
-// POOL, PQK, GAUGES //
-// ----------------- //
+// --------------- //
+// MATCHING ENGINE //
+// --------------- //
 
 /// @notice Thrown by pool-adjacent contracts when a credit manager being connected has a wrong pool address
 error IncompatibleCreditManagerException();
-
-/// @notice Thrown when attempting to set an incompatible successor staking contract
-error IncompatibleSuccessorException();
-
-/// @notice Thrown when attempting to vote in a non-approved contract
-error VotingContractNotAllowedException();
-
-/// @notice Thrown when attempting to unvote more votes than there are
-error InsufficientVotesException();
 
 /// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
@@ -82,14 +73,8 @@ error BorrowingMoreThanU2ForbiddenException();
 /// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
 error CreditManagerCantBorrowException();
 
-/// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
-error IncompatiblePoolQuotaKeeperException();
-
-/// @notice Thrown when attempting to connect a gauge to an incompatible pool quota keeper
-error IncompatibleGaugeException();
-
-/// @notice Thrown when the quota is outside of min/max bounds
-error QuotaIsOutOfBoundsException();
+/// @notice Thrown on attempting to call an access restricted function not as credit account's lender
+error CallerNotLenderException();
 
 // -------------- //
 // CREDIT MANAGER //
@@ -260,14 +245,8 @@ error CallerNotPausableAdminException();
 /// @notice Thrown on attempting to unpause a contract without unpausable admin rights
 error CallerNotUnpausableAdminException();
 
-/// @notice Thrown on attempting to call an access restricted function not as gauge
-error CallerNotGaugeException();
-
-/// @notice Thrown on attempting to call an access restricted function not as quota keeper
-error CallerNotPoolQuotaKeeperException();
-
-/// @notice Thrown on attempting to call an access restricted function not as voter
-error CallerNotVoterException();
+/// @notice Thrown on attempting to call an access restricted function not as matching engine
+error CallerNotMatchingEngineException();
 
 /// @notice Thrown on attempting to call an access restricted function not as allowed adapter
 error CallerNotAdapterException();

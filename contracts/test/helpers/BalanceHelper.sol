@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -18,6 +19,7 @@ enum Assertion {
     GE,
     LE
 }
+*_/
 
 struct ExpectedTokenTransfer {
     string reason;
@@ -192,3 +194,4 @@ contract BalanceHelper is BalanceEngine {
         expectAllowance(tokenTestSuite.addressOf(t), owner, spender, expectedAllowance, reason);
     }
 }
+*/

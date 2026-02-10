@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -29,3 +30,4 @@ contract GaugeV3Harness is GaugeV3 {
         userTokenVotes[user][token] = UserVotes({votesLpSide: votesLpSide, votesCaSide: votesCaSide});
     }
 }
+*/

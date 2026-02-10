@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -13,6 +14,7 @@ struct MockToken {
     int256 price;
     uint256 underlying;
 }
+*_/
 
 library MockTokensData {
     function getTokenData() internal pure returns (MockToken[] memory result) {
@@ -56,3 +58,4 @@ library MockTokensData {
         }
     }
 }
+*/

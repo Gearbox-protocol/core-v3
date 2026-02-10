@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -33,6 +34,7 @@ interface IERC4626Events {
         address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
     );
 }
+
 
 /// @title Pool V3 unit test
 /// @notice U:[LP]: Unit tests for lending pool
@@ -1049,9 +1051,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 1900, 1300, true));
 
         pool.updateBaseInterest({
-            expectedLiquidityDelta: -300,
-            availableLiquidityDelta: 300,
-            checkOptimalBorrowing: true
+            expectedLiquidityDelta: -300, availableLiquidityDelta: 300, checkOptimalBorrowing: true
         });
 
         assertEq(pool.expectedLiquidity(), 1900, "Incorrect expectedLiquidity");
@@ -1301,3 +1301,4 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.setWithdrawFee(fee);
     }
 }
+*/

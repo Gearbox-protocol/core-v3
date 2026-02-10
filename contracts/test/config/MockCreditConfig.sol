@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -116,3 +117,4 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         return _creditManagers;
     }
 }
+*/

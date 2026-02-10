@@ -18,8 +18,6 @@ interface IAliasedLossPolicyV3 is IAliasedLossPolicyV3Events, ILossPolicy, IACLT
     // GETTERS //
     // ------- //
 
-    function pool() external view returns (address);
-    function underlying() external view returns (address);
     function priceFeedStore() external view returns (address);
     function getTokensWithAlias() external view returns (address[] memory);
     function getAliasPriceFeedParams(address token) external view returns (PriceFeedParams memory);

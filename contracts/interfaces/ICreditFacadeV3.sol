@@ -8,6 +8,8 @@ import "./ICreditFacadeV3Multicall.sol";
 import {IACLTrait} from "./base/IACLTrait.sol";
 import {PriceUpdate} from "./base/IPriceFeedStore.sol";
 import {IVersion} from "./base/IVersion.sol";
+import {CollateralTokenData} from "./ICreditManagerV3.sol";
+import {Balance} from "../libraries/BalancesLogic.sol";
 
 /// @notice Multicall element
 /// @param target Call target, which is either credit facade or adapter
@@ -26,19 +28,26 @@ struct DebtLimits {
 }
 
 /// @notice Collateral check params
-/// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
-///        when known subset of account's collateral tokens covers all the debt
 /// @param minHealthFactor Min account's health factor in bps in order not to revert
 struct FullCheckParams {
-    uint256[] collateralHints;
     uint16 minHealthFactor;
+}
+
+struct AccountOpeningParams {
+    address onBehalfOf;
+    address interestRateModel;
+    address priceOracle;
+    uint256 debt;
+    uint40 maturityTimestamp;
+    bytes interestRateParams;
+    CollateralTokenData[] collateralTokens;
+    Balance[] inititalCollaterals;
+    MultiCall[] calls;
 }
 
 interface ICreditFacadeV3Events {
     /// @notice Emitted when a new credit account is opened
-    event OpenCreditAccount(
-        address indexed creditAccount, address indexed onBehalfOf, address indexed caller, uint256 referralCode
-    );
+    event OpenCreditAccount(address indexed creditAccount, address indexed onBehalfOf);
 
     /// @notice Emitted when account is closed
     event CloseCreditAccount(address indexed creditAccount, address indexed borrower);
@@ -47,6 +56,8 @@ interface ICreditFacadeV3Events {
     event LiquidateCreditAccount(
         address indexed creditAccount, address indexed liquidator, address to, uint256 remainingFunds
     );
+
+    event ForceClosure(address indexed creditAccount);
 
     /// @notice Emitted when account is partially liquidated
     event PartiallyLiquidateCreditAccount(
@@ -87,34 +98,19 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
 
     function priceFeedStore() external view returns (address);
 
-    function degenNFT() external view returns (address);
-
     function weth() external view returns (address);
 
     function botList() external view returns (address);
-
-    function maxDebtPerBlockMultiplier() external view returns (uint8);
-
-    function maxQuotaMultiplier() external view returns (uint256);
-
-    function expirable() external view returns (bool);
-
-    function expirationDate() external view returns (uint40);
 
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
     function lossPolicy() external view returns (address);
 
-    function forbiddenTokenMask() external view returns (uint256);
-
     // ------------------ //
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint256 referralCode)
-        external
-        payable
-        returns (address creditAccount);
+    function openCreditAccount(AccountOpeningParams calldata params) external payable returns (address creditAccount);
 
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
@@ -126,6 +122,8 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     ) external;
 
     function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
+
+    function forceClosure(address creditAccount) external;
 
     function partiallyLiquidateCreditAccount(
         address creditAccount,
@@ -144,13 +142,9 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     // CONFIGURATION //
     // ------------- //
 
-    function setExpirationDate(uint40 newExpirationDate) external;
-
-    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setLossPolicy(address newLossPolicy) external;
-
-    function setTokenAllowance(address token, AllowanceAction allowance) external;
 
     function pause() external;
 

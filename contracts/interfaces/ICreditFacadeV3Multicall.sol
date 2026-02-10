@@ -16,13 +16,13 @@ uint192 constant ADD_COLLATERAL_PERMISSION = 1 << 0;
 uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
 uint192 constant DECREASE_DEBT_PERMISSION = 1 << 2;
 uint192 constant WITHDRAW_COLLATERAL_PERMISSION = 1 << 5;
-uint192 constant UPDATE_QUOTA_PERMISSION = 1 << 6;
 uint192 constant SET_BOT_PERMISSIONS_PERMISSION = 1 << 8;
 uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 16;
 
-uint192 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | UPDATE_QUOTA_PERMISSION
-    | INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | SET_BOT_PERMISSIONS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
-uint192 constant OPEN_CREDIT_ACCOUNT_PERMISSIONS = ALL_PERMISSIONS & ~DECREASE_DEBT_PERMISSION;
+uint192 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
+    | DECREASE_DEBT_PERMISSION | SET_BOT_PERMISSIONS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
+uint192 constant OPEN_CREDIT_ACCOUNT_PERMISSIONS =
+    ALL_PERMISSIONS & ~DECREASE_DEBT_PERMISSION & ~ADD_COLLATERAL_PERMISSION;
 uint192 constant CLOSE_CREDIT_ACCOUNT_PERMISSIONS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION;
 uint192 constant LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS =
     EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION;
@@ -41,10 +41,6 @@ uint256 constant EXTERNAL_CONTRACT_WAS_CALLED_FLAG = 1 << 193;
 /// @dev Indicates that the price updates call should be skipped, set to true on liquidation when the first call
 ///      of the multicall is `onDemandPriceUpdates`
 uint256 constant SKIP_PRICE_UPDATES_CALL_FLAG = 1 << 194;
-
-/// @dev Indicates that collateral check must revert if any forbidden token is encountered on the account,
-///      set to true after risky operations, such as `increaseDebt` or `withdrawCollateral`
-uint256 constant REVERT_ON_FORBIDDEN_TOKENS_FLAG = 1 << 195;
 
 /// @dev Indicates that collateral check must be performed using safe prices, set to true on `withdrawCollateral`
 ///      or if account has enabled forbidden tokens
@@ -98,16 +94,6 @@ interface ICreditFacadeV3Multicall {
     function addCollateralWithPermit(address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         external;
 
-    /// @notice Increases account's debt
-    /// @param amount Underlying amount to borrow
-    /// @dev Increasing debt is prohibited when closing an account
-    /// @dev Increasing debt is prohibited if it was previously updated in the same block
-    /// @dev The resulting debt amount must be within allowed limits
-    /// @dev Increasing debt is prohibited if there are forbidden tokens enabled as collateral on the account
-    /// @dev After debt increase, total amount borrowed by the credit manager in the current block must not exceed
-    ///      the limit defined in the facade
-    function increaseDebt(uint256 amount) external;
-
     /// @notice Decreases account's debt
     /// @param amount Underlying amount to repay, value above account's total debt indicates full repayment
     /// @dev Decreasing debt is prohibited when opening an account
@@ -117,16 +103,6 @@ interface ICreditFacadeV3Multicall {
     /// @dev Full repayment brings account into a special mode that skips collateral checks and thus requires
     ///      an account to have no potential debt sources, e.g., all quotas must be disabled
     function decreaseDebt(uint256 amount) external;
-
-    /// @notice Updates account's quota for a token
-    /// @param token Collateral token to update the quota for (can't be underlying)
-    /// @param quotaChange Desired quota change in underlying token units (`type(int96).min` to disable quota)
-    /// @param minQuota Minimum resulting account's quota for token required not to revert
-    /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
-    /// @dev Quota increase is prohibited for forbidden tokens
-    /// @dev Quota update is prohibited if account has zero debt
-    /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
-    function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
     /// @notice Withdraws collateral from account
     /// @param token Token to withdraw
@@ -141,12 +117,9 @@ interface ICreditFacadeV3Multicall {
     function withdrawCollateral(address token, uint256 amount, address to) external;
 
     /// @notice Sets advanced collateral check parameters
-    /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
-    ///        when known subset of account's collateral tokens covers all the debt. Underlying token is always
-    ///        checked last so it's forbidden to pass its mask.
     /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
     /// @dev This method can't be called during closure or liquidation
-    function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
+    function setFullCheckParams(uint16 minHealthFactor) external;
 
     /// @notice Sets `bot`'s permissions to manage account to `permissions`
     /// @param bot Bot to set permissions for

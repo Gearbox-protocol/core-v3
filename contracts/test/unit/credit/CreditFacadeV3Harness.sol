@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -73,3 +74,4 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         return _isExpired();
     }
 }
+*/

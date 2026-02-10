@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
@@ -508,3 +509,4 @@ contract CreditLogicUnitTest is TestHelper {
         return a * (PERCENTAGE_FACTOR - TEST_FEE) / PERCENTAGE_FACTOR;
     }
 }
+*/

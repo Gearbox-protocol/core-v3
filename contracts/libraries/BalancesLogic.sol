@@ -14,12 +14,6 @@ struct Balance {
     uint256 balance;
 }
 
-struct BalanceWithMask {
-    address token;
-    uint256 tokenMask;
-    uint256 balance;
-}
-
 struct BalanceDelta {
     address token;
     int256 amount;
@@ -93,56 +87,14 @@ library BalancesLogic {
 
     /// @dev Returns balances of specified tokens on the credit account
     /// @param creditAccount Credit account to compute balances for
-    /// @param tokensMask Bit mask of tokens to compute balances for
-    /// @param getTokenByMaskFn Function that returns token's address by its mask
     function storeBalances(
         address creditAccount,
-        uint256 tokensMask,
-        function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view returns (BalanceWithMask[] memory balances) {
-        if (tokensMask == 0) return balances;
-
-        balances = new BalanceWithMask[](tokensMask.calcEnabledTokens()); // U:[BLL-4]
-        unchecked {
-            uint256 i;
-            while (tokensMask != 0) {
-                uint256 tokenMask = tokensMask.lsbMask();
-                tokensMask ^= tokenMask;
-
-                address token = getTokenByMaskFn(tokenMask);
-                balances[i] = BalanceWithMask({
-                    token: token,
-                    tokenMask: tokenMask,
-                    balance: IERC20(token).safeBalanceOf(creditAccount)
-                }); // U:[BLL-4]
-                ++i;
-            }
-        }
-    }
-
-    /// @dev Compares current balances of specified tokens with the previously stored ones
-    /// @param creditAccount Credit account to compare balances for
-    /// @param tokensMask Bit mask of tokens to compare balances for
-    /// @param balances Array of previously stored balances
-    /// @param comparison Whether current balances must be greater/less than or equal to stored ones
-    /// @return failedToken The first token for which the condition specified by `comparison` fails, if any
-    /// @dev This function assumes that `tokensMask` encodes a subset of tokens from `balances`
-    function compareBalances(
-        address creditAccount,
-        uint256 tokensMask,
-        BalanceWithMask[] memory balances,
-        Comparison comparison
-    ) internal view returns (address failedToken) {
-        if (tokensMask == 0) return address(0);
-
-        unchecked {
-            uint256 len = balances.length;
-            for (uint256 i; i < len; ++i) {
-                if (tokensMask & balances[i].tokenMask == 0) continue;
-                if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison)) {
-                    return balances[i].token; // U:[BLL-5]
-                }
-            }
+        function(address) view returns (address[] memory) getTokensByCreditAccountFn
+    ) internal view returns (Balance[] memory balances) {
+        address[] memory tokens = getTokensByCreditAccountFn(creditAccount);
+        balances = new Balance[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            balances[i] = Balance({token: tokens[i], balance: IERC20(tokens[i]).safeBalanceOf(creditAccount)});
         }
     }
 }
