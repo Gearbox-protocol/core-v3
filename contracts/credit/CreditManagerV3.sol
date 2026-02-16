@@ -38,7 +38,8 @@ import {
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     MAX_SANE_ENABLED_TOKENS,
     PERCENTAGE_FACTOR,
-    UNDERLYING_TOKEN_MASK
+    UNDERLYING_TOKEN_MASK,
+    FORCE_CLOSURE_GRACE_PERIOD
 } from "../libraries/Constants.sol";
 
 // EXCEPTIONS
@@ -186,12 +187,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint40 maturityTimestamp,
         CollateralTokenData[] calldata collateralTokens
     ) external override nonZeroAddress(onBehalfOf) nonReentrant creditFacadeOnly returns (address creditAccount) {
-        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
+        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(0, 0);
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
-
-        /// TODO: possibly turn into assembly again?
-        /// TODO: price feed validation
 
         newCreditAccountInfo.flags = 0;
         newCreditAccountInfo.lastDebtUpdate = 0;
@@ -310,8 +308,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 useSafePrices: false
             });
 
-            /// TODO: save profit in a separate variable to retain fees?
-
             uint256 earlyClosureAmount =
                 collateralDebtData.calcTotalDebt() * collateralDebtData.earlyClosurePenalty / PERCENTAGE_FACTOR;
 
@@ -328,10 +324,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex;
         }
 
-        /// TODO: 7 days to constant or param
-
         currentCreditAccountInfo.maturityTimestamp = uint40(block.timestamp);
-        currentCreditAccountInfo.forcedClosureTimestamp = uint40(block.timestamp + 7 days);
+        currentCreditAccountInfo.forcedClosureTimestamp = uint40(block.timestamp + FORCE_CLOSURE_GRACE_PERIOD);
     }
 
     /// @notice Increases or decreases credit account's debt
@@ -738,46 +732,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return allowedCollateralSet.contains(token);
     }
 
-    function borrowerOf(address creditAccount) public view override returns (address borrower) {
-        return creditAccountInfo[creditAccount].borrower;
-    }
-
-    function collateralTokensOf(address creditAccount) public view override returns (CollateralTokenData[] memory) {
-        return creditAccountInfo[creditAccount].collateralTokens;
-    }
-
-    function priceOracleOf(address creditAccount) public view override returns (address priceOracle) {
-        return creditAccountInfo[creditAccount].priceOracle;
-    }
-
-    /// @notice Returns collateral token's liquidation threshold
-    /// @param token Token address
-    /// @return lt Token's liquidation threshold in bps
-    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
-    function liquidationThresholds(address creditAccount, address token) public view override returns (uint16 lt) {
-        revertIfNotAllowedCollateral(token);
-
-        CollateralTokenData[] memory collateralTokens = creditAccountInfo[creditAccount].collateralTokens;
-        for (uint256 i = 0; i < collateralTokens.length; ++i) {
-            if (collateralTokens[i].token == token) {
-                return collateralTokens[i].lt;
-            }
-        }
-    }
-
-    function earlyClosurePenaltyOf(address creditAccount) public view override returns (uint16 earlyClosurePenalty) {
-        uint40 openingTimestamp = creditAccountInfo[creditAccount].openingTimestamp;
-        uint40 maturityTimestamp = creditAccountInfo[creditAccount].maturityTimestamp;
-
-        if (block.timestamp >= openingTimestamp && block.timestamp < maturityTimestamp) {
-            return uint16(
-                maxEarlyClosurePenalty * (maturityTimestamp - uint40(block.timestamp))
-                    / (maturityTimestamp - openingTimestamp)
-            );
-        }
-        return 0;
-    }
-
     // --------------------- //
     // CREDIT MANAGER PARAMS //
     // --------------------- //
@@ -854,6 +808,57 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     function isAccountMature(address creditAccount) public view override returns (bool) {
         return block.timestamp >= creditAccountInfo[creditAccount].maturityTimestamp;
+    }
+
+    function maturityTimestamps(address creditAccount)
+        public
+        view
+        override
+        returns (uint40 maturityTimestamp, uint40 forcedClosureTimestamp)
+    {
+        return (
+            creditAccountInfo[creditAccount].maturityTimestamp, creditAccountInfo[creditAccount].forcedClosureTimestamp
+        );
+    }
+
+    function borrowerOf(address creditAccount) public view override returns (address borrower) {
+        return creditAccountInfo[creditAccount].borrower;
+    }
+
+    function collateralTokensOf(address creditAccount) public view override returns (CollateralTokenData[] memory) {
+        return creditAccountInfo[creditAccount].collateralTokens;
+    }
+
+    function priceOracleOf(address creditAccount) public view override returns (address priceOracle) {
+        return creditAccountInfo[creditAccount].priceOracle;
+    }
+
+    /// @notice Returns collateral token's liquidation threshold
+    /// @param token Token address
+    /// @return lt Token's liquidation threshold in bps
+    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
+    function liquidationThresholds(address creditAccount, address token) public view override returns (uint16 lt) {
+        revertIfNotAllowedCollateral(token);
+
+        CollateralTokenData[] memory collateralTokens = creditAccountInfo[creditAccount].collateralTokens;
+        for (uint256 i = 0; i < collateralTokens.length; ++i) {
+            if (collateralTokens[i].token == token) {
+                return collateralTokens[i].lt;
+            }
+        }
+    }
+
+    function earlyClosurePenaltyOf(address creditAccount) public view override returns (uint16 earlyClosurePenalty) {
+        uint40 openingTimestamp = creditAccountInfo[creditAccount].openingTimestamp;
+        uint40 maturityTimestamp = creditAccountInfo[creditAccount].maturityTimestamp;
+
+        if (block.timestamp >= openingTimestamp && block.timestamp < maturityTimestamp) {
+            return uint16(
+                maxEarlyClosurePenalty * (maturityTimestamp - uint40(block.timestamp))
+                    / (maturityTimestamp - openingTimestamp)
+            );
+        }
+        return 0;
     }
 
     /// @notice Returns an array of all credit accounts opened in this credit manager

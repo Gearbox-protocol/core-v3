@@ -190,6 +190,11 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function isAccountMature(address creditAccount) external view returns (bool);
 
+    function maturityTimestamps(address creditAccount)
+        external
+        view
+        returns (uint40 maturityTimestamp, uint40 forcedClosureTimestamp);
+
     function liquidationThresholds(address creditAccount, address token) external view returns (uint16 lt);
 
     function flagsOf(address creditAccount) external view returns (uint16);

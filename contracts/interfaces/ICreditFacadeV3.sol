@@ -85,6 +85,12 @@ interface ICreditFacadeV3Events {
 
     /// @notice Emitted when a multicall is finished
     event FinishMultiCall();
+
+    /// @notice Emitted when borrowing is forbidden (by pausable admin or after lossy liquidation)
+    event ForbidBorrowing();
+
+    /// @notice Emitted when borrowing is allowed again (by configurator)
+    event AllowBorrowing();
 }
 
 /// @title Credit facade V3 interface
@@ -104,6 +110,8 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
     function lossPolicy() external view returns (address);
+
+    function borrowingForbidden() external view returns (bool);
 
     // ------------------ //
     // ACCOUNT MANAGEMENT //
@@ -144,6 +152,8 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setLossPolicy(address newLossPolicy) external;
+
+    function setBorrowingForbidden(bool forbidden) external;
 
     function pause() external;
 

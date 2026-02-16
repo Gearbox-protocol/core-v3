@@ -33,6 +33,7 @@ import {
     SellerOrder,
     BuyerOrder
 } from "../interfaces/IMatchingEngineV3.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IValidationStrategy} from "../interfaces/base/IValidationStrategy.sol";
 import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
@@ -113,6 +114,8 @@ contract MatchingEngineV3 is
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
+    EnumerableSet.AddressSet internal _priceOracleSet;
+
     modifier matcherOnly() {
         if (!_hasRole("MATCHER", msg.sender)) revert IncorrectParameterException();
         _;
@@ -142,6 +145,10 @@ contract MatchingEngineV3 is
     function isCancelled(bytes32 orderHash) external view override returns (bool) {
         return _cancelled[orderHash];
     }
+
+    // --------------- //
+    // EIP-712 HASHING //
+    // --------------- //
 
     function getGeneralOrderHash(GeneralOrderParams calldata order) public view override returns (bytes32) {
         bytes32 structHash = keccak256(
@@ -236,9 +243,9 @@ contract MatchingEngineV3 is
         return _creditManagerSet.values();
     }
 
-    // -------- //
-    // MATCHING //
-    // -------- //
+    // ------------------------ //
+    // ORDER MATCHING / CANCELS //
+    // ------------------------ //
 
     function matchCreditOrders(
         LenderOrder calldata lender,
@@ -330,18 +337,45 @@ contract MatchingEngineV3 is
 
         data.lender = buyerOrder.buyer;
         data.lenderFundingVault = address(0);
+        data.lenderFundingVault = buyerOrder.fundingVault;
 
         emit CreditAccountSold(
             creditAccount, sellerOrder.seller, buyerOrder.buyer, sellerOrder.receiveToken, sellerOrder.receiveAmount
         );
     }
 
-    // TODO: implement cancels?
+    function cancelOrder(LenderOrder calldata lender) external override {
+        if (msg.sender != lender.lender) revert CallerNotOrderOwnerException();
 
-    // function cancelOrder(bytes32 orderHash) external override {
-    //     _cancelled[orderHash] = true;
-    //     emit OrderCancelled(orderHash, msg.sender);
-    // }
+        bytes32 orderHash = getLenderOrderHash(lender);
+        _cancelOrder(orderHash);
+    }
+
+    function cancelOrder(BorrowerOrder calldata borrower) external override {
+        if (msg.sender != borrower.borrower) revert CallerNotOrderOwnerException();
+
+        bytes32 orderHash = getBorrowerOrderHash(borrower);
+        _cancelOrder(orderHash);
+    }
+
+    function cancelOrder(SellerOrder calldata seller) external override {
+        if (msg.sender != seller.seller) revert CallerNotOrderOwnerException();
+
+        bytes32 orderHash = getSellerOrderHash(seller);
+        _cancelOrder(orderHash);
+    }
+
+    function cancelOrder(BuyerOrder calldata buyer) external override {
+        if (msg.sender != buyer.buyer) revert CallerNotOrderOwnerException();
+
+        bytes32 orderHash = getBuyerOrderHash(buyer);
+        _cancelOrder(orderHash);
+    }
+
+    function _cancelOrder(bytes32 orderHash) internal {
+        _cancelled[orderHash] = true;
+        emit CancelOrder(orderHash, msg.sender);
+    }
 
     // --------------- //
     // ACCOUNT ACTIONS //
@@ -354,8 +388,6 @@ contract MatchingEngineV3 is
 
         ICreditFacadeV3(creditFacade).forceClosure(creditAccount);
     }
-
-    function sellCreditAccount(address creditAccount) external override {}
 
     // ---------------- //
     // ORDER VALIDATION //
@@ -389,6 +421,14 @@ contract MatchingEngineV3 is
         if (lender.generalParams.interestRateModel != borrower.generalParams.interestRateModel) {
             revert IncorrectParameterException();
         }
+
+        if (
+            lender.generalParams.priceOracle != borrower.generalParams.priceOracle
+                && !_priceOracleSet.contains(borrower.generalParams.priceOracle)
+        ) {
+            revert IncorrectParameterException();
+        }
+
         if (params.principal != borrower.principal) revert IncorrectParameterException();
 
         _validateExpiry(lender.generalParams.expiry);
@@ -402,13 +442,20 @@ contract MatchingEngineV3 is
             params.duration
         );
 
+        /// TODO: this can work incorrectly if interest rate models are custom,
+        ///       how to validate better
+        ///       IRMs need some better validation in general, since they now directly compute indices
+        ///       and can break CM math. On contract side this can only break a specific CA via borrower & lender footgun,
+        ///       but can possibly also break monitoring services
+
         if (!IInterestRateModel(lender.generalParams.interestRateModel)
                 .isGreaterOrEqualRate(borrower.generalParams.interestRateModel)) {
             revert IncorrectParameterException();
         }
 
         _validateCollaterals(
-            lender.generalParams.creditManager,
+            borrower.generalParams.creditManager,
+            borrower.generalParams.priceOracle,
             lender.permittedCollaterals,
             lender.collateralLTs,
             borrower.requiredCollaterals,
@@ -427,26 +474,78 @@ contract MatchingEngineV3 is
 
         uint256 filled = _alreadyFilled[lenderHash];
         if (filled + params.principal > lender.maxPrincipal) revert IncorrectParameterException();
+
+        _validateFundingVault(lender.fundingVault, borrower.generalParams.creditManager);
     }
 
-    // TODO: maybe enforce collateral sorting to avoid mishaps
+    function _validateSellOrderMatch(
+        SellerOrder calldata sellerOrder,
+        BuyerOrder calldata buyerOrder,
+        bytes calldata sellerSig,
+        bytes calldata buyerSig
+    ) internal view {
+        if (sellerOrder.seller == address(0) || sellerOrder.creditAccount == address(0)) {
+            revert ZeroAddressException();
+        }
+        if (buyerOrder.buyer == address(0) || buyerOrder.creditAccount == address(0)) {
+            revert ZeroAddressException();
+        }
+        if (sellerOrder.creditAccount != buyerOrder.creditAccount) {
+            revert IncorrectParameterException();
+        }
+
+        address creditAccount = sellerOrder.creditAccount;
+        CreditAccountData storage data = caData[creditAccount];
+        if (data.lender != sellerOrder.seller) revert CallerNotLenderException();
+
+        if (sellerOrder.receiveAmount == 0 || sellerOrder.receiveToken == address(0)) {
+            revert ZeroAddressException();
+        }
+
+        _validateExpiry(sellerOrder.expiry);
+        _validateExpiry(buyerOrder.expiry);
+
+        _validateFundingVault(buyerOrder.fundingVault, data.creditManager);
+
+        bytes32 sellerHash = getSellerOrderHash(sellerOrder);
+        bytes32 buyerHash = getBuyerOrderHash(buyerOrder);
+
+        _validateNonce(sellerOrder.seller, sellerOrder.nonce, sellerHash);
+        _validateNonce(buyerOrder.buyer, buyerOrder.nonce, buyerHash);
+
+        if (_cancelled[sellerHash] || _cancelled[buyerHash]) revert IncorrectParameterException();
+        _verifySignature(sellerOrder.seller, sellerHash, sellerSig);
+        _verifySignature(buyerOrder.buyer, buyerHash, buyerSig);
+
+        _validateEligibility(buyerOrder.validationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
+        _validateEligibility(data.borrowerValidationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
+    }
 
     function _validateCollaterals(
         address creditManager,
+        address priceOracle,
         address[] calldata lenderTokens,
         uint16[] calldata lenderLts,
         address[] calldata borrowerTokens,
         uint16[] calldata borrowerLts
     ) internal view {
         uint16 ltUnderlying = ICreditManagerV3(creditManager).ltUnderlying();
-        uint256 len = lenderTokens.length;
-        if (len != borrowerTokens.length || len != lenderLts.length || len != borrowerLts.length) {
+        uint256 len = borrowerTokens.length;
+        if (len != lenderTokens.length || len != lenderLts.length || len != borrowerLts.length) {
             revert IncorrectParameterException();
         }
         for (uint256 i; i < len; ++i) {
             if (lenderTokens[i] != borrowerTokens[i] || lenderLts[i] < borrowerLts[i] || borrowerLts[i] > ltUnderlying)
             {
                 revert IncorrectParameterException();
+            }
+
+            if (!ICreditManagerV3(creditManager).isAllowedCollateral(borrowerTokens[i])) {
+                revert IncorrectParameterException();
+            }
+
+            if (IPriceOracleV3(priceOracle).priceFeeds(borrowerTokens[i]) == address(0)) {
+                revert PriceFeedDoesNotExistException();
             }
         }
     }
@@ -480,45 +579,11 @@ contract MatchingEngineV3 is
         }
     }
 
-    function _validateSellOrderMatch(
-        SellerOrder calldata sellerOrder,
-        BuyerOrder calldata buyerOrder,
-        bytes calldata sellerSig,
-        bytes calldata buyerSig
-    ) internal view {
-        if (sellerOrder.seller == address(0) || sellerOrder.creditAccount == address(0)) {
-            revert ZeroAddressException();
-        }
-        if (buyerOrder.buyer == address(0) || buyerOrder.creditAccount == address(0)) {
-            revert ZeroAddressException();
-        }
-        if (sellerOrder.creditAccount != buyerOrder.creditAccount) {
+    function _validateFundingVault(address fundingVault, address creditManager) internal view {
+        if (fundingVault == address(0)) return;
+        if (IERC4626(fundingVault).asset() != ICreditManagerV3(creditManager).underlying()) {
             revert IncorrectParameterException();
         }
-
-        address creditAccount = sellerOrder.creditAccount;
-        CreditAccountData storage data = caData[creditAccount];
-        if (data.lender != sellerOrder.seller) revert CallerNotLenderException();
-
-        if (sellerOrder.receiveAmount == 0 || sellerOrder.receiveToken == address(0)) {
-            revert ZeroAddressException();
-        }
-
-        _validateExpiry(sellerOrder.expiry);
-        _validateExpiry(buyerOrder.expiry);
-
-        bytes32 sellerHash = getSellerOrderHash(sellerOrder);
-        bytes32 buyerHash = getBuyerOrderHash(buyerOrder);
-
-        _validateNonce(sellerOrder.seller, sellerOrder.nonce, sellerHash);
-        _validateNonce(buyerOrder.buyer, buyerOrder.nonce, buyerHash);
-
-        if (_cancelled[sellerHash] || _cancelled[buyerHash]) revert IncorrectParameterException();
-        _verifySignature(sellerOrder.seller, sellerHash, sellerSig);
-        _verifySignature(buyerOrder.buyer, buyerHash, buyerSig);
-
-        _validateEligibility(buyerOrder.validationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
-        _validateEligibility(data.borrowerValidationStrategy, buyerOrder.buyer, data.borrower, creditAccount);
     }
 
     /// -------------- ///
@@ -542,11 +607,18 @@ contract MatchingEngineV3 is
         if (fundingVault == address(0)) {
             IERC20(underlying).safeTransferFrom(lender, creditAccount, borrowedAmount);
         } else {
+            uint256 balanceBefore = IERC20(underlying).balanceOf(creditAccount);
             IERC4626(fundingVault).withdraw(borrowedAmount, creditAccount, lender);
+            uint256 balanceAfter = IERC20(underlying).balanceOf(creditAccount);
+            if (balanceAfter - balanceBefore < borrowedAmount) revert FundingVaultWithdrawnAmountTooLowException();
         }
 
         emit Borrow(creditManager, creditAccount, borrowedAmount);
     }
+
+    // TODO: profit / loss calculations are not reliable if price feeds are fully custom,
+    //       so we need to validate price oracles somehow. Check if whitelisting price oracles
+    //       is enough.
 
     function repayCreditAccount(address creditAccount, uint256 repaidAmount, uint256 profit, uint256 loss)
         external
@@ -565,8 +637,7 @@ contract MatchingEngineV3 is
             IERC20(underlying).safeTransfer(treasury, profit);
         } else if (loss > 0) {
             address treasury_ = treasury;
-            /// TODO: maybe approval instead of balance?
-            uint256 recoverableAssets = IERC20(underlying).balanceOf(treasury_);
+            uint256 recoverableAssets = IERC20(underlying).allowance(treasury_, address(this));
 
             if (recoverableAssets < loss) {
                 unchecked {
@@ -575,7 +646,6 @@ contract MatchingEngineV3 is
                 loss = recoverableAssets;
             }
 
-            /// TODO: approval from treasury is probably not great, how to do better?
             IERC20(underlying).safeTransferFrom(treasury_, lender, loss);
         }
 
@@ -609,6 +679,21 @@ contract MatchingEngineV3 is
         } else if (_creditManagerSet.contains(creditManager) && !isAllowed) {
             _creditManagerSet.remove(creditManager);
             emit RemoveCreditManager(creditManager);
+        }
+    }
+
+    function setPriceOracleStatus(address priceOracle, bool isAllowed)
+        external
+        override
+        configuratorOnly
+        nonZeroAddress(priceOracle)
+    {
+        if (!_priceOracleSet.contains(priceOracle) && isAllowed) {
+            _priceOracleSet.add(priceOracle);
+            emit AddPriceOracle(priceOracle);
+        } else if (_priceOracleSet.contains(priceOracle) && !isAllowed) {
+            _priceOracleSet.remove(priceOracle);
+            emit RemovePriceOracle(priceOracle);
         }
     }
 

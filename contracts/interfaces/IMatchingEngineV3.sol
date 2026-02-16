@@ -56,6 +56,7 @@ struct SellerOrder {
 struct BuyerOrder {
     address buyer;
     address creditAccount;
+    address fundingVault;
     uint256 nonce;
     uint40 expiry;
     address validationStrategy;
@@ -82,6 +83,11 @@ interface IMatchingEngineV3Events {
 
     event AddCreditManager(address indexed creditManager);
     event RemoveCreditManager(address indexed creditManager);
+
+    event AddPriceOracle(address indexed priceOracle);
+    event RemovePriceOracle(address indexed priceOracle);
+
+    event CancelOrder(bytes32 indexed orderHash, address indexed caller);
 
     event Borrow(address indexed creditManager, address indexed creditAccount, uint256 borrowedAmount);
     event Repay(address indexed creditManager, uint256 repaidAmount, uint256 profit, uint256 loss);
@@ -115,7 +121,10 @@ interface IMatchingEngineV3 is IVersion, IACLTrait, IContractsRegisterTrait, IMa
         bytes calldata buyerSig
     ) external;
 
-    function sellCreditAccount(address creditAccount) external;
+    function cancelOrder(LenderOrder calldata lender) external;
+    function cancelOrder(BorrowerOrder calldata borrower) external;
+    function cancelOrder(SellerOrder calldata seller) external;
+    function cancelOrder(BuyerOrder calldata buyer) external;
 
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
 
@@ -144,4 +153,6 @@ interface IMatchingEngineV3 is IVersion, IACLTrait, IContractsRegisterTrait, IMa
     function unpause() external;
 
     function setCreditManagerStatus(address creditManager, bool isAllowed) external;
+
+    function setPriceOracleStatus(address priceOracle, bool isAllowed) external;
 }

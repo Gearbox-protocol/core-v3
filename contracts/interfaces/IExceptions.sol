@@ -76,8 +76,14 @@ error CreditManagerCantBorrowException();
 /// @notice Thrown on attempting to call an access restricted function not as credit account's lender
 error CallerNotLenderException();
 
+/// @notice Thrown when attempting to cancel an order that is not owned by the caller
+error CallerNotOrderOwnerException();
+
 /// @notice Thrown when attempting to compare two IRMs that have mismatching types or other crucial parameters
 error IRMNotComparableException();
+
+/// @notice Thrown when withdrawing funds from a funding vault transfers an underlying amount to the credit account that is too small
+error FundingVaultWithdrawnAmountTooLowException();
 
 // -------------- //
 // CREDIT MANAGER //
@@ -172,6 +178,12 @@ error CreditAccountNotLiquidatableException();
 /// @notice Thrown if a liquidator tries to liquidate an account with loss but violates the loss policy
 error CreditAccountNotLiquidatableWithLossException();
 
+/// @notice Thrown if there is an attempt to force close an account with no debt
+error CreditAccountHasNoDebtException();
+
+/// @notice Thrown if there is an attempt to force close an account that is already in force closure
+error CreditAccountAlreadyInForceClosureException();
+
 /// @notice Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();
 
@@ -180,6 +192,9 @@ error BorrowAmountOutOfLimitsException();
 
 /// @notice Thrown if a user attempts to open an account via an expired credit facade
 error NotAllowedAfterExpirationException();
+
+/// @notice Thrown when attempting to open a credit account while borrowing is forbidden
+error BorrowingForbiddenException();
 
 /// @notice Thrown if expected balances are attempted to be set twice without performing a slippage check
 error ExpectedBalancesAlreadySetException();

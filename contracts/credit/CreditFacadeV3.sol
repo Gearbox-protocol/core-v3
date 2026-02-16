@@ -59,9 +59,6 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
-/// TODO: add ability to forbid borrowing
-/// TODO: add forced closure function
-
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
 ///         and implements the main entry-point for credit accounts management: multicall.
@@ -114,6 +111,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
     /// @notice Contract that enforces a policy on how liquidations with loss are performed
     address public override lossPolicy;
+
+    /// @notice When true, no new credit accounts can be opened. Set by pausable admin or automatically on lossy liquidation; cleared only by configurator.
+    bool public override borrowingForbidden;
 
     /// @dev Ensures that function caller is credit configurator
     modifier creditConfiguratorOnly() {
@@ -288,6 +288,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             if (!ILossPolicy(lossPolicy).isLiquidatableWithLoss(creditAccount, msg.sender, params)) {
                 revert CreditAccountNotLiquidatableWithLossException();
             }
+            borrowingForbidden = true;
+            emit ForbidBorrowing();
         }
 
         Balance[] memory initialBalances = BalancesLogic.storeBalances({
@@ -415,11 +417,22 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         _multicall(creditAccount, calls, botPermissions);
     }
 
-    /// TODO: consider debt limits
-
+    /// @notice Forces the closure of a credit account
+    /// @param creditAccount Account to force closure
+    /// @dev Reverts if caller is not matching engine
+    /// @dev Reverts if `creditAccount` is not opened in connected credit manager
+    /// @dev Reverts if account has no debt or is alreadt being force closed
     function forceClosure(address creditAccount) external override matchingEngineOnly nonReentrant {
-        ICreditManagerV3(creditManager).forceClosure(creditAccount);
+        _getBorrowerOrRevert(creditAccount);
 
+        CollateralDebtData memory cdd =
+            ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.GENERIC_PARAMS);
+        if (cdd.debt == 0) revert CreditAccountHasNoDebtException();
+
+        (, uint40 forcedClosureTimestamp) = ICreditManagerV3(creditManager).maturityTimestamps(creditAccount);
+        if (forcedClosureTimestamp != type(uint40).max) revert CreditAccountAlreadyInForceClosureException();
+
+        ICreditManagerV3(creditManager).forceClosure(creditAccount);
         emit ForceClosure(creditAccount);
     }
 
@@ -590,6 +603,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     function _manageDebt(address creditAccount, uint256 amount, ManageDebtAction action) internal {
         if (amount == 0) revert AmountCantBeZeroException(); // U:[FA-27,31]
 
+        if (action == ManageDebtAction.INCREASE_DEBT && borrowingForbidden) revert BorrowingForbiddenException();
+
         (uint256 newDebt,,) = ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, action);
 
         _revertIfOutOfDebtLimits(newDebt, action);
@@ -712,6 +727,19 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
 
     {
         lossPolicy = newLossPolicy; // U:[FA-51]
+    }
+
+    /// @notice Sets the borrowing forbidden flag
+    /// @param forbidden New flag value
+    /// @dev Reverts if caller is not credit configurator
+    function setBorrowingForbidden(bool forbidden) external override creditConfiguratorOnly {
+        if (borrowingForbidden == forbidden) return;
+        borrowingForbidden = forbidden;
+        if (forbidden) {
+            emit ForbidBorrowing();
+        } else {
+            emit AllowBorrowing();
+        }
     }
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role

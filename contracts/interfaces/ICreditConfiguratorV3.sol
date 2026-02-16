@@ -129,4 +129,8 @@ interface ICreditConfiguratorV3 is IVersion, IACLTrait, ICreditConfiguratorV3Eve
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt) external;
 
     function setLossPolicy(address newLossPolicy) external;
+
+    function forbidBorrowing() external;
+
+    function allowBorrowing() external;
 }

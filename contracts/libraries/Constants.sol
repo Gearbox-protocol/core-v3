@@ -13,10 +13,9 @@ uint256 constant WAD = 1e18;
 uint256 constant RAY = 1e27;
 uint16 constant PERCENTAGE_FACTOR = 1e4;
 
+uint256 constant FORCE_CLOSURE_GRACE_PERIOD = 7 days;
+
 uint256 constant SECONDS_PER_YEAR = 365 days;
-uint256 constant EPOCH_LENGTH = 7 days;
-uint256 constant FIRST_EPOCH_TIMESTAMP = 1702900800;
-uint256 constant EPOCHS_TO_WITHDRAW = 4;
 
 uint8 constant MAX_SANE_ENABLED_TOKENS = 20;
 uint256 constant MAX_SANE_EPOCH_LENGTH = 28 days;
