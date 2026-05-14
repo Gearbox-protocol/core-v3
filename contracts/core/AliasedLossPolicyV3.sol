@@ -66,7 +66,7 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     }
 
     /// @notice Contract version
-    uint256 public constant override version = 3_10;
+    uint256 public constant override version = 3_11;
 
     /// @notice Contract type
     bytes32 public constant override contractType = "LOSS_POLICY::ALIASED";
@@ -122,6 +122,7 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     /// @custom:tests U:[ALP-4], U:[ALP-5]
     function isLiquidatableWithLoss(address creditAccount, address caller, Params calldata params)
         external
+        view
         override
         returns (bool)
     {
