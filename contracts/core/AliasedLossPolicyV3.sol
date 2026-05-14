@@ -130,8 +130,6 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
         if (accessMode_ == AccessMode.Permissioned && !_hasRole("LOSS_LIQUIDATOR", caller)) return false;
         if (!checksEnabled) return true;
 
-        _updatePrices(params.extraData);
-
         return _adjustForAliases(creditAccount, params.twvUSD) < params.totalDebtUSD;
     }
 
@@ -230,22 +228,14 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     // INTERNALS //
     // --------- //
 
-    /// @dev If provided non-empty `data`, updates prices in the price feed store
-    /// @custom:tests U:[ALP-5]
-    function _updatePrices(bytes calldata data) internal {
-        if (data.length == 0) return;
-        PriceUpdate[] memory priceUpdates = abi.decode(data, (PriceUpdate[]));
-        IPriceFeedStore(priceFeedStore).updatePrices(priceUpdates);
-    }
-
     /// @dev Adjusts credit account's TWV for difference between normal and alias price feeds
     /// @custom:tests U:[ALP-7]
     function _adjustForAliases(address creditAccount, uint256 twvUSD) internal view returns (uint256 twvUSDAliased) {
         SharedInfo memory sharedInfo = _getSharedInfo(creditAccount);
         twvUSDAliased = twvUSD;
 
-        uint256 remainingTokensMask =
-            ICreditManagerV3(sharedInfo.creditManager).enabledTokensMaskOf(creditAccount).disable(UNDERLYING_TOKEN_MASK);
+        uint256 remainingTokensMask = ICreditManagerV3(sharedInfo.creditManager).enabledTokensMaskOf(creditAccount)
+            .disable(UNDERLYING_TOKEN_MASK);
         while (remainingTokensMask != 0) {
             uint256 tokenMask = remainingTokensMask.lsbMask();
             remainingTokensMask ^= tokenMask;
