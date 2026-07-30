@@ -10,7 +10,8 @@ import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
 import {IDefaultAccountFactoryV3} from "../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
-    MasterCreditAccountAlreadyDeployedException
+    MasterCreditAccountAlreadyDeployedException,
+    NotImplementedException
 } from "../interfaces/IExceptions.sol";
 
 /// @title Default account factory V3
@@ -49,8 +50,10 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3 {
         emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2]
     }
 
-    /// @dev Account reuse is no longer supported. No-op is kept for `IAccountFactory` / CreditManager compatibility.
-    function returnCreditAccount(address) external override {}
+    /// @dev Account reuse is no longer supported, so closing credit accounts is disabled to avoid stranding funds.
+    function returnCreditAccount(address) external pure virtual override {
+        revert NotImplementedException();
+    }
 
     // ------------- //
     // CONFIGURATION //

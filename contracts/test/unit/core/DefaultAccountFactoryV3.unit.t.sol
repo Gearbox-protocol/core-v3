@@ -9,7 +9,8 @@ import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {IDefaultAccountFactoryV3Events} from "../../../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
-    MasterCreditAccountAlreadyDeployedException
+    MasterCreditAccountAlreadyDeployedException,
+    NotImplementedException
 } from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
@@ -58,8 +59,9 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
         );
     }
 
-    /// @notice U:[AF-3]: `returnCreditAccount` is a no-op
-    function test_U_AF_03_returnCreditAccount_is_noop(address caller, address creditAccount) public {
+    /// @notice U:[AF-3]: `returnCreditAccount` is not supported
+    function test_U_AF_03_returnCreditAccount_reverts(address caller, address creditAccount) public {
+        vm.expectRevert(NotImplementedException.selector);
         vm.prank(caller);
         accountFactory.returnCreditAccount(creditAccount);
     }
