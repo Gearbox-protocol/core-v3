@@ -14,7 +14,12 @@ interface IDefaultAccountFactoryV3Events {
 
     /// @notice Emitted when new credit manager is added to the factory
     event AddCreditManager(address indexed creditManager, address masterCreditAccount);
+
+    /// @notice Emitted when the DAO performs a proxy call from Credit Account to rescue funds
+    event Rescue(address indexed creditAccount, address indexed target, bytes data);
 }
 
 /// @title Default account factory V3 interface
-interface IDefaultAccountFactoryV3 is IAccountFactory, IDefaultAccountFactoryV3Events {}
+interface IDefaultAccountFactoryV3 is IAccountFactory, IDefaultAccountFactoryV3Events {
+    function rescue(address creditAccount, address target, bytes calldata data) external;
+}

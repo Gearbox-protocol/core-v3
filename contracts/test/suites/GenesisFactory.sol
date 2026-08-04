@@ -7,7 +7,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
-import {DefaultAccountFactoryV3Mock} from "../mocks/core/DefaultAccountFactoryV3Mock.sol";
 import {LossPolicyMock} from "../mocks/core/LossPolicyMock.sol";
 import {DefaultAccountFactoryV3} from "../../core/DefaultAccountFactoryV3.sol";
 import {GearStakingV3} from "../../core/GearStakingV3.sol";
@@ -37,7 +36,7 @@ contract GenesisFactory is Ownable {
 
         priceOracle = new PriceOracleV3(address(acl));
         lossPolicy = new LossPolicyMock();
-        accountFactory = new DefaultAccountFactoryV3Mock(address(acl));
+        accountFactory = new DefaultAccountFactoryV3(address(acl));
         botList = new BotListV3(address(acl));
         priceFeedStore = IPriceFeedStore(acl.getAddressOrRevert(AP_PRICE_FEED_STORE, 0));
 

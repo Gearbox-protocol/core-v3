@@ -4,21 +4,26 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {IDefaultAccountFactoryV3} from "../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
     MasterCreditAccountAlreadyDeployedException,
-    NotImplementedException
+    CreditAccountIsInUseException
 } from "../interfaces/IExceptions.sol";
+import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
+
+import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
 /// @title Default account factory V3
 /// @notice Credit accounts factory.
 ///         - Account deployment is cheap thanks to the clones proxy pattern
 ///         - Each take deploys a new credit account
-contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3 {
+contract DefaultAccountFactoryV3 is Ownable, IDefaultAccountFactoryV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_11;
 
@@ -29,8 +34,12 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3 {
     mapping(address => address) internal _masterCreditAccounts;
 
     /// @notice Constructor
-    /// @dev `addressProvider` is unused and retained for deployment ABI compatibility
-    constructor(address) {}
+    /// @param addressProvider_ Address provider contract address
+    constructor(address addressProvider_) {
+        transferOwnership(
+            IAddressProvider(addressProvider_).getAddressOrRevert(AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL)
+        );
+    }
 
     /// @notice Empty state serialization
     function serialize() external view override returns (bytes memory) {}
@@ -51,9 +60,7 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3 {
     }
 
     /// @dev Account reuse is no longer supported, so closing credit accounts is disabled to avoid stranding funds.
-    function returnCreditAccount(address) external pure virtual override {
-        revert NotImplementedException();
-    }
+    function returnCreditAccount(address) external pure virtual override {}
 
     // ------------- //
     // CONFIGURATION //
@@ -68,5 +75,28 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3 {
         address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4B]
         _masterCreditAccounts[creditManager] = masterCreditAccount; // U:[AF-4B]
         emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4B]
+    }
+
+    /// @notice Executes function call from the account to the target contract with provided data,
+    ///         can only be called by configurator when account is not in use by anyone.
+    ///         Allows to rescue funds that were accidentally left on the account upon closure.
+    /// @param creditAccount Credit account to execute the call from
+    /// @param target Contract to call
+    /// @param data Data to call the target contract with
+    function rescue(address creditAccount, address target, bytes calldata data)
+        external
+        override
+        onlyOwner // U:[AF-1]
+
+    {
+        address creditManager = CreditAccountV3(creditAccount).creditManager();
+
+        (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
+        if (borrower != address(0)) {
+            revert CreditAccountIsInUseException(); // U:[AF-5A]
+        }
+
+        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5B]
+        emit Rescue(creditAccount, target, data); // U:[AF-5B]
     }
 }
