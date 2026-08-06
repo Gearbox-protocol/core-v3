@@ -59,7 +59,7 @@ contract DefaultAccountFactoryV3 is Ownable, IDefaultAccountFactoryV3 {
         emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2]
     }
 
-    /// @dev Account reuse is no longer supported, so closing credit accounts is disabled to avoid stranding funds.
+    /// @dev Account reuse is no longer supported, so this function is a no-op.
     function returnCreditAccount(address) external pure virtual override {}
 
     // ------------- //
