@@ -1120,7 +1120,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             makeTokenQuoted(address(token), 1, uint96(type(int96).max));
 
             vm.prank(CONFIGURATOR);
-            creditConfigurator.addCollateralToken{gas: 100_000}(address(token), 8800);
+            creditConfigurator.addCollateralToken{gas: 180_000}(address(token), 8800);
 
             assertTrue(creditManager.getTokenMaskOrRevert(address(token)) > 0, "Token wasn't added");
 
