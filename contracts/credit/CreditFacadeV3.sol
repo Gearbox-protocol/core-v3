@@ -431,7 +431,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             enabledTokensMask: cdd.enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
+            // A phantom-token withdrawal routes an adapter call into an
+            // external contract whose state a main price feed can read. The
+            // multicall path reacts by switching the final check to safe
+            // prices; this path captured the same flags but discarded them.
+            // Honour the flag here too.
+            useSafePrices: flags & USE_SAFE_PRICES_FLAG != 0
         }); // U:[FA-16]
 
         emit PartiallyLiquidateCreditAccount(creditAccount, token, msg.sender, repaidAmount, seizedAmount, feeAmount); // U:[FA-16]
