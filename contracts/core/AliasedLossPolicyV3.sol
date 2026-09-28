@@ -66,10 +66,14 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     }
 
     /// @notice Contract version
-    uint256 public constant override version = 3_10;
+    function version() external view virtual override returns (uint256) {
+        return 3_11;
+    }
 
     /// @notice Contract type
-    bytes32 public constant override contractType = "LOSS_POLICY::ALIASED";
+    function contractType() external view virtual override returns (bytes32) {
+        return "LOSS_POLICY::ALIASED";
+    }
 
     /// @notice Pool for which the loss policy is applied
     address public immutable override pool;
@@ -108,7 +112,7 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
 
     /// @notice Serializes the loss policy state
     /// @custom:tests U:[ALP-1], U:[ALP-2], U:[ALP-3]
-    function serialize() external view override returns (bytes memory) {
+    function serialize() external view virtual override returns (bytes memory) {
         address[] memory tokens = _tokensWithAliasSet.values();
         uint256 numTokens = tokens.length;
         PriceFeedParams[] memory priceFeedParams = new PriceFeedParams[](numTokens);
@@ -121,7 +125,8 @@ contract AliasedLossPolicyV3 is ACLTrait, PriceFeedValidationTrait, IAliasedLoss
     /// @notice Returns whether `creditAccount` can be liquidated with loss by `caller`
     /// @custom:tests U:[ALP-4], U:[ALP-5]
     function isLiquidatableWithLoss(address creditAccount, address caller, Params calldata params)
-        external
+        public
+        virtual
         override
         returns (bool)
     {

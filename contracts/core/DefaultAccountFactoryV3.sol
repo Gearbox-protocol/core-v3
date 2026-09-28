@@ -12,52 +12,26 @@ import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {IDefaultAccountFactoryV3} from "../interfaces/IDefaultAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
-    CreditAccountIsInUseException,
-    MasterCreditAccountAlreadyDeployedException
+    MasterCreditAccountAlreadyDeployedException,
+    CreditAccountIsInUseException
 } from "../interfaces/IExceptions.sol";
 import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
 
 import {AP_INSTANCE_MANAGER_PROXY, NO_VERSION_CONTROL} from "../libraries/Constants.sol";
 
-/// @dev Struct holding factory and queue params for a credit manager
-/// @param masterCreditAccount Address of the contract to clone to create new accounts for the credit manager
-/// @param head Index of the next credit account to be taken from the queue in case it's already reusable
-/// @param tail Index of the last credit account returned to the queue
-struct FactoryParams {
-    address masterCreditAccount;
-    uint40 head;
-    uint40 tail;
-}
-
-/// @dev Struct holding queued credit account address and timestamp after which it becomes reusable
-struct QueuedAccount {
-    address creditAccount;
-    uint40 reusableAfter;
-}
-
 /// @title Default account factory V3
-/// @notice Reusable credit accounts factory.
+/// @notice Credit accounts factory.
 ///         - Account deployment is cheap thanks to the clones proxy pattern
-///         - Accounts are reusable: new accounts are only deployed when the queue of reusable accounts is empty
-///           (a separate queue is maintained for each credit manager)
-///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
-///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
-///           as protection against potential attacks involving reopening an account right after closing it
-contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
+///         - Each take deploys a new credit account
+contract DefaultAccountFactoryV3 is Ownable, IDefaultAccountFactoryV3 {
     /// @notice Contract version
-    uint256 public constant override version = 3_10;
+    uint256 public constant override version = 3_11;
 
     /// @notice Contract type
     bytes32 public constant override contractType = "ACCOUNT_FACTORY::DEFAULT";
 
-    /// @notice Delay after which returned credit accounts can be reused
-    uint40 public constant override delay = 3 days;
-
-    /// @dev Mapping credit manager => factory params
-    mapping(address => FactoryParams) internal _factoryParams;
-
-    /// @dev Mapping (credit manager, index) => queued account
-    mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
+    /// @dev Mapping credit manager => master credit account used for cloning
+    mapping(address => address) internal _masterCreditAccounts;
 
     /// @notice Constructor
     /// @param addressProvider_ Address provider contract address
@@ -70,52 +44,23 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
     /// @notice Empty state serialization
     function serialize() external view override returns (bytes memory) {}
 
-    /// @notice Provides a reusable credit account from the queue to the credit manager.
-    ///         If there are no accounts that can be reused in the queue, deploys a new one.
+    /// @notice Deploys a new credit account for the calling credit manager
     /// @return creditAccount Address of the provided credit account
     /// @dev Parameters are ignored and only kept for backward compatibility
     /// @custom:expects Credit manager sets account's borrower to non-zero address after calling this function
     function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
-        FactoryParams storage fp = _factoryParams[msg.sender];
-
-        address masterCreditAccount = fp.masterCreditAccount;
+        address masterCreditAccount = _masterCreditAccounts[msg.sender];
         if (masterCreditAccount == address(0)) {
             revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
-        uint256 head = fp.head;
-        if (head == fp.tail || block.timestamp < _queuedAccounts[msg.sender][head].reusableAfter) {
-            creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2A]
-            emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A]
-        } else {
-            creditAccount = _queuedAccounts[msg.sender][head].creditAccount; // U:[AF-2B]
-            delete _queuedAccounts[msg.sender][head]; // U:[AF-2B]
-            unchecked {
-                ++fp.head; // U:[AF-2B]
-            }
-        }
-
-        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A,2B]
+        creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2]
+        emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2]
+        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2]
     }
 
-    /// @notice Returns a used credit account to the queue
-    /// @param creditAccount Address of the returned credit account
-    /// @custom:expects Credit account is connected to the calling credit manager
-    /// @custom:expects Credit manager sets account's borrower to zero-address before calling this function
-    function returnCreditAccount(address creditAccount) external override {
-        FactoryParams storage fp = _factoryParams[msg.sender];
-
-        if (fp.masterCreditAccount == address(0)) {
-            revert CallerNotCreditManagerException(); // U:[AF-1]
-        }
-
-        _queuedAccounts[msg.sender][fp.tail] =
-            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay}); // U:[AF-3]
-        unchecked {
-            ++fp.tail; // U:[AF-3]
-        }
-        emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-3]
-    }
+    /// @dev Account reuse is no longer supported, so this function is a no-op.
+    function returnCreditAccount(address) external pure virtual override {}
 
     // ------------- //
     // CONFIGURATION //
@@ -124,11 +69,11 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
     /// @notice Adds a credit manager to the factory and deploys the master credit account for it
     /// @param creditManager Credit manager address
     function addCreditManager(address creditManager) external override {
-        if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
+        if (_masterCreditAccounts[creditManager] != address(0)) {
             revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4A]
         }
         address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4B]
-        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4B]
+        _masterCreditAccounts[creditManager] = masterCreditAccount; // U:[AF-4B]
         emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4B]
     }
 
@@ -142,6 +87,7 @@ contract DefaultAccountFactoryV3 is IDefaultAccountFactoryV3, Ownable {
         external
         override
         onlyOwner // U:[AF-1]
+
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
 

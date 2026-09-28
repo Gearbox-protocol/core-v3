@@ -3,26 +3,16 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {DefaultAccountFactoryV3, FactoryParams, QueuedAccount} from "../../../core/DefaultAccountFactoryV3.sol";
+import {DefaultAccountFactoryV3} from "../../../core/DefaultAccountFactoryV3.sol";
 
 contract DefaultAccountFactoryV3Harness is DefaultAccountFactoryV3 {
     constructor(address addressProvider) DefaultAccountFactoryV3(addressProvider) {}
 
-    function queuedAccounts(address creditManager, uint256 index) external view returns (QueuedAccount memory) {
-        return _queuedAccounts[creditManager][index];
+    function masterCreditAccount(address creditManager) external view returns (address) {
+        return _masterCreditAccounts[creditManager];
     }
 
-    function setQueuedAccount(address creditManager, uint256 index, address creditAccount, uint40 reusableAfter)
-        external
-    {
-        _queuedAccounts[creditManager][index] = QueuedAccount(creditAccount, reusableAfter);
-    }
-
-    function factoryParams(address creditManager) external view returns (FactoryParams memory) {
-        return _factoryParams[creditManager];
-    }
-
-    function setFactoryParams(address creditManager, address masterCreditAccount, uint40 head, uint40 tail) external {
-        _factoryParams[creditManager] = FactoryParams(masterCreditAccount, head, tail);
+    function setMasterCreditAccount(address creditManager, address masterCreditAccount_) external {
+        _masterCreditAccounts[creditManager] = masterCreditAccount_;
     }
 }
