@@ -426,12 +426,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // U:[FA-16]
         _withdrawCollateral(creditAccount, underlying, feeAmount, treasury); // U:[FA-16]
         _withdrawCollateral(creditAccount, token, seizedAmount, to); // U:[FA-16]
+        // Multicall `withdrawCollateral` always ORs USE_SAFE_PRICES_FLAG after any withdrawal
+        // (including after a phantom withdraw whose adapter returned false). This path always
+        // withdraws fee + seized collateral, so the final check must use safe prices too.
         _fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: cdd.enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
+            useSafePrices: true
         }); // U:[FA-16]
 
         emit PartiallyLiquidateCreditAccount(creditAccount, token, msg.sender, repaidAmount, seizedAmount, feeAmount); // U:[FA-16]
