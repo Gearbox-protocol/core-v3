@@ -116,6 +116,13 @@ interface ICreditFacadeV3 is IVersion, IACLTrait, ICreditFacadeV3Events {
         payable
         returns (address creditAccount);
 
+    function openCreditAccount(
+        address onBehalfOf,
+        MultiCall[] calldata calls,
+        uint256 referralCode,
+        bytes calldata degenNFTData
+    ) external payable returns (address creditAccount);
+
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function liquidateCreditAccount(

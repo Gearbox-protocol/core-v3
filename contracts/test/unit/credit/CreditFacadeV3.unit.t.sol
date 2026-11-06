@@ -20,6 +20,8 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
+import {DegenNFTWithDataMock} from "../../mocks/token/DegenNFTWithDataMock.sol";
+import {IDegenNFTWithData} from "../../../interfaces/base/IDegenNFT.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
 import {LossPolicyMock} from "../../mocks/core/LossPolicyMock.sol";
@@ -400,6 +402,41 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 
+    /// @dev U:[FA-9A]: openCreditAccount with data reverts in whitelisted if user has no rights
+    function test_U_FA_09A_openCreditAccount_with_data_reverts_in_whitelisted_if_user_has_no_rights()
+        public
+        notExpirableCase
+    {
+        DegenNFTWithDataMock degenNFTWithDataMock = new DegenNFTWithDataMock();
+        creditFacade = new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(lossPolicyMock),
+            address(botListMock),
+            tokenTestSuite.addressOf(TOKEN_WETH),
+            address(degenNFTWithDataMock),
+            false
+        );
+        creditManagerMock.setCreditFacade(address(creditFacade));
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 2, 2);
+
+        bytes memory degenNFTData = abi.encode("opening-signature-data");
+
+        vm.expectRevert(ForbiddenInWhitelistedModeException.selector);
+        vm.prank(USER);
+        creditFacade.openCreditAccount({
+            onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0, degenNFTData: degenNFTData
+        });
+
+        vm.expectRevert(InsufficientBalanceException.selector);
+        vm.prank(USER);
+        creditFacade.openCreditAccount({
+            onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0, degenNFTData: degenNFTData
+        });
+    }
+
     /// @dev U:[FA-10]: openCreditAccount wokrs as expected
     function test_U_FA_10_openCreditAccount_works_as_expected() public notExpirableCase {
         address token = makeAddr("token");
@@ -439,6 +476,48 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
+    }
+
+    /// @dev U:[FA-10A]: openCreditAccount with data works as expected
+    function test_U_FA_10A_openCreditAccount_with_data_works_as_expected() public notExpirableCase {
+        DegenNFTWithDataMock degenNFTWithDataMock = new DegenNFTWithDataMock();
+        degenNFTWithDataMock.mint(USER, 1);
+
+        creditFacade = new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(lossPolicyMock),
+            address(botListMock),
+            tokenTestSuite.addressOf(TOKEN_WETH),
+            address(degenNFTWithDataMock),
+            false
+        );
+        creditManagerMock.setCreditFacade(address(creditFacade));
+
+        address expectedCreditAccount = DUMB_ADDRESS;
+        creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
+
+        bytes memory degenNFTData = abi.encode("opening-signature-data");
+
+        vm.expectCall(
+            address(degenNFTWithDataMock),
+            abi.encodeCall(IDegenNFTWithData.burn, (USER, 1, degenNFTData))
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit OpenCreditAccount(expectedCreditAccount, USER, USER, REFERRAL_CODE);
+
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount({
+            onBehalfOf: USER, calls: new MultiCall[](0), referralCode: REFERRAL_CODE, degenNFTData: degenNFTData
+        });
+
+        assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
+        assertEq(degenNFTWithDataMock.burnWithDataCalls(), 1, "Burn with data was not called");
+        assertEq(degenNFTWithDataMock.lastBurnFrom(), USER, "Incorrect burn from");
+        assertEq(degenNFTWithDataMock.lastBurnAmount(), 1, "Incorrect burn amount");
+        assertEq(degenNFTWithDataMock.lastBurnData(), degenNFTData, "Incorrect burn data");
+        assertEq(degenNFTWithDataMock.balances(USER), 0, "DegenNFT balance was not burned");
     }
 
     /// @dev U:[FA-11]: closeCreditAccount wokrs as expected

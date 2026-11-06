@@ -13,3 +13,7 @@ import {IStateSerializer} from "./IStateSerializer.sol";
 interface IDegenNFT is IVersion, IStateSerializer {
     function burn(address from, uint256 amount) external;
 }
+
+interface IDegenNFTWithData is IDegenNFT {
+    function burn(address from, uint256 amount, bytes calldata data) external;
+}

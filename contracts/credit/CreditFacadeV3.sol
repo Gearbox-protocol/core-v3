@@ -27,7 +27,7 @@ import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAddressProvider} from "../interfaces/base/IAddressProvider.sol";
-import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
+import {IDegenNFT, IDegenNFTWithData} from "../interfaces/base/IDegenNFT.sol";
 import {ILossPolicy} from "../interfaces/base/ILossPolicy.sol";
 import {IPhantomToken, IPhantomTokenWithdrawer} from "../interfaces/base/IPhantomToken.sol";
 import {IPriceFeedStore, PriceUpdate} from "../interfaces/base/IPriceFeedStore.sol";
@@ -77,7 +77,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     using MarketHelper for ICreditManagerV3;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_10;
+    uint256 public constant override version = 3_11;
 
     /// @notice Contract type
     bytes32 public constant override contractType = "CREDIT_FACADE";
@@ -195,12 +195,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    /// @notice Opens a new credit account
-    ///         - Wraps any ETH sent in the function call and sends it back to the caller
-    ///         - If Degen NFT is enabled, burns one from the caller
-    ///         - Opens an account in the credit manager
-    ///         - Performs a multicall (all calls allowed except debt decrease)
-    ///         - Runs the collateral check
+    /// @notice Opens a credit account.
+    /// @notice If DegenNFT is enabled, burns one and checks that the account owner is the caller.
     /// @param onBehalfOf Address on whose behalf to open the account
     /// @param calls List of calls to perform after opening the account
     /// @param referralCode Referral code to use for potential rewards, 0 if no referral code is provided
@@ -224,6 +220,51 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
             IDegenNFT(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
         }
 
+        creditAccount = _openCreditAccount(onBehalfOf, calls, referralCode);
+    }
+
+    /// @notice Opens a credit account with extra DegenNFT data.
+    /// @notice If DegenNFT is enabled, burns one and checks that the account owner is the caller.
+    /// @param onBehalfOf Address on whose behalf to open the account
+    /// @param calls List of calls to perform after opening the account
+    /// @param referralCode Referral code to use for potential rewards, 0 if no referral code is provided
+    /// @return creditAccount Address of the newly opened account
+    /// @dev Reverts if credit facade is paused or expired
+    /// @dev Reverts if `onBehalfOf` is not caller while Degen NFT is enabled
+    function openCreditAccount(
+        address onBehalfOf,
+        MultiCall[] calldata calls,
+        uint256 referralCode,
+        bytes calldata degenNFTData
+    )
+        external
+        payable
+        override
+        whenNotPaused // U:[FA-2]
+        whenNotExpired // U:[FA-3]
+        nonReentrant // U:[FA-4]
+        wrapETH // U:[FA-7]
+        returns (address creditAccount)
+    {
+        if (degenNFT != address(0)) {
+            if (msg.sender != onBehalfOf) {
+                revert ForbiddenInWhitelistedModeException(); // U:[FA-9A]
+            }
+            IDegenNFTWithData(degenNFT).burn(onBehalfOf, 1, degenNFTData); // U:[FA-10A]
+        }
+
+        creditAccount = _openCreditAccount(onBehalfOf, calls, referralCode);
+    }
+
+    /// @dev Opens a new credit account
+    ///         - Wraps any ETH sent in the function call and sends it back to the caller
+    ///         - Opens an account in the credit manager
+    ///         - Performs a multicall (all calls allowed except debt decrease)
+    ///         - Runs the collateral check
+    function _openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint256 referralCode)
+        internal
+        returns (address creditAccount)
+    {
         creditAccount = ICreditManagerV3(creditManager).openCreditAccount({onBehalfOf: onBehalfOf}); // U:[FA-10]
 
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, referralCode); // U:[FA-10]
