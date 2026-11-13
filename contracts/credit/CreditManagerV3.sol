@@ -57,7 +57,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_10;
+    uint256 public constant override version = 3_11;
 
     /// @notice Account factory contract address
     address public immutable override accountFactory;
@@ -357,9 +357,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-        if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-9]
-        }
 
         currentCreditAccountInfo.debt = 0; // U:[CM-8]
         currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
@@ -390,9 +387,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 newDebt, uint256, uint256)
     {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-        if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-12A]
-        }
+
         if (amount == 0) return (currentCreditAccountInfo.debt, 0, 0); // U:[CM-12B]
 
         uint256[] memory collateralHints;

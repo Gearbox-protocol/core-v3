@@ -151,7 +151,6 @@ contract MultiCallIntegrationTest is
     {
         (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
-        vm.roll(block.number + 1);
 
         address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
         tokenTestSuite.mint(TOKEN_USDC, USER, USDC_EXCHANGE_AMOUNT);
@@ -222,7 +221,6 @@ contract MultiCallIntegrationTest is
     {
         (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
-        vm.roll(block.number + 1);
 
         address usdcToken = tokenTestSuite.addressOf(TOKEN_USDC);
         tokenTestSuite.mint(TOKEN_USDC, USER, USDC_EXCHANGE_AMOUNT);
@@ -286,11 +284,10 @@ contract MultiCallIntegrationTest is
         );
     }
 
-    /// @dev I:[MC-8]: multicall reverts for decrease opeartion after increase one
-    function test_I_MC_08_multicall_reverts_for_decrease_opeartion_after_increase_one() public creditTest {
+    /// @dev I:[MC-8]: multicall allows decrease after increase in the same block
+    function test_I_MC_08_multicall_allows_decrease_after_increase_in_the_same_block() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
-
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
+        (uint256 debtBefore,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -306,6 +303,9 @@ contract MultiCallIntegrationTest is
                 })
             )
         );
+
+        (uint256 debtAfter,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(debtAfter, debtBefore, "Debt should be unchanged after increase+decrease");
     }
 
     /// @dev I:[MC-9]: multicall works with adapters calls as expected

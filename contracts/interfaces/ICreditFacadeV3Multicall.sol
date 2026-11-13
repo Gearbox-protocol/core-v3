@@ -101,7 +101,6 @@ interface ICreditFacadeV3Multicall {
     /// @notice Increases account's debt
     /// @param amount Underlying amount to borrow
     /// @dev Increasing debt is prohibited when closing an account
-    /// @dev Increasing debt is prohibited if it was previously updated in the same block
     /// @dev The resulting debt amount must be within allowed limits
     /// @dev Increasing debt is prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev After debt increase, total amount borrowed by the credit manager in the current block must not exceed
@@ -111,7 +110,6 @@ interface ICreditFacadeV3Multicall {
     /// @notice Decreases account's debt
     /// @param amount Underlying amount to repay, value above account's total debt indicates full repayment
     /// @dev Decreasing debt is prohibited when opening an account
-    /// @dev Decreasing debt is prohibited if it was previously updated in the same block
     /// @dev The resulting debt amount must be above allowed minimum or zero (maximum is not checked here
     ///      to allow small repayments and partial liquidations in case configurator lowers it)
     /// @dev Full repayment brings account into a special mode that skips collateral checks and thus requires

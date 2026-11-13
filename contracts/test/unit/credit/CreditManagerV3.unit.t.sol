@@ -1061,31 +1061,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
-    /// @dev U:[CM-9]: liquidate credit account reverts if called twice a block
-    function test_U_CM_09_liquidateCreditAccount_reverts_if_called_twice_a_block() public creditManagerTest {
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeperMock);
-        collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
-        collateralDebtData.accruedInterest = 0;
-        collateralDebtData.accruedFees = 0;
-        collateralDebtData.totalValue = DAI_ACCOUNT_AMOUNT * 2;
-        collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
-
-        address creditAccount = accountFactory.usedAccount();
-
-        tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
-
-        creditManager.setLastDebtUpdate({creditAccount: creditAccount, lastDebtUpdate: uint64(block.number)});
-
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-        creditManager.liquidateCreditAccount({
-            creditAccount: creditAccount,
-            collateralDebtData: collateralDebtData,
-            to: FRIEND,
-            isExpired: false
-        });
-    }
-
     // ----------- //
     // MANAGE DEBT //
     // ----------- //
@@ -1302,19 +1277,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: quotedTokensMask,
             action: ManageDebtAction.DECREASE_DEBT
         });
-    }
-
-    /// @dev U:[CM-12A]: manageDebt reverts if debt already updated in the same block
-    function test_U_CM_12A_manageDebt_reverts_if_debt_already_updated_in_the_same_block() public creditManagerTest {
-        address creditAccount = accountFactory.usedAccount();
-
-        creditManager.setLastDebtUpdate(creditAccount, uint64(block.number));
-
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-        creditManager.manageDebt(creditAccount, 1, 0, ManageDebtAction.INCREASE_DEBT);
-
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-        creditManager.manageDebt(creditAccount, 1, 0, ManageDebtAction.DECREASE_DEBT);
     }
 
     /// @dev U:[CM-12B]: manageDebt returns early if amount is zero
