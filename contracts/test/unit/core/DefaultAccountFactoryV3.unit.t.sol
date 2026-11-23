@@ -6,18 +6,18 @@ pragma solidity ^0.8.17;
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
-import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {IDefaultAccountFactoryV3Events} from "../../../interfaces/IDefaultAccountFactoryV3.sol";
+import {CreditAccountInfo} from "../../../interfaces/ICreditManagerV3.sol";
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
-    MasterCreditAccountAlreadyDeployedException,
-    RegisteredCreditManagerOnlyException
+    MasterCreditAccountAlreadyDeployedException
 } from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-import {DefaultAccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./DefaultAccountFactoryV3Harness.sol";
+import {DefaultAccountFactoryV3Harness} from "./DefaultAccountFactoryV3Harness.sol";
 
 /// @title Default account factory V3 unit test
 /// @notice U:[AF]: Unit tests for account factory
@@ -33,8 +33,6 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
 
         owner = accountFactory.owner();
         creditManager = makeAddr("CREDIT_MANAGER");
-
-        vm.prank(owner);
         accountFactory.addCreditManager(creditManager);
     }
 
@@ -45,10 +43,6 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
             vm.expectRevert(CallerNotCreditManagerException.selector);
             accountFactory.takeCreditAccount(0, 0);
         }
-        if (caller != creditManager) {
-            vm.expectRevert(CallerNotCreditManagerException.selector);
-            accountFactory.returnCreditAccount(address(0));
-        }
         if (caller != owner) {
             vm.expectRevert("Ownable: caller is not the owner");
             accountFactory.rescue(address(0), address(0), bytes(""));
@@ -56,19 +50,8 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
         vm.stopPrank();
     }
 
-    /// @notice U:[AF-2A]: `takeCreditAccount` works correctly when queue has no reusable accounts
-    function test_U_AF_02A_takeCreditAccount_works_correctly_when_queue_has_no_reusable_accounts(
-        uint40 head,
-        uint40 tail
-    ) public {
-        tail = uint40(bound(tail, 0, 512));
-        head = uint40(bound(head, 0, tail));
-        FactoryParams memory fp = accountFactory.factoryParams(creditManager);
-        accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
-        if (head < tail) {
-            accountFactory.setQueuedAccount(creditManager, head, address(0), uint40(block.timestamp + 1));
-        }
-
+    /// @notice U:[AF-2]: `takeCreditAccount` always deploys a new credit account
+    function test_U_AF_02_takeCreditAccount_deploys_new_credit_account() public {
         vm.expectEmit(false, true, false, false);
         emit DeployCreditAccount(address(0), creditManager);
 
@@ -81,48 +64,14 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
         assertNotEq(creditAccount, address(0), "Incorrect clone account");
         assertEq(CreditAccountV3(creditAccount).factory(), address(accountFactory), "Incorrect clone account's factory");
         assertEq(
-            CreditAccountV3(creditAccount).creditManager(), creditManager, "Incorrect cline deployed's creditManager"
+            CreditAccountV3(creditAccount).creditManager(), creditManager, "Incorrect clone account's creditManager"
         );
     }
 
-    /// @notice U:[AF-2B]: `takeCreditAccount` works correctly when queue has reusable accounts
-    function test_U_AF_02B_takeCreditAccount_works_correctly_when_queue_has_reusable_accounts(
-        address creditAccount,
-        uint40 head,
-        uint40 tail
-    ) public {
-        tail = uint40(bound(tail, 1, 512));
-        head = uint40(bound(head, 0, tail - 1));
-
-        FactoryParams memory fp = accountFactory.factoryParams(creditManager);
-        accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
-        accountFactory.setQueuedAccount(creditManager, head, creditAccount, uint40(block.timestamp - 1));
-
-        vm.expectEmit(true, true, false, false);
-        emit TakeCreditAccount(creditAccount, creditManager);
-
-        vm.prank(creditManager);
-        address result = accountFactory.takeCreditAccount(0, 0);
-
-        assertEq(result, creditAccount, "Incorrect creditAccount");
-        assertEq(accountFactory.factoryParams(creditManager).head, uint40(head) + 1, "Incorrect head");
-    }
-
-    /// @notice U:[AF-3]: `returnCreditAccount` works correctly
-    function test_U_AF_03_returnCreditAccount_works_correctly(address creditAccount, uint8 tail) public {
-        FactoryParams memory fp = accountFactory.factoryParams(creditManager);
-        accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, fp.head, tail);
-
-        vm.expectEmit(true, true, false, false);
-        emit ReturnCreditAccount(creditAccount, creditManager);
-
-        vm.prank(creditManager);
+    /// @notice U:[AF-3]: `returnCreditAccount` is a no-op
+    function test_U_AF_03_returnCreditAccount_is_noop(address caller, address creditAccount) public {
+        vm.prank(caller);
         accountFactory.returnCreditAccount(creditAccount);
-
-        QueuedAccount memory qa = accountFactory.queuedAccounts(creditManager, tail);
-        assertEq(qa.creditAccount, creditAccount, "Incorrect creditAccount");
-        assertEq(qa.reusableAfter, uint40(block.timestamp + 3 days), "Incorrect reusableAfter");
-        assertEq(accountFactory.factoryParams(creditManager).tail, uint40(tail) + 1, "Incorrect tail");
     }
 
     /// @notice U:[AF-4A]: `addCreditManager` reverts on already added credit manager
@@ -132,10 +81,9 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
     ) public {
         vm.assume(manager != creditManager && creditAccount != address(0));
 
-        accountFactory.setFactoryParams(manager, creditAccount, 0, 0);
+        accountFactory.setMasterCreditAccount(manager, creditAccount);
 
         vm.expectRevert(MasterCreditAccountAlreadyDeployedException.selector);
-        vm.prank(owner);
         accountFactory.addCreditManager(manager);
     }
 
@@ -146,10 +94,9 @@ contract DefaultAccountFactoryV3UnitTest is TestHelper, IDefaultAccountFactoryV3
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(manager, address(0));
 
-        vm.prank(owner);
         accountFactory.addCreditManager(manager);
 
-        address account = accountFactory.factoryParams(manager).masterCreditAccount;
+        address account = accountFactory.masterCreditAccount(manager);
         assertNotEq(account, address(0), "Incorrect master account");
         assertEq(CreditAccountV3(account).factory(), address(accountFactory), "Incorrect master account's factory");
         assertEq(CreditAccountV3(account).creditManager(), manager, "Incorrect master account's creditManager");

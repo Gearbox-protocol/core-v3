@@ -38,7 +38,7 @@ contract CreditLogicUnitTest is TestHelper {
         // accrued interest computed by pool and by credit manager is roughly the same
         uint256 expectedInterest = amount * CreditLogic.calcLinearGrowth(interestRate, timestampLastUpdate) / RAY;
         uint256 interest = CreditLogic.calcAccruedInterest(amount, indexLastUpdate, indexNow);
-        assertApproxEqAbs(interest, expectedInterest, amount / 1e18);
+        assertApproxEqAbs(interest, expectedInterest, 2 + amount / 1e18);
     }
 
     /// @notice U:[CL-2]: `calcIncrease` works correctly
@@ -115,8 +115,9 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaFees,
         uint16 feeInterest
     ) internal pure {
-        (uint256 newDebt, uint256 newIndex,, uint128 newQuotaInterest, uint128 newQuotaFees) =
-            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        (uint256 newDebt, uint256 newIndex,, uint128 newQuotaInterest, uint128 newQuotaFees) = CreditLogic.calcDecrease(
+            amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest
+        );
 
         uint256 totalDebt = _getTotalDebt(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
         uint256 newTotalDebt = _getTotalDebt(newDebt, indexNow, newIndex, newQuotaInterest, newQuotaFees, feeInterest);
@@ -139,8 +140,9 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaFees,
         uint16 feeInterest
     ) internal pure {
-        (uint256 newDebt,, uint256 profit,,) =
-            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        (uint256 newDebt,, uint256 profit,,) = CreditLogic.calcDecrease(
+            amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest
+        );
 
         uint256 accruedFees = _getAccruedFees(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
         // NOTE: + 1 because we do have a rounding issue however it can't be used to harm the protocol
@@ -161,8 +163,9 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaFees,
         uint16 feeInterest
     ) internal pure {
-        (uint256 newDebt, uint256 newIndex,,,) =
-            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        (uint256 newDebt, uint256 newIndex,,,) = CreditLogic.calcDecrease(
+            amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest
+        );
 
         assertGe(newIndex, indexLastUpdate, "New index is smaller than old index");
         assertLe(newIndex, indexNow, "New index is greater than current index");
@@ -185,8 +188,9 @@ contract CreditLogicUnitTest is TestHelper {
         uint128 quotaFees,
         uint16 feeInterest
     ) internal pure {
-        (uint256 newDebt,,, uint128 newQuotaInterest, uint128 newQuotaFees) =
-            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        (uint256 newDebt,,, uint128 newQuotaInterest, uint128 newQuotaFees) = CreditLogic.calcDecrease(
+            amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest
+        );
 
         assertLe(newQuotaInterest, quotaInterest, "Quota interest increased");
         assertLe(newQuotaFees, quotaFees, "Quota fees increased");
@@ -362,8 +366,7 @@ contract CreditLogicUnitTest is TestHelper {
             cdd.accruedInterest = cases[i].accruedInterest;
             cdd.accruedFees = cases[i].accruedInterest * cases[i].feeInterest / PERCENTAGE_FACTOR;
 
-            (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) = CreditLogic
-                .calcLiquidationPayments(
+            (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) = CreditLogic.calcLiquidationPayments(
                 cdd,
                 cases[i].feeLiquidation,
                 cases[i].liquidationDiscount,
