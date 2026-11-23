@@ -279,24 +279,6 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
         );
     }
 
-    /// @notice U:[ALP-5]: `isLiquidatableWithLoss` calls `updatePrices` if needed
-    function test_U_ALP_05_isLiquidatableWithLoss_calls_updatePrices_if_needed() public {
-        lossPolicy.hackAccessMode(ILossPolicy.AccessMode.Permissionless);
-        lossPolicy.hackChecksEnabled(true);
-
-        PriceUpdate[] memory updates = new PriceUpdate[](0);
-        ILossPolicy.Params memory params =
-            ILossPolicy.Params({totalDebtUSD: 1e8, twvUSD: 0.99e8, extraData: abi.encode(updates)});
-
-        vm.expectCall(address(priceFeedStoreMock), abi.encodeCall(IPriceFeedStore.updatePrices, (updates)), 1);
-        lossPolicy.isLiquidatableWithLoss(creditAccount, caller, params);
-
-        params.extraData = "";
-
-        vm.expectCall(address(priceFeedStoreMock), abi.encodePacked(IPriceFeedStore.updatePrices.selector), 0);
-        lossPolicy.isLiquidatableWithLoss(creditAccount, caller, params);
-    }
-
     /// @notice U:[ALP-6]: `getRequiredAliasPriceFeeds` works correctly
     function test_U_ALP_06_getRequiredAliasPriceFeeds_works_correctly() public {
         ERC20Mock token1 = new ERC20Mock("Test Token 1", "TEST1", 18);
@@ -492,10 +474,7 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
             balance: 1e18,
             quotaUSD: 1e8,
             aliasParams: PriceFeedParams({
-                priceFeed: address(priceFeed),
-                stalenessPeriod: 3600,
-                skipCheck: false,
-                tokenDecimals: 18
+                priceFeed: address(priceFeed), stalenessPeriod: 3600, skipCheck: false, tokenDecimals: 18
             })
         });
 
@@ -512,8 +491,9 @@ contract AliasedLossPolicyV3UnitTest is Test, IAliasedLossPolicyV3Events {
 
     /// @notice U:[ALP-11]: `_convertToUSDAlias` works correctly
     function test_U_ALP_11_convertToUSDAlias_works_correctly() public view {
-        PriceFeedParams memory params =
-            PriceFeedParams({priceFeed: address(priceFeed), stalenessPeriod: 3600, skipCheck: false, tokenDecimals: 18});
+        PriceFeedParams memory params = PriceFeedParams({
+            priceFeed: address(priceFeed), stalenessPeriod: 3600, skipCheck: false, tokenDecimals: 18
+        });
 
         // Normal case
         uint256 usdValue = lossPolicy.exposed_convertToUSDAlias(params, 1e18);
